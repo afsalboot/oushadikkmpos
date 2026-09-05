@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createConnectionManager } from "../src/lib/db-connection.js";
 import { bootstrapAllowed } from "../src/lib/bootstrap.js";
 import { readBackupSnapshot } from "../src/lib/backup-snapshot.js";
-import { validateProductionEnv } from "../src/lib/production-env.js";
+import { validateProductionEnv } from "../src/lib/production-env.mjs";
 
 test("failed database connection can retry and concurrent callers share a connection", async () => {
   const previous = process.env.MONGODB_URI;

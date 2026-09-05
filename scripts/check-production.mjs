@@ -1,5 +1,5 @@
 import nextEnv from "@next/env";
-import { validateProductionEnv } from "../src/lib/production-env.js";
+import { validateProductionEnv } from "../src/lib/production-env.mjs";
 
 nextEnv.loadEnvConfig(process.cwd(), false);
 const errors = validateProductionEnv(process.env);

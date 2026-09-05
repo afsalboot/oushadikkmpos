@@ -12,6 +12,10 @@ Use a supported Node.js LTS release compatible with Next.js 16 (Node 22 or 24), 
 
 ## Traffic and monitoring
 
+The owner can change the archive folder in **Settings > Backups > Backup storage location**, then click **Save Changes**. Enter an absolute path on the POS server, including a mounted external drive or network share if the server account can access it. Saving creates the directory if needed and verifies read/write/delete access with a temporary probe file. The saved setting overrides `BACKUP_DIR`; blank uses `BACKUP_DIR` again. Keep `BACKUP_DIR` configured as the production startup fallback. Settings reset also returns to this fallback. Other server processes refresh cached settings within 30 seconds.
+
+Changing folders does not migrate or delete archives. The history lists the active folder; switch back to access previous archives or retain downloaded copies. Browser downloads still use the browser's download location. A backup already running can finish in its previously selected folder. Restoring an archive also restores its saved Settings, including its backup directory; verify that location after a restore.
+
 The built-in login limiter is process-local. It combines a 30-attempt source limit with a five-attempt source/email limit per 15 minutes. By default it uses a shared source bucket because arbitrary client IP headers are untrusted. Set `TRUST_PROXY_HEADERS=true` only if the upstream proxy strips and overwrites incoming `X-Forwarded-For`, `CF-Connecting-IP`, and `X-Real-IP` headers and direct access to Node is blocked. Multiple processes or replicas require additional shared rate limiting at the gateway. Process restarts reset local counters.
 
 `GET /api/health` checks HTTP liveness only; it does not prove database readiness. Monitor application errors, database availability, request latency, storage space, and backup freshness separately. API responses are marked private/no-store.

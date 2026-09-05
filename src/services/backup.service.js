@@ -1,3 +1,4 @@
+import {resolveBackupDirectory} from "../lib/backup-storage.js";
 import {readBackupSnapshot} from "../lib/backup-snapshot.js";
 import {createCipheriv,createDecipheriv,createHash,randomBytes,scryptSync} from "node:crypto";
 import {mkdir,readdir,readFile,rename,stat,writeFile} from "node:fs/promises";
@@ -13,7 +14,7 @@ const FILE_PATTERN=/^oushadi-(manual|auto)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.
 const models={users:User,staffRoles:StaffRole,categories:Category,products:Product,inventoryBatches:InventoryBatch,stockTransactions:StockTransaction,settings:Settings,customers:Customer,sales:Sale,suppliers:Supplier,purchases:Purchase,expenses:Expense,expenseCategories:ExpenseCategory,documentCounters:DocumentCounter,auditLogs:AuditLog};
 function nextAutomaticDate(value,frequency){const next=new Date(value);if(frequency==="MONTHLY")next.setUTCMonth(next.getUTCMonth()+1);else next.setUTCDate(next.getUTCDate()+(frequency==="WEEKLY"?7:1));return next;}
 
-function backupDirectory(){return path.resolve(/* turbopackIgnore: true */ process.env.BACKUP_DIR||path.join(process.cwd(),"backups"));}
+async function backupDirectory(){const settings=await getSettings();return resolveBackupDirectory(settings.backup.directory);}
 function encryptionSecret(){return process.env.BACKUP_ENCRYPTION_KEY||"";}
 function decryptionSecrets(){return [...new Set([process.env.BACKUP_ENCRYPTION_KEY,process.env.JWT_SECRET].filter(Boolean))];}
 function safeName(name){if(!FILE_PATTERN.test(String(name||"")))throw new Error("Invalid backup file");return name;}
@@ -21,7 +22,7 @@ function fileName(type,date=new Date()){return `oushadi-${type}-${date.toISOStri
 function actorId(actor){return actor?.sub||undefined;}
 function serializeError(error){return String(error?.message||error).slice(0,500);}
 
-async function ensureDirectory(){const directory=backupDirectory();await mkdir(/* turbopackIgnore: true */ directory,{recursive:true});return directory;}
+async function ensureDirectory(){const directory=await backupDirectory();await mkdir(/* turbopackIgnore: true */ directory,{recursive:true});return directory;}
 
 async function snapshot(){const session=await mongoose.startSession();try{const collections=await readBackupSnapshot(models,session),counts=Object.fromEntries(Object.entries(collections).map(([name,rows])=>[name,rows.length]));const payload={format:FORMAT,version:VERSION,createdAt:new Date().toISOString(),database:collections};const json=JSON.stringify(payload);return{json,counts,checksum:createHash("sha256").update(json).digest("hex")};}finally{await session.endSession();}}
 
@@ -41,7 +42,7 @@ export async function readBackup(name){const file=safeName(name);return readFile
 
 export async function restoreBackup(archive,actor){if(global.oushadiRestoreInProgress)throw new Error("Another database restore is already running");global.oushadiRestoreInProgress=true;let session;try{await connectDb();const payload=decryptArchive(archive),safetyBackup=await createBackup({type:"manual",actor});session=await mongoose.startSession();await session.withTransaction(async()=>{for(const Model of Object.values(models))await Model.deleteMany({}).session(session);for(const[name,Model]of Object.entries(models)){const rows=payload.database[name];if(rows.length)await Model.insertMany(rows,{session,ordered:true});}await AuditLog.create([{actorId:actorId(actor),action:"BACKUP_RESTORED",module:"backup",targetType:"Backup",description:"Database restored from encrypted backup",metadata:{sourceCreatedAt:payload.createdAt,safetyBackup:safetyBackup.name}}],{session});},{readConcern:{level:"snapshot"},writeConcern:{w:"majority"}});invalidateSettingsCache();return{restored:true,sourceCreatedAt:payload.createdAt,safetyBackup:safetyBackup.name,counts:Object.fromEntries(Object.entries(payload.database).map(([name,rows])=>[name,rows.length]))};}finally{global.oushadiRestoreInProgress=false;if(session)await session.endSession();}}
 
-export async function getBackupStatus({runDue=true}={}){if(runDue)await runDueAutomaticBackup();const settings=await getSettings(),backups=await listBackups(),automatic=backups.filter((item)=>item.type==="AUTOMATIC"),last=backups[0]||null,lastAutomatic=automatic[0]||null,frequency=settings.backup.frequency;return{configured:Boolean(encryptionSecret()),keySource:process.env.BACKUP_ENCRYPTION_KEY?"BACKUP_ENCRYPTION_KEY":null,directory:backupDirectory(),automaticEnabled:settings.backup.automaticEnabled,frequency,lastBackup:last,lastAutomaticBackup:lastAutomatic,nextAutomaticAt:settings.backup.automaticEnabled?(lastAutomatic?nextAutomaticDate(lastAutomatic.createdAt,frequency):new Date()).toISOString():null,backups};}
+export async function getBackupStatus({runDue=true}={}){if(runDue)await runDueAutomaticBackup();const settings=await getSettings(),backups=await listBackups(),automatic=backups.filter((item)=>item.type==="AUTOMATIC"),last=backups[0]||null,lastAutomatic=automatic[0]||null,frequency=settings.backup.frequency;return{configured:Boolean(encryptionSecret()),keySource:process.env.BACKUP_ENCRYPTION_KEY?"BACKUP_ENCRYPTION_KEY":null,directory:await backupDirectory(),automaticEnabled:settings.backup.automaticEnabled,frequency,lastBackup:last,lastAutomaticBackup:lastAutomatic,nextAutomaticAt:settings.backup.automaticEnabled?(lastAutomatic?nextAutomaticDate(lastAutomatic.createdAt,frequency):new Date()).toISOString():null,backups};}
 
 let automaticRun=global.oushadiAutomaticBackupRun||null;
 export async function runDueAutomaticBackup(){if(global.oushadiRestoreInProgress)return null;if(automaticRun)return automaticRun;automaticRun=(async()=>{try{await connectDb();const settings=await getSettings();if(!settings.backup.automaticEnabled||!encryptionSecret())return null;const automatic=(await listBackups()).filter((item)=>item.type==="AUTOMATIC"),last=automatic[0];if(last&&Date.now()<nextAutomaticDate(last.createdAt,settings.backup.frequency).getTime())return null;return await createBackup({type:"auto"});}catch(error){try{await connectDb();await audit("BACKUP_FAILED","Automatic backup failed",{error:serializeError(error)});}catch{}return null;}finally{automaticRun=null;global.oushadiAutomaticBackupRun=null;}})();global.oushadiAutomaticBackupRun=automaticRun;return automaticRun;}
