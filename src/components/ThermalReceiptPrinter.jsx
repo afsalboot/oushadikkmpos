@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Printer } from "lucide-react";
+import OushadhiLogo from "@/components/branding/OushadhiLogo";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -45,7 +46,7 @@ export function ThermalReceipt({ sale }) {
   return (
     <div className="thermal-receipt">
       <header className="receipt-center">
-        <h1>{sale.storeSnapshot?.name || "Oushadi POS"}</h1>
+        <div className="receipt-wordmark"><OushadhiLogo showPos={false} className="!text-black" /></div>
         {sale.storeSnapshot?.address && <p>{sale.storeSnapshot.address}</p>}
         {sale.storeSnapshot?.phone && <p>{sale.storeSnapshot.phone}</p>}
         {showGst && sale.storeSnapshot?.gstin && (
@@ -101,7 +102,6 @@ export function ThermalReceipt({ sale }) {
       <footer className="receipt-center">
         <strong>Thank you for your purchase</strong>
         <p>വീണ്ടും സന്ദർശിക്കുക</p>
-        <small>Powered by Oushadi POS</small>
       </footer>
     </div>
   );
@@ -115,9 +115,10 @@ function printThermalReceipt(source, onFinished) {
   document.body.appendChild(frame);
   const documentRef = frame.contentDocument;
   documentRef.open();
-  documentRef.write(`<!doctype html><html><head><title>Invoice Reprint</title><style>*{box-sizing:border-box}html,body{margin:0!important;padding:0!important;width:80mm;min-height:0!important;background:#fff;color:#000;font-family:Arial,sans-serif;overflow:visible}.thermal-receipt{display:block!important;position:static!important;width:80mm;max-width:80mm;height:auto!important;min-height:0!important;margin:0;padding:4mm 4mm 3mm;font-size:11px;line-height:1.35;overflow:visible;break-after:avoid;page-break-after:avoid}.receipt-center{text-align:center}.receipt-center h1{font-size:18px;line-height:1.1;margin:0 0 2px}.receipt-center p{margin:1px 0}.receipt-center small{display:block;margin-top:5px}.receipt-rule{border-top:1px dashed #000;margin:8px 0}.receipt-meta,.receipt-totals{margin:0}.receipt-meta div,.receipt-totals div,.receipt-item div{display:flex;justify-content:space-between;gap:8px}.receipt-meta dt,.receipt-totals dt{font-weight:400}.receipt-meta dd,.receipt-totals dd{margin:0;text-align:right;font-weight:700;overflow-wrap:anywhere}.receipt-item{margin:0 0 7px;break-inside:avoid}.receipt-item strong{display:block;margin-bottom:1px}.receipt-item span{max-width:50mm;overflow-wrap:anywhere}.receipt-item b{white-space:nowrap}.receipt-grand{font-size:14px;font-weight:700;border-top:1px solid #000;margin-top:5px;padding-top:5px}</style></head><body>${source.innerHTML}</body></html>`);
+  documentRef.write(`<!doctype html><html><head><title>Invoice Reprint</title><style>@font-face{font-family:OushadhiPrint;src:url("/fonts/UncialAntiqua-Regular.ttf") format("truetype");font-weight:400;font-style:normal}.receipt-wordmark{margin-bottom:6px}.oushadhi-logo{display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap;color:#000}.oushadhi-logo__word{font-family:OushadhiPrint,serif;font-size:26px;font-weight:400;line-height:1.15;letter-spacing:-.035em}.oushadhi-logo__pos{font-family:Arial,sans-serif;font-size:9px;font-weight:600;letter-spacing:.12em;color:#526b59}*{box-sizing:border-box}html,body{margin:0!important;padding:0!important;width:80mm;min-height:0!important;background:#fff;color:#000;font-family:Arial,sans-serif;overflow:visible}.thermal-receipt{display:block!important;position:static!important;width:80mm;max-width:80mm;height:auto!important;min-height:0!important;margin:0;padding:4mm 4mm 3mm;font-size:11px;line-height:1.35;overflow:visible;break-after:avoid;page-break-after:avoid}.receipt-center{text-align:center}.receipt-center h1{font-size:18px;line-height:1.1;margin:0 0 2px}.receipt-center p{margin:1px 0}.receipt-center small{display:block;margin-top:5px}.receipt-rule{border-top:1px dashed #000;margin:8px 0}.receipt-meta,.receipt-totals{margin:0}.receipt-meta div,.receipt-totals div,.receipt-item div{display:flex;justify-content:space-between;gap:8px}.receipt-meta dt,.receipt-totals dt{font-weight:400}.receipt-meta dd,.receipt-totals dd{margin:0;text-align:right;font-weight:700;overflow-wrap:anywhere}.receipt-item{margin:0 0 7px;break-inside:avoid}.receipt-item strong{display:block;margin-bottom:1px}.receipt-item span{max-width:50mm;overflow-wrap:anywhere}.receipt-item b{white-space:nowrap}.receipt-grand{font-size:14px;font-weight:700;border-top:1px solid #000;margin-top:5px;padding-top:5px}</style></head><body>${source.innerHTML}</body></html>`);
   documentRef.close();
-  frame.onload = () => {
+  frame.onload = async () => {
+    try { await documentRef.fonts.load('400 26px "OushadhiPrint"'); await documentRef.fonts.ready; } catch { /* Use the serif fallback if the font cannot be loaded. */ }
     const target = frame.contentWindow;
     const receipt = documentRef.querySelector(".thermal-receipt");
     const renderedHeight = receipt?.getBoundingClientRect().height || receipt?.scrollHeight || 0;

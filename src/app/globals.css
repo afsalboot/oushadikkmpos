@@ -31,6 +31,14 @@
   animation: success-pop 420ms cubic-bezier(.2,.8,.2,1) both, success-glow 800ms 420ms ease-out;
 }
 .success-check svg { width: 58px; height: 58px; fill: none; stroke: white; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-height: 740px) {
+  .sales-success-dialog .sales-success-header { padding: 12px 24px; }
+  .sales-success-dialog .success-check { display: none; }
+  .sales-success-dialog .sales-success-header h2 { margin-top: 0; font-size: 20px; }
+  .sales-success-dialog .sales-success-header p:last-child { margin-top: 4px; font-size: 26px; }
+  .sales-success-dialog .sales-success-body { padding: 12px 24px; }
+  .sales-success-dialog > footer { padding: 12px 20px; }
+}
 .success-check circle { opacity: .95; stroke-dasharray: 151; stroke-dashoffset: 151; animation: success-draw 520ms 100ms ease-out forwards; }
 .success-check path { stroke-dasharray: 32; stroke-dashoffset: 32; animation: success-draw 330ms 480ms ease-out forwards; }
 @keyframes success-pop { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
@@ -299,7 +307,7 @@ body:has(.report-controls input[placeholder="Search settings..."]) .fixed.inset-
     background: #aebdb2;
   }
 
-  body:has(.report-controls input[placeholder="Search settings..."]) .h-20 {
+  body:has(.report-controls input[placeholder="Search settings..."]) [data-settings-spacer] {
     display: none;
   }
 
@@ -829,49 +837,15 @@ tbody tr:last-child td {
     .confirm-surface { animation: none; }
 }
 
-/* Use the supplied wordmark as the sole navigation brand. */
-.app-sidebar > div:first-child {
-    position: relative;
-    justify-content: center;
-}
-
-.app-sidebar > div:first-child > a:first-child {
-    width: 7rem;
-    height: 4rem;
-    flex: 0 0 auto;
-    overflow: hidden;
-    background: url("/logo.png") center / contain no-repeat;
-    font-size: 0;
-}
-
-.app-sidebar > div:first-child > a:first-child > span {
-    display: none;
-}
-
-.app-sidebar > div:first-child > button:last-child {
-    position: absolute;
-    right: 1.25rem;
-}
-
-/* Login branding uses the same supplied logo as the application shell. */
-main.min-h-screen > section:first-child > div:nth-child(3) {
-    width: 11rem;
-    height: 6rem;
-    background: url("/logo.png") left center / contain no-repeat;
-    font-size: 0;
-}
-
-main.min-h-screen > section:first-child > div:nth-child(3) > span,
-main.min-h-screen > section:last-child > div > div:first-child > span {
-    display: none;
-}
-
-main.min-h-screen > section:last-child > div > div:first-child {
-    width: 9rem;
-    height: 5rem;
-    background: url("/logo.png") left center / contain no-repeat;
-    font-size: 0;
-}
+/* Shared text-only Oushadhi wordmark. */
+.oushadhi-logo { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap; color: #047c35; }
+.oushadhi-logo__word { font-family: var(--font-oushadhi), serif; font-size: 24px; font-weight: 400; line-height: 1.15; letter-spacing: -0.035em; }
+.oushadhi-logo__pos { font-family: Arial, sans-serif; font-size: 9px; font-weight: 600; line-height: 1; letter-spacing: .12em; color: #526b59; }
+.oushadhi-logo--inverse { color: #9ee5b6; }
+.oushadhi-logo--inverse .oushadhi-logo__pos { color: #b8d3bf; }
+.oushadhi-logo--compact .oushadhi-logo__word { font-size: 30px; }
+@media (min-width: 768px) { .oushadhi-logo__word { font-size: 27px; } }
+@media (min-width: 1024px) { .oushadhi-logo__word { font-size: 30px; } .oushadhi-logo__pos { font-size: 10px; } }
 
 main.min-h-screen form > button:last-child {
     margin-top: 1.25rem;
