@@ -3,8 +3,9 @@ import { useState } from "react";
 import { FolderOpen } from "lucide-react";
 import BackupFolderPicker from "./BackupFolderPicker";
 
-export default function BackupStorageSettings({ value, onChange, disabled, error }) {
+export default function BackupStorageSettings({ value, onChange, disabled, error, storage }) {
   const [choosing, setChoosing] = useState(false);
+  if (storage === "mongodb") return <section className="card p-5 sm:p-6"><h3 className="text-lg font-extrabold">Backup storage</h3><p className="mt-2 text-sm text-[var(--muted)]">Encrypted backups are stored in your hosted database. Download a copy to a separate device for recovery if the database becomes unavailable.</p></section>;
   return <section className="card p-5 sm:p-6">
     <h3 className="text-lg font-extrabold">Backup storage location</h3>
     <p className="mt-1 text-sm text-[var(--muted)]">Choose a folder on the computer or server running the POS. For a hosted POS, this is a server folder, not a folder on this browser device.</p>

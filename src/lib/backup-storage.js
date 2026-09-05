@@ -2,6 +2,10 @@ import path from "node:path";
 import { mkdir, readdir, writeFile, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
+export function usesDatabaseBackupStorage(env = process.env) {
+  return env.VERCEL === "1";
+}
+
 export function resolveBackupDirectory(directory, env = process.env, cwd = process.cwd()) {
   return path.resolve(/* turbopackIgnore: true */ directory || env.BACKUP_DIR || path.join(cwd, "backups"));
 }
