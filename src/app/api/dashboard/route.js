@@ -1,0 +1,2 @@
+import {connectDb} from "@/lib/db";import {requireSession} from "@/lib/auth";import {ok,apiError} from "@/lib/api";import {getDashboardData} from "@/lib/server/dashboard-data";
+export async function GET(request){try{const session=await requireSession("dashboard.view");await connectDb();const range=new URL(request.url).searchParams.get("range")||"today",dashboard=await getDashboardData(range);return ok({...dashboard,currentUser:{name:session.name}});}catch(e){return apiError(e);}}

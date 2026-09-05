@@ -1,0 +1,2 @@
+import {connectDb} from "@/lib/db";import {requireSession} from "@/lib/auth";import {apiError,fail,ok} from "@/lib/api";import {resetSettings} from "@/services/settings.service";
+export async function POST(request){try{const actor=await requireSession("ADMIN");await connectDb();if((await request.json()).confirmation!=="RESET SETTINGS")return fail("Type RESET SETTINGS to confirm",400);return ok(await resetSettings(actor));}catch(error){return apiError(error);}}

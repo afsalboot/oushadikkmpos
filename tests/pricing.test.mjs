@@ -1,0 +1,7 @@
+import test from "node:test";import assert from "node:assert/strict";import {calculateConfiguredDiscount,calculateRoundOff,calculateSaleTotal} from "../src/services/pricing.service.js";
+test("nearest rupee round off",()=>assert.equal(calculateRoundOff(499.7,"NEAREST_1"),.3));
+test("disabled discount and round off are fully ignored",()=>assert.deepEqual(calculateSaleTotal({subtotal:499.7,discount:50,settings:{discount:{enabled:false},roundOff:{enabled:false}}}),{subtotal:499.7,discount:0,roundOff:0,total:499.7}));
+test("enabled settings apply discount then round off",()=>assert.deepEqual(calculateSaleTotal({subtotal:549.7,discount:50,settings:{discount:{enabled:true},roundOff:{enabled:true,method:"NEAREST_1"}}}),{subtotal:549.7,discount:50,roundOff:.3,total:500}));
+test("configured percentage discount is calculated from the cart subtotal",()=>assert.equal(calculateConfiguredDiscount({subtotal:750,type:"PERCENTAGE",value:10,settings:{discount:{enabled:true,allowPercentage:true,maxStaffPercentage:20}}}),75));
+test("configured fixed discount respects its maximum",()=>assert.throws(()=>calculateConfiguredDiscount({subtotal:750,type:"FIXED",value:501,settings:{discount:{enabled:true,allowFixed:true,maxFixedAmount:500}}}),/cannot exceed/));
+test("round off is calculated after discount",()=>assert.deepEqual(calculateSaleTotal({subtotal:100.6,discount:10,settings:{discount:{enabled:true},roundOff:{enabled:true,method:"DOWN"}}}),{subtotal:100.6,discount:10,roundOff:-.6,total:90}));

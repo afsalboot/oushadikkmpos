@@ -1,0 +1,2 @@
+import mongoose from "mongoose";import {connectDb} from "@/lib/db";import {requireSession} from "@/lib/auth";import {apiError,fail,ok} from "@/lib/api";import {resetStaffPassword} from "@/services/staff.service";
+export async function POST(request,{params}){try{const actor=await requireSession("staff.resetPassword");await connectDb();const{id}=await params;if(!mongoose.isValidObjectId(id))return fail("Invalid staff account");return ok(await resetStaffPassword(id,await request.json(),actor));}catch(error){return apiError(error);}}

@@ -1,0 +1,2 @@
+import mongoose from "mongoose";import {connectDb} from "@/lib/db";import {requireSession} from "@/lib/auth";import {apiError,fail,ok} from "@/lib/api";import {setStaffStatus} from "@/services/staff.service";
+export async function POST(request,{params}){try{const actor=await requireSession("staff.deactivate");await connectDb();const{id}=await params;if(!mongoose.isValidObjectId(id))return fail("Invalid staff account");return ok(await setStaffStatus(id,false,(await request.json()).reason,actor));}catch(error){return apiError(error);}}

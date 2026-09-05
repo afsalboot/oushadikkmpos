@@ -1,0 +1,2 @@
+import {redirect} from "next/navigation";import {readSession} from "@/lib/auth";import AppShell from "@/components/AppShell";
+export default async function WorkspaceLayout({children}){const session=await readSession();if(!session)redirect("/login");if(session.mustChangePassword)redirect("/change-password");return <AppShell user={{name:session.name,role:session.role,roleName:session.roleName,permissions:session.permissions||[]}}>{children}</AppShell>;}

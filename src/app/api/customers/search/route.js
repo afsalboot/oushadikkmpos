@@ -1,0 +1,2 @@
+import {connectDb} from "@/lib/db";import {requireSession} from "@/lib/auth";import {ok,apiError} from "@/lib/api";import {searchCustomers} from "@/services/customer.service";
+export async function GET(request){try{await requireSession("customers.view");await connectDb();const params=new URL(request.url).searchParams;return ok(await searchCustomers(params.get("q")||"",params.get("limit")||10,{includeInactive:params.get("includeInactive")==="true",customerType:params.get("customerType")}));}catch(error){return apiError(error)}}

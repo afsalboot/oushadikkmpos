@@ -1,0 +1,2 @@
+import mongoose from "mongoose";import {connectDb} from "@/lib/db";import {requireSession} from "@/lib/auth";import {apiError,fail,ok} from "@/lib/api";import {getStaffDetails} from "@/services/staff.service";
+export async function GET(_request,{params}){try{await requireSession("staff.view");await connectDb();const{id}=await params;if(!mongoose.isValidObjectId(id))return fail("Invalid staff account");return ok((await getStaffDetails(id)).activity);}catch(error){return apiError(error);}}
