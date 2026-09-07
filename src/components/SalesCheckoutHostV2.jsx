@@ -71,7 +71,8 @@ export default function SalesCheckoutHostV2() {
       } catch {}
       const nextSaleType =
         event.detail?.saleType === "WHOLESALE" ? "WHOLESALE" : "SALE";
-      if (nextSaleType === "WHOLESALE") preselected = null;
+      if (nextSaleType === "WHOLESALE" || isWholesaleCustomer(preselected))
+        preselected = null;
       const customerDiscount =
         nextSaleType === "WHOLESALE"
           ? Number(preselected?.defaultDiscount || 0)
@@ -127,10 +128,12 @@ export default function SalesCheckoutHostV2() {
       timer = setTimeout(async () => {
         setSearching(true);
         try {
-          const wholesaleFilter =
-            saleType === "WHOLESALE" ? "&customerType=WHOLESALE" : "";
+          const customerFilter =
+            saleType === "WHOLESALE"
+              ? "&customerType=WHOLESALE"
+              : "&customerType=RETAIL";
           const found = await api(
-            `/api/customers/search?q=${encodeURIComponent(query.trim())}${wholesaleFilter}`,
+            `/api/customers/search?q=${encodeURIComponent(query.trim())}${customerFilter}`,
             { signal: controller.signal },
           );
           setResults(found);
@@ -263,6 +266,10 @@ export default function SalesCheckoutHostV2() {
     event.preventDefault();
     if (customerType === "EXISTING" && !selected)
       return toast.error("Select an existing customer");
+    if (saleType !== "WHOLESALE" && isWholesaleCustomer(selected)) {
+      setSelected(null);
+      return toast.error("Select a retail customer for this sale.");
+    }
     if (!paymentValid)
       return toast.error(
         payment === "CASH"
@@ -408,6 +415,8 @@ export default function SalesCheckoutHostV2() {
     setResults([]);
   }
   function chooseExisting(customer) {
+    if (saleType !== "WHOLESALE" && isWholesaleCustomer(customer))
+      return toast.error("Select a retail customer for this sale.");
     if (saleType === "WHOLESALE" && !isWholesaleCustomer(customer))
       return toast.error(
         "Select a wholesale customer. This customer is configured as retail.",
