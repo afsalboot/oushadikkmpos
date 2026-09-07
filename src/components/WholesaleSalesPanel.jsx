@@ -1,58 +1,562 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Gift, Minus, Package, Plus, ShoppingCart, Trash2, X } from "lucide-react";
+import {
+  Gift,
+  Minus,
+  Package,
+  Plus,
+  ShoppingCart,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
-import { buildWholesaleCartItem, buildWholesaleLine, minimumWholesalePackageQuantity, wholesaleLooseRate, wholesaleRate } from "@/lib/wholesale";
+import {
+  buildWholesaleCartItem,
+  buildWholesaleLine,
+  minimumWholesalePackageQuantity,
+  wholesaleLooseRate,
+  wholesaleRate,
+} from "@/lib/wholesale";
 
-const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value || 0));
-const packagesAvailable = (product) => Number(product.stock?.sealedPackages || 0);
+const money = (value) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+const packagesAvailable = (product) =>
+  Number(product.stock?.sealedPackages || 0);
 
 function WholesaleQuantityModal({ product, onClose, onAdd }) {
   const packUnit = product.wholesaleUnit || product.packageType;
-  const hasBulkPack = product.wholesalePackEnabled !== false && packUnit !== product.packageType && Number(product.unitsPerWholesalePack) > 1;
-  const preferredSellBy = product.wholesaleSaleUnit === "LOOSE_UNIT" && product.allowWholesaleLooseSale && product.allowLooseSale ? "LOOSE" : product.wholesaleSaleUnit === "PACKAGE" || !hasBulkPack ? product.packageType : packUnit;
-  const [sellBy, setSellBy] = useState(product.saleMode==="WHOLESALE" ? product.sellBy : preferredSellBy);
+  const hasBulkPack =
+    product.wholesalePackEnabled !== false &&
+    packUnit !== product.packageType &&
+    Number(product.unitsPerWholesalePack) > 1;
+  const preferredSellBy =
+    product.wholesaleSaleUnit === "LOOSE_UNIT" &&
+    product.allowWholesaleLooseSale &&
+    product.allowLooseSale
+      ? "LOOSE"
+      : product.wholesaleSaleUnit === "PACKAGE" || !hasBulkPack
+        ? product.packageType
+        : packUnit;
+  const [sellBy, setSellBy] = useState(
+    product.saleMode === "WHOLESALE" ? product.sellBy : preferredSellBy,
+  );
   const minimum = minimumWholesalePackageQuantity(product);
   const isLoose = sellBy === "LOOSE";
-  const conversion = sellBy === packUnit && hasBulkPack ? Number(product.unitsPerWholesalePack) : 1;
-  const [quantity, setQuantity] = useState(product.saleMode==="WHOLESALE" ? Number(product.quantity) : Math.max(1, Math.ceil(minimumWholesalePackageQuantity(product) / conversion)));
-  const [manualOpen, setManualOpen] = useState(product.manualFreeQuantity!==null&&product.manualFreeQuantity!==undefined);
-  const [manualFree, setManualFree] = useState(product.manualFreeQuantity??"");
-  const [manualReason, setManualReason] = useState(product.manualFreeReason||"Scheme");
+  const conversion =
+    sellBy === packUnit && hasBulkPack
+      ? Number(product.unitsPerWholesalePack)
+      : 1;
+  const [quantity, setQuantity] = useState(
+    product.saleMode === "WHOLESALE"
+      ? Number(product.quantity)
+      : Math.max(
+          1,
+          Math.ceil(minimumWholesalePackageQuantity(product) / conversion),
+        ),
+  );
+  const [manualOpen, setManualOpen] = useState(
+    product.manualFreeQuantity !== null &&
+      product.manualFreeQuantity !== undefined,
+  );
+  const [manualFree, setManualFree] = useState(
+    product.manualFreeQuantity ?? "",
+  );
+  const [manualReason, setManualReason] = useState(
+    product.manualFreeReason || "Scheme",
+  );
   let line;
-  try { const looseRate=wholesaleLooseRate(product); line = isLoose ? {sellBy:"LOOSE",orderedQuantity:Number(quantity),paidPackageQuantity:Number(quantity),freeQuantity:0,totalOutgoingQuantity:Number(quantity),unitPrice:looseRate,total:Number(quantity)*looseRate,tier:null,manualFree:false,manualFreeReason:""} : buildWholesaleLine(product, { sellBy, quantity, manualFreeQuantity: manualOpen ? Number(manualFree || 0) : null, manualFreeReason: manualReason }); } catch {}
-  const availableForSelection=isLoose?Number(product.stock?.totalBaseQuantity||0):packagesAvailable(product);
-  const mainStockOutgoing=product.freeSchemeType==="DIFFERENT_PRODUCT"?Number(line?.paidPackageQuantity||0):Number(line?.totalOutgoingQuantity||0);
+  try {
+    const looseRate = wholesaleLooseRate(product);
+    line = isLoose
+      ? {
+          sellBy: "LOOSE",
+          orderedQuantity: Number(quantity),
+          paidPackageQuantity: Number(quantity),
+          freeQuantity: 0,
+          totalOutgoingQuantity: Number(quantity),
+          unitPrice: looseRate,
+          total: Number(quantity) * looseRate,
+          tier: null,
+          manualFree: false,
+          manualFreeReason: "",
+        }
+      : buildWholesaleLine(product, {
+          sellBy,
+          quantity,
+          manualFreeQuantity: manualOpen ? Number(manualFree || 0) : null,
+          manualFreeReason: manualReason,
+        });
+  } catch {}
+  const availableForSelection = isLoose
+    ? Number(product.stock?.totalBaseQuantity || 0)
+    : packagesAvailable(product);
+  const mainStockOutgoing =
+    product.freeSchemeType === "DIFFERENT_PRODUCT"
+      ? Number(line?.paidPackageQuantity || 0)
+      : Number(line?.totalOutgoingQuantity || 0);
   const enoughStock = line && mainStockOutgoing <= availableForSelection;
-  return <div className="fixed inset-0 z-[95] grid place-items-center bg-black/45 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section className="card max-h-[92vh] w-full max-w-lg overflow-y-auto p-6" role="dialog" aria-modal="true" aria-labelledby="wholesale-product-title">
-      <div className="flex items-start justify-between gap-4"><div><span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-700">Wholesale</span><h2 id="wholesale-product-title" className="mt-3 text-2xl font-extrabold">{product.name}</h2><p className="mt-1 text-sm text-[var(--muted)]">{packagesAvailable(product)} {product.packageType}s available</p></div><button type="button" onClick={onClose} aria-label="Close"><X /></button></div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2"><label><span className="label">Sell by</span><select className="field" value={sellBy} onChange={(event) => { const next = event.target.value; const nextConversion = next === packUnit && hasBulkPack ? Number(product.unitsPerWholesalePack) : 1; setSellBy(next); setQuantity(next==="LOOSE"?1:Math.max(1, Math.ceil(minimum / nextConversion))); setManualOpen(false); }}><option>{product.packageType}</option>{hasBulkPack && <option>{packUnit}</option>}{product.allowWholesaleLooseSale&&product.allowLooseSale&&<option value="LOOSE">Loose ({product.baseUnit})</option>}</select></label><label><span className="label">Quantity</span><div className="flex overflow-hidden rounded-xl border border-[var(--line)] bg-white"><button type="button" className="grid size-11 place-items-center" onClick={() => setQuantity((value) => Math.max(isLoose ? .01 : 1, Number(value) - 1))}><Minus size={15}/></button><input className="min-w-0 flex-1 border-x text-center font-extrabold outline-none" type="number" min={isLoose ? .01 : 1} step={isLoose?"any":1} value={quantity} onChange={(event) => setQuantity(Math.max(isLoose ? .01 : 1, Number(event.target.value || 1)))}/><button type="button" className="grid size-11 place-items-center" onClick={() => setQuantity((value) => Number(value) + 1)}><Plus size={15}/></button></div></label></div>
-      {hasBulkPack && <p className="mt-3 rounded-xl bg-[#f4f7f3] p-3 text-sm"><b>1 {packUnit} = {product.unitsPerWholesalePack} {product.packageType}s</b><br/>{quantity} {sellBy}{quantity === 1 ? "" : "s"} = {line?.paidPackageQuantity || quantity * conversion} {product.packageType}s</p>}
-      {line && <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border p-4 text-sm"><span>Wholesale rate</span><b className="text-right">{money(line.unitPrice)} / {product.packageType}</b><span>Paid quantity</span><b className="text-right">{line.paidPackageQuantity}</b><span>Free quantity</span><b className="text-right text-emerald-700">{line.freeQuantity}</b><span>Total outgoing</span><b className="text-right">{line.totalOutgoingQuantity}</b>{line.tier&&<><span>Tier applied</span><b className="text-right text-emerald-700">{line.tier.quantity}+ @ {money(line.tier.price)}</b></>}<span>Stock after sale</span><b className={`text-right ${enoughStock ? "" : "text-[var(--red)]"}`}>{packagesAvailable(product) - line.totalOutgoingQuantity} {product.packageType}s</b></div>}
-      {!isLoose&&product.freeSchemeEnabled && <p className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800"><Gift size={17}/>Scheme applied: Buy {product.freeSchemeBuyQty} {packUnit}{Number(product.freeSchemeBuyQty)===1?"":"s"} + Get {product.freeSchemeFreeQty} {product.freeSchemeType==="DIFFERENT_PRODUCT"?"free product package":packUnit}{Number(product.freeSchemeFreeQty)===1?"":"s"} free</p>}
-      {!isLoose&&<button type="button" className="mt-4 text-sm font-extrabold text-[var(--green)]" onClick={() => setManualOpen((value) => !value)}>Add or change free quantity</button>}
-      {manualOpen && <div className="mt-3 space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4"><label><span className="label">Free quantity</span><input className="field" type="number" min="0" step="1" value={manualFree} onChange={(event) => setManualFree(event.target.value)}/></label><label><span className="label">Reason</span><select className="field" value={manualReason} onChange={(event) => setManualReason(event.target.value)}>{["Scheme","Promotion","Customer Offer","Other"].map((reason) => <option key={reason}>{reason}</option>)}</select></label><small className="text-[var(--muted)]">Administrator permission is checked when the sale is completed.</small></div>}
-      <div className="mt-6 flex items-end justify-between gap-4"><div><small className="label">Line total</small><b className="block text-2xl">{money(line?.total)}</b></div><button type="button" disabled={!line || !enoughStock} className="btn btn-primary" onClick={() => onAdd(buildWholesaleCartItem(product, line))}><ShoppingCart size={17}/>Add to wholesale cart</button></div>
-    </section>
-  </div>;
+  return (
+    <div
+      className="fixed inset-0 z-[95] grid place-items-center bg-black/45 p-4"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <section
+        className="card max-h-[92vh] w-full max-w-lg overflow-y-auto p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wholesale-product-title"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-700">
+              Wholesale
+            </span>
+            <h2
+              id="wholesale-product-title"
+              className="mt-3 text-2xl font-extrabold"
+            >
+              {product.name}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              {packagesAvailable(product)} {product.packageType}s available
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close">
+            <X />
+          </button>
+        </div>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <label>
+            <span className="label">Sell by</span>
+            <select
+              className="field"
+              value={sellBy}
+              onChange={(event) => {
+                const next = event.target.value;
+                const nextConversion =
+                  next === packUnit && hasBulkPack
+                    ? Number(product.unitsPerWholesalePack)
+                    : 1;
+                setSellBy(next);
+                setQuantity(
+                  next === "LOOSE"
+                    ? 1
+                    : Math.max(1, Math.ceil(minimum / nextConversion)),
+                );
+                setManualOpen(false);
+              }}
+            >
+              <option>{product.packageType}</option>
+              {hasBulkPack && <option>{packUnit}</option>}
+              {product.allowWholesaleLooseSale && product.allowLooseSale && (
+                <option value="LOOSE">Loose ({product.baseUnit})</option>
+              )}
+            </select>
+          </label>
+          <label>
+            <span className="label">Quantity</span>
+            <div className="flex overflow-hidden rounded-xl border border-[var(--line)] bg-white">
+              <button
+                type="button"
+                className="grid size-11 place-items-center"
+                onClick={() =>
+                  setQuantity((value) =>
+                    Math.max(isLoose ? 0.01 : 1, Number(value) - 1),
+                  )
+                }
+              >
+                <Minus size={15} />
+              </button>
+              <input
+                className="min-w-0 flex-1 border-x text-center font-extrabold outline-none"
+                type="number"
+                min={isLoose ? 0.01 : 1}
+                step={isLoose ? "any" : 1}
+                value={quantity}
+                onChange={(event) =>
+                  setQuantity(
+                    Math.max(
+                      isLoose ? 0.01 : 1,
+                      Number(event.target.value || 1),
+                    ),
+                  )
+                }
+              />
+              <button
+                type="button"
+                className="grid size-11 place-items-center"
+                onClick={() => setQuantity((value) => Number(value) + 1)}
+              >
+                <Plus size={15} />
+              </button>
+            </div>
+          </label>
+        </div>
+        {hasBulkPack && (
+          <p className="mt-3 rounded-xl bg-[#f4f7f3] p-3 text-sm">
+            <b>
+              1 {packUnit} = {product.unitsPerWholesalePack}{" "}
+              {product.packageType}s
+            </b>
+            <br />
+            {quantity} {sellBy}
+            {quantity === 1 ? "" : "s"} ={" "}
+            {line?.paidPackageQuantity || quantity * conversion}{" "}
+            {product.packageType}s
+          </p>
+        )}
+        {line && (
+          <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border p-4 text-sm">
+            <span>Wholesale rate</span>
+            <b className="text-right">
+              {money(line.unitPrice)} / {product.packageType}
+            </b>
+            <span>Paid quantity</span>
+            <b className="text-right">{line.paidPackageQuantity}</b>
+            <span>Free quantity</span>
+            <b className="text-right text-emerald-700">{line.freeQuantity}</b>
+            <span>Total outgoing</span>
+            <b className="text-right">{line.totalOutgoingQuantity}</b>
+            {line.tier && (
+              <>
+                <span>Tier applied</span>
+                <b className="text-right text-emerald-700">
+                  {line.tier.quantity}+ @ {money(line.tier.price)}
+                </b>
+              </>
+            )}
+            <span>Stock after sale</span>
+            <b
+              className={`text-right ${enoughStock ? "" : "text-[var(--red)]"}`}
+            >
+              {packagesAvailable(product) - line.totalOutgoingQuantity}{" "}
+              {product.packageType}s
+            </b>
+          </div>
+        )}
+        {!isLoose && product.freeSchemeEnabled && (
+          <p className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800">
+            <Gift size={17} />
+            Scheme applied: Buy {product.freeSchemeBuyQty} {packUnit}
+            {Number(product.freeSchemeBuyQty) === 1 ? "" : "s"} + Get{" "}
+            {product.freeSchemeFreeQty}{" "}
+            {product.freeSchemeType === "DIFFERENT_PRODUCT"
+              ? "free product package"
+              : packUnit}
+            {Number(product.freeSchemeFreeQty) === 1 ? "" : "s"} free
+          </p>
+        )}
+        {!isLoose && (
+          <button
+            type="button"
+            className="mt-4 text-sm font-extrabold text-[var(--green)]"
+            onClick={() => setManualOpen((value) => !value)}
+          >
+            Add or change free quantity
+          </button>
+        )}
+        {manualOpen && (
+          <div className="mt-3 space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+            <label>
+              <span className="label">Free quantity</span>
+              <input
+                className="field"
+                type="number"
+                min="0"
+                step="1"
+                value={manualFree}
+                onChange={(event) => setManualFree(event.target.value)}
+              />
+            </label>
+            <label>
+              <span className="label">Reason</span>
+              <select
+                className="field"
+                value={manualReason}
+                onChange={(event) => setManualReason(event.target.value)}
+              >
+                {["Scheme", "Promotion", "Customer Offer", "Other"].map(
+                  (reason) => (
+                    <option key={reason}>{reason}</option>
+                  ),
+                )}
+              </select>
+            </label>
+            <small className="text-[var(--muted)]">
+              Administrator permission is checked when the sale is completed.
+            </small>
+          </div>
+        )}
+        <div className="mt-6 flex items-end justify-between gap-4">
+          <div>
+            <small className="label">Line total</small>
+            <b className="block text-2xl">{money(line?.total)}</b>
+          </div>
+          <button
+            type="button"
+            disabled={!line || !enoughStock}
+            className="btn btn-primary"
+            onClick={() => onAdd(buildWholesaleCartItem(product, line))}
+          >
+            <ShoppingCart size={17} />
+            Add to wholesale cart
+          </button>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export default function WholesaleSalesPanel({ products, search, filter }) {
   const [quick, setQuick] = useState(null);
   const [cart, setCart] = useState([]);
-  useEffect(() => { const completed = () => setCart([]); window.addEventListener("oushadi-sale-complete", completed); return () => window.removeEventListener("oushadi-sale-complete", completed); }, []);
-  const shown = useMemo(() => products.filter((product) => product.wholesaleEnabled && (!search || `${product.name} ${product.sku} ${product.barcode || ""} ${product.categoryId?.name || ""}`.toLowerCase().includes(search.toLowerCase())) && (filter === "All" || filter === "Loose Sale" && product.allowWholesaleLooseSale || filter === "Low Stock" && product.lowStock || filter === "Opened Stock" && Number(product.stock?.openQuantity || 0) > 0 || product.categoryId?.name === filter)), [filter, products, search]);
-  const subtotal = cart.reduce((sum, item) => sum + Number(item.wholesaleTotal || 0), 0);
-  const paid = cart.reduce((sum, item) => sum + Number(item.paidPackageQuantity || 0), 0);
-  const free = cart.reduce((sum, item) => sum + Number(item.freeQuantity || 0), 0);
-  function add(item) { setCart((current) => current.some((entry) => entry.productId === item._id || entry.productId === item.productId) ? current.map((entry) => entry.productId === (item.productId || item._id) ? item : entry) : [...current, { ...item, productId:item.productId || item._id }]); setQuick(null); toast.success(`${item.name} added to wholesale cart`); }
-  function checkout() { window.dispatchEvent(new CustomEvent("oushadi-open-checkout", { detail:{ cart, saleType:"WHOLESALE", source:"PROCEED_PAYMENT" } })); }
-  return <div data-wholesale-workspace className={`space-y-4 ${cart.length?"sales-cart-workspace":""}`}>
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[["Wholesale products",shown.length],["Schemes",shown.filter((product) => product.freeSchemeEnabled).length],["Paid qty",paid],["Free qty",free]].map(([label,value]) => <div className="rounded-xl border bg-white p-3" key={label}><small className="uppercase text-[var(--muted)]">{label}</small><b className="mt-1 block">{value}</b></div>)}</div>
-    <div className="sales-cart-grid grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_410px]"><main className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">{shown.map((product) => { const firstTier=wholesaleRate(product,minimumWholesalePackageQuantity(product)); return <article key={product._id} className="card flex min-h-60 cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md" onClick={() => setQuick(product)}><div className="flex justify-between"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-700">Wholesale</span><span className="grid size-9 place-items-center rounded-xl bg-[var(--green-soft)] text-[var(--green)]"><Plus size={17}/></span></div><h2 className="mt-4 text-lg font-extrabold">{product.name}</h2><small className="text-[var(--muted)]">SKU {product.sku}</small><b className="mt-3 text-sm text-[var(--green)]">{product.stockLabel}</b><div className="mt-3 flex flex-wrap gap-1"><span className="rounded-full bg-[#eff2ee] px-2 py-1 text-[10px] font-extrabold uppercase">MOQ {product.wholesaleMinQty} {product.wholesaleUnit}{Number(product.wholesaleMinQty)===1?"":"s"}</span>{Number(product.unitsPerWholesalePack)>1&&<span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-extrabold uppercase text-blue-700">1 {product.wholesaleUnit} = {product.unitsPerWholesalePack} {product.packageType}s</span>}{product.freeSchemeEnabled&&<span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-700">Buy {product.freeSchemeBuyQty} {product.wholesaleUnit} + {product.freeSchemeFreeQty} free</span>}</div><div className="mt-auto pt-4"><p className="text-xl font-extrabold">{money(firstTier.price)} <small>/ {product.packageType}</small></p><p className="mt-1 text-xs text-[var(--muted)]">Retail {money(product.packageSellingPrice)}{firstTier.tier ? ` · ${firstTier.tier.quantity}+ tier` : ""}</p></div></article>; })}</main>
-      <aside className={`sales-cart-panel sales-cart-shell card overflow-hidden xl:sticky xl:top-24 ${cart.length?"":"sales-cart-empty"}`}><div className="sales-cart-header border-b"><small className="uppercase tracking-wide text-[var(--green)]">Wholesale Sale</small><h2 className="mt-1 flex items-center gap-2 text-lg font-extrabold"><Package size={18}/>{cart.length} {cart.length === 1 ? "item" : "items"}</h2></div><div className="sales-cart-list">{cart.length ? [...cart].reverse().map((item) => <article className="sales-cart-item" key={item._id}><div className="min-w-0 flex-1"><div className="flex justify-between gap-2"><b>{item.name}</b><button type="button" aria-label={`Remove ${item.name}`} onClick={() => setCart((current) => current.filter((entry) => entry._id !== item._id))}><Trash2 size={16}/></button></div><p className="mt-2 text-xs text-[var(--muted)]">{item.quantity} {item.wholesaleUnit}{item.quantity === 1 ? "" : "s"} · {item.paidPackageQuantity} paid {item.packageType}s</p><button type="button" className="mt-2 text-xs font-extrabold text-[var(--green)]" onClick={() => setQuick(item)}>Change quantity</button>{item.freeQuantity > 0 && <span className="ml-2 mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-700">{item.paidPackageQuantity} + {item.freeQuantity} FREE</span>}<div className="mt-3 flex justify-between"><span className="text-xs">{money(item.wholesalePriceApplied)} × {item.paidPackageQuantity}</span><b>{money(item.wholesaleTotal)}</b></div></div></article>) : <div className="sales-cart-empty-state"><ShoppingCart size={20}/><b>Your wholesale cart is empty.</b><small>Select a wholesale-enabled product.</small></div>}</div><div className="sales-cart-summary border-t"><div className="flex justify-between"><span>Subtotal</span><b>{money(subtotal)}</b></div><div className="mt-2 flex justify-between text-sm"><span>Paid Qty</span><b>{paid}</b></div><div className="mt-2 flex justify-between text-sm text-emerald-700"><span>Free Qty</span><b>{free}</b></div><div className="mt-3 flex justify-between border-t pt-3 text-lg"><strong>Total Items Out</strong><strong>{paid + free}</strong></div><button type="button" disabled={!cart.length} className="btn btn-primary mt-4 w-full" onClick={checkout}>Proceed to Payment · {money(subtotal)}</button></div></aside>
-    </div>{quick&&<WholesaleQuantityModal product={quick} onClose={() => setQuick(null)} onAdd={add}/>}<small className="block text-[var(--muted)]">GST, configured discounts, and round-off are applied in checkout using the existing store settings.</small>
-  </div>;
+  useEffect(() => {
+    const completed = () => setCart([]);
+    window.addEventListener("oushadi-sale-complete", completed);
+    return () => window.removeEventListener("oushadi-sale-complete", completed);
+  }, []);
+  const shown = useMemo(
+    () =>
+      products.filter(
+        (product) =>
+          product.wholesaleEnabled &&
+          (!search ||
+            `${product.name} ${product.sku} ${product.barcode || ""} ${product.categoryId?.name || ""}`
+              .toLowerCase()
+              .includes(search.toLowerCase())) &&
+          (filter === "All" ||
+            (filter === "Loose Sale" && product.allowWholesaleLooseSale) ||
+            (filter === "Low Stock" && product.lowStock) ||
+            (filter === "Opened Stock" &&
+              Number(product.stock?.openQuantity || 0) > 0) ||
+            product.categoryId?.name === filter),
+      ),
+    [filter, products, search],
+  );
+  const subtotal = cart.reduce(
+    (sum, item) => sum + Number(item.wholesaleTotal || 0),
+    0,
+  );
+  const paid = cart.reduce(
+    (sum, item) => sum + Number(item.paidPackageQuantity || 0),
+    0,
+  );
+  const free = cart.reduce(
+    (sum, item) => sum + Number(item.freeQuantity || 0),
+    0,
+  );
+  function add(item) {
+    setCart((current) =>
+      current.some(
+        (entry) =>
+          entry.productId === item._id || entry.productId === item.productId,
+      )
+        ? current.map((entry) =>
+            entry.productId === (item.productId || item._id) ? item : entry,
+          )
+        : [...current, { ...item, productId: item.productId || item._id }],
+    );
+    setQuick(null);
+    toast.success(`${item.name} added to wholesale cart`);
+  }
+  function checkout() {
+    window.dispatchEvent(
+      new CustomEvent("oushadi-open-checkout", {
+        detail: { cart, saleType: "WHOLESALE", source: "PROCEED_PAYMENT" },
+      }),
+    );
+  }
+  return (
+    <div
+      data-wholesale-workspace
+      className={`space-y-4 ${cart.length ? "sales-cart-workspace" : ""}`}
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          ["Wholesale products", shown.length],
+          [
+            "Schemes",
+            shown.filter((product) => product.freeSchemeEnabled).length,
+          ],
+          ["Paid qty", paid],
+          ["Free qty", free],
+        ].map(([label, value]) => (
+          <div className="rounded-xl border bg-white p-3" key={label}>
+            <small className="uppercase text-[var(--muted)]">{label}</small>
+            <b className="mt-1 block">{value}</b>
+          </div>
+        ))}
+      </div>
+      <div className="sales-cart-grid grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
+        <main className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+          {shown.map((product) => {
+            const firstTier = wholesaleRate(
+              product,
+              minimumWholesalePackageQuantity(product),
+            );
+            return (
+              <article
+                key={product._id}
+                className="card flex min-h-60 cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+                onClick={() => setQuick(product)}
+              >
+                <div className="flex justify-between">
+                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-700">
+                    Wholesale
+                  </span>
+                  <span className="grid size-9 place-items-center rounded-xl bg-[var(--green-soft)] text-[var(--green)]">
+                    <Plus size={17} />
+                  </span>
+                </div>
+                <h2 className="mt-4 text-lg font-extrabold">{product.name}</h2>
+                <small className="text-[var(--muted)]">SKU {product.sku}</small>
+                <b className="mt-3 text-sm text-[var(--green)]">
+                  {product.stockLabel}
+                </b>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  <span className="rounded-full bg-[#eff2ee] px-2 py-1 text-[10px] font-extrabold uppercase">
+                    MOQ {product.wholesaleMinQty} {product.wholesaleUnit}
+                    {Number(product.wholesaleMinQty) === 1 ? "" : "s"}
+                  </span>
+                  {Number(product.unitsPerWholesalePack) > 1 && (
+                    <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-extrabold uppercase text-blue-700">
+                      1 {product.wholesaleUnit} ={" "}
+                      {product.unitsPerWholesalePack} {product.packageType}s
+                    </span>
+                  )}
+                  {product.freeSchemeEnabled && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-700">
+                      Buy {product.freeSchemeBuyQty} {product.wholesaleUnit} +{" "}
+                      {product.freeSchemeFreeQty} free
+                    </span>
+                  )}
+                </div>
+                <div className="mt-auto pt-4">
+                  <p className="text-xl font-extrabold">
+                    {money(firstTier.price)}{" "}
+                    <small>/ {product.packageType}</small>
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Retail {money(product.packageSellingPrice)}
+                    {firstTier.tier
+                      ? ` · ${firstTier.tier.quantity}+ tier`
+                      : ""}
+                  </p>
+                </div>
+              </article>
+            );
+          })}
+        </main>
+        <aside
+          className={`sales-cart-panel sales-cart-shell card overflow-hidden xl:sticky xl:top-24 ${cart.length ? "" : "sales-cart-empty"}`}
+        >
+          <div className="sales-cart-header border-b">
+            <small className="uppercase tracking-wide text-[var(--green)]">
+              Wholesale Sale
+            </small>
+            <h2 className="mt-1 flex items-center gap-2 text-lg font-extrabold">
+              <Package size={18} />
+              {cart.length} {cart.length === 1 ? "item" : "items"}
+            </h2>
+          </div>
+          <div className="sales-cart-list">
+            {cart.length ? (
+              [...cart].reverse().map((item) => (
+                <article className="sales-cart-item" key={item._id}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex justify-between gap-2">
+                      <b>{item.name}</b>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${item.name}`}
+                        onClick={() =>
+                          setCart((current) =>
+                            current.filter((entry) => entry._id !== item._id),
+                          )
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-[var(--muted)]">
+                      {item.quantity} {item.wholesaleUnit}
+                      {item.quantity === 1 ? "" : "s"} ·{" "}
+                      {item.paidPackageQuantity} paid {item.packageType}s
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-2 text-xs font-extrabold text-[var(--green)]"
+                      onClick={() => setQuick(item)}
+                    >
+                      Change quantity
+                    </button>
+                    {item.freeQuantity > 0 && (
+                      <span className="ml-2 mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-700">
+                        {item.paidPackageQuantity} + {item.freeQuantity} FREE
+                      </span>
+                    )}
+                    <div className="mt-3 flex justify-between">
+                      <span className="text-xs">
+                        {money(item.wholesalePriceApplied)} ×{" "}
+                        {item.paidPackageQuantity}
+                      </span>
+                      <b>{money(item.wholesaleTotal)}</b>
+                    </div>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="sales-cart-empty-state">
+                <ShoppingCart size={20} />
+                <b>Your wholesale cart is empty.</b>
+                <small>Select a wholesale-enabled product.</small>
+              </div>
+            )}
+          </div>
+          <div className="sales-cart-summary border-t">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <b>{money(subtotal)}</b>
+            </div>
+            <div className="mt-2 flex justify-between text-sm">
+              <span>Paid Qty</span>
+              <b>{paid}</b>
+            </div>
+            <div className="mt-2 flex justify-between text-sm text-emerald-700">
+              <span>Free Qty</span>
+              <b>{free}</b>
+            </div>
+            <div className="mt-3 flex justify-between border-t pt-3 text-lg">
+              <strong>Total Items Out</strong>
+              <strong>{paid + free}</strong>
+            </div>
+            <button
+              type="button"
+              disabled={!cart.length}
+              className="btn btn-primary mt-4 w-full"
+              onClick={checkout}
+            >
+              Proceed to Payment · {money(subtotal)}
+            </button>
+          </div>
+        </aside>
+      </div>
+      {quick && (
+        <WholesaleQuantityModal
+          product={quick}
+          onClose={() => setQuick(null)}
+          onAdd={add}
+        />
+      )}
+      <small className="block text-[var(--muted)]">
+        GST, configured discounts, and round-off are applied in checkout using
+        the existing store settings.
+      </small>
+    </div>
+  );
 }

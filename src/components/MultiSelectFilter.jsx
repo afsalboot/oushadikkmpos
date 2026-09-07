@@ -4,16 +4,29 @@ import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
-export default function MultiSelectFilter({ label, placeholder = label, clearLabel, values = [], options = [], onChange, triggerClassName = "field", openTriggerClassName = "" }) {
+export default function MultiSelectFilter({
+  label,
+  placeholder = label,
+  clearLabel,
+  values = [],
+  options = [],
+  onChange,
+  triggerClassName = "field",
+  openTriggerClassName = "",
+}) {
   const [open, setOpen] = useState(false);
   const selected = new Set(values.map(String));
-  const displayLabel = values.length ? `${label} (${values.length})` : placeholder;
+  const displayLabel = values.length
+    ? `${label} (${values.length})`
+    : placeholder;
 
   function toggle(value) {
     const normalized = String(value);
-    onChange(selected.has(normalized)
-      ? values.filter((item) => String(item) !== normalized)
-      : [...values, value]);
+    onChange(
+      selected.has(normalized)
+        ? values.filter((item) => String(item) !== normalized)
+        : [...values, value],
+    );
   }
 
   return (
@@ -26,7 +39,11 @@ export default function MultiSelectFilter({ label, placeholder = label, clearLab
           aria-expanded={open}
         >
           <span className="min-w-0 flex-1 truncate">{displayLabel}</span>
-          {open ? <ChevronUp className="shrink-0" size={17} /> : <ChevronDown className="shrink-0" size={17} />}
+          {open ? (
+            <ChevronUp className="shrink-0" size={17} />
+          ) : (
+            <ChevronDown className="shrink-0" size={17} />
+          )}
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -48,7 +65,8 @@ export default function MultiSelectFilter({ label, placeholder = label, clearLab
           </DropdownMenu.Item>
           {options.map((option) => {
             const value = typeof option === "object" ? option.value : option;
-            const optionLabel = typeof option === "object" ? option.label : option;
+            const optionLabel =
+              typeof option === "object" ? option.label : option;
             return (
               <DropdownMenu.CheckboxItem
                 key={String(value)}

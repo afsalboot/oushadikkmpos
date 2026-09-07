@@ -1,6 +1,11 @@
 "use client";
 
-import { CheckCircle2, LoaderCircle, ScanBarcode, TriangleAlert } from "lucide-react";
+import {
+  CheckCircle2,
+  LoaderCircle,
+  ScanBarcode,
+  TriangleAlert,
+} from "lucide-react";
 
 export default function ScannerStatus({ status = "ready", message }) {
   if (status === "ready" && !message) return null;
@@ -11,5 +16,16 @@ export default function ScannerStatus({ status = "ready", message }) {
     error: [TriangleAlert, "Product not found", "text-amber-700"],
   }[status] || [ScanBarcode, "Barcode scanner ready", "text-[var(--muted)]"];
   const [Icon, fallback, tone] = config;
-  return <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${tone}`} role="status"><Icon className={status === "scanning" ? "loading-shimmer-icon" : ""} size={14}/>{message || fallback}</span>;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs font-bold ${tone}`}
+      role="status"
+    >
+      <Icon
+        className={status === "scanning" ? "loading-shimmer-icon" : ""}
+        size={14}
+      />
+      {message || fallback}
+    </span>
+  );
 }

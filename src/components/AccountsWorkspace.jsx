@@ -1,50 +1,972 @@
 "use client";
 
-import {useEffect,useMemo,useState} from "react";
-import {useRouter} from "next/navigation";
-import {Area,AreaChart,CartesianGrid,ResponsiveContainer,Tooltip,XAxis,YAxis} from "recharts";
-import {ArrowDownToLine,ArrowRight,CalendarDays,ChevronLeft,ChevronRight,CircleDollarSign,Eye,Landmark,LoaderCircle,RefreshCw,Search,TrendingDown,TrendingUp,WalletCards,X} from "lucide-react";
-import {toast} from "sonner";
-import {hasFilterValue,serializedFilterEntries} from "@/lib/filter-utils";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  ArrowDownToLine,
+  ArrowRight,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  Eye,
+  Landmark,
+  LoaderCircle,
+  RefreshCw,
+  Search,
+  TrendingDown,
+  TrendingUp,
+  WalletCards,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { hasFilterValue, serializedFilterEntries } from "@/lib/filter-utils";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 
-const money=(value)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(value||0));
-const dateTime=(value)=>value?new Intl.DateTimeFormat("en-IN",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"—";
-const inputDate=(value)=>{const date=new Date(value);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;};
-const TODAY=inputDate(new Date());
-const emptyFilters={direction:"",transactionType:[],paymentMethod:[],source:[],dateFrom:"",dateTo:"",sort:"date",order:"desc"};
+const money = (value) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+const dateTime = (value) =>
+  value
+    ? new Intl.DateTimeFormat("en-IN", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(value))
+    : "—";
+const inputDate = (value) => {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+const TODAY = inputDate(new Date());
+const emptyFilters = {
+  direction: "",
+  transactionType: [],
+  paymentMethod: [],
+  source: [],
+  dateFrom: "",
+  dateTo: "",
+  sort: "date",
+  order: "desc",
+};
 
-async function api(url){const response=await fetch(url);const json=await response.json();if(!response.ok)throw new Error(json.error||"Unable to load Accounts");return json.data;}
+async function api(url) {
+  const response = await fetch(url);
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.error || "Unable to load Accounts");
+  return json.data;
+}
 
-function typeBadge(type){return{SALE:"bg-emerald-50 text-emerald-700",PURCHASE:"bg-indigo-50 text-indigo-700",EXPENSE:"bg-amber-50 text-amber-700",REFUND:"bg-rose-50 text-rose-700",ADJUSTMENT:"bg-slate-100 text-slate-700"}[type]||"bg-slate-100 text-slate-700";}
-function Badge({type}){return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-extrabold tracking-wide ${typeBadge(type)}`}>{type}</span>}
+function typeBadge(type) {
+  return (
+    {
+      SALE: "bg-emerald-50 text-emerald-700",
+      PURCHASE: "bg-indigo-50 text-indigo-700",
+      EXPENSE: "bg-amber-50 text-amber-700",
+      REFUND: "bg-rose-50 text-rose-700",
+      ADJUSTMENT: "bg-slate-100 text-slate-700",
+    }[type] || "bg-slate-100 text-slate-700"
+  );
+}
+function Badge({ type }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-extrabold tracking-wide ${typeBadge(type)}`}
+    >
+      {type}
+    </span>
+  );
+}
 
-function KpiCard({label,value,note,icon:Icon,tone="green",loading}){const colors={green:"bg-[var(--green-soft)] text-[var(--green)]",red:"bg-rose-50 text-rose-700",blue:"bg-sky-50 text-sky-700",amber:"bg-amber-50 text-amber-700"};return <article className="card p-5"><div className="flex items-start justify-between"><div><p className="text-sm font-bold text-[var(--muted)]">{label}</p>{loading?<div className="mt-3 h-8 w-32 loading-shimmer rounded-lg bg-slate-100"/>:<p className={`mt-2 text-2xl font-extrabold ${Number(value)<0?"text-[var(--red)]":""}`}>{money(value)}</p>}<p className="mt-1 text-xs text-[var(--muted)]">{note}</p></div><span className={`grid size-10 place-items-center rounded-xl ${colors[tone]}`}><Icon size={19}/></span></div></article>}
+function KpiCard({ label, value, note, icon: Icon, tone = "green", loading }) {
+  const colors = {
+    green: "bg-[var(--green-soft)] text-[var(--green)]",
+    red: "bg-rose-50 text-rose-700",
+    blue: "bg-sky-50 text-sky-700",
+    amber: "bg-amber-50 text-amber-700",
+  };
+  return (
+    <article className="card p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-bold text-[var(--muted)]">{label}</p>
+          {loading ? (
+            <div className="mt-3 h-8 w-32 loading-shimmer rounded-lg bg-slate-100" />
+          ) : (
+            <p
+              className={`mt-2 text-2xl font-extrabold ${Number(value) < 0 ? "text-[var(--red)]" : ""}`}
+            >
+              {money(value)}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-[var(--muted)]">{note}</p>
+        </div>
+        <span
+          className={`grid size-10 place-items-center rounded-xl ${colors[tone]}`}
+        >
+          <Icon size={19} />
+        </span>
+      </div>
+    </article>
+  );
+}
 
-function PaymentCard({entry}){return <article className="rounded-xl border border-[var(--line)] bg-white p-4"><div className="flex items-center justify-between"><strong>{entry.method==="BANK"?"Bank":entry.method}</strong><WalletCards size={17} className="text-[var(--green)]"/></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><span className="text-[var(--muted)]">Money in</span><p className="mt-1 font-extrabold text-[var(--green)]">{money(entry.moneyIn)}</p></div><div><span className="text-[var(--muted)]">Money out</span><p className="mt-1 font-extrabold text-[var(--red)]">{money(entry.moneyOut)}</p></div></div><div className="mt-3 border-t border-[var(--line)] pt-3 text-sm"><span className="text-[var(--muted)]">Net</span><strong className={`float-right ${entry.net<0?"text-[var(--red)]":""}`}>{money(entry.net)}</strong></div></article>}
+function PaymentCard({ entry }) {
+  return (
+    <article className="rounded-xl border border-[var(--line)] bg-white p-4">
+      <div className="flex items-center justify-between">
+        <strong>{entry.method === "BANK" ? "Bank" : entry.method}</strong>
+        <WalletCards size={17} className="text-[var(--green)]" />
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <span className="text-[var(--muted)]">Money in</span>
+          <p className="mt-1 font-extrabold text-[var(--green)]">
+            {money(entry.moneyIn)}
+          </p>
+        </div>
+        <div>
+          <span className="text-[var(--muted)]">Money out</span>
+          <p className="mt-1 font-extrabold text-[var(--red)]">
+            {money(entry.moneyOut)}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 border-t border-[var(--line)] pt-3 text-sm">
+        <span className="text-[var(--muted)]">Net</span>
+        <strong
+          className={`float-right ${entry.net < 0 ? "text-[var(--red)]" : ""}`}
+        >
+          {money(entry.net)}
+        </strong>
+      </div>
+    </article>
+  );
+}
 
-function TransactionDrawer({movement,onClose,onSource}){return <div className="fixed inset-0 z-[80] bg-black/40" onMouseDown={(event)=>event.target===event.currentTarget&&onClose()}><aside className="ml-auto flex h-full w-full max-w-xl flex-col bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-[var(--line)] p-5"><div><p className="text-xs font-extrabold uppercase tracking-[.16em] text-[var(--green)]">Transaction details</p><div className="mt-2 flex items-center gap-2"><h2 className="text-2xl font-extrabold">{movement.reference}</h2><Badge type={movement.type}/></div></div><button onClick={onClose} aria-label="Close transaction details"><X/></button></header><div className="flex-1 overflow-y-auto p-5"><section className={`rounded-2xl p-5 ${movement.direction==="IN"?"bg-emerald-50":"bg-rose-50"}`}><p className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">{movement.direction==="IN"?"Money in":"Money out"}</p><p className={`mt-2 text-3xl font-extrabold ${movement.direction==="OUT"?"text-[var(--red)]":"text-[var(--green)]"}`}>{movement.direction==="IN"?"+":"−"}{money(movement.amount)}</p><p className="mt-2 text-sm text-[var(--muted)]">{dateTime(movement.date)}</p></section><section className="mt-6 grid gap-5 sm:grid-cols-2"><div><span className="label">Type</span><strong>{movement.type}</strong></div><div><span className="label">Direction</span><strong>{movement.direction==="IN"?"Money In":"Money Out"}</strong></div><div><span className="label">Party</span><strong>{movement.party}</strong></div><div><span className="label">Source</span><strong>{movement.source}</strong></div><div><span className="label">Payment method</span><strong>{movement.method}</strong></div><div><span className="label">Created by</span><strong>{movement.createdBy}</strong></div><div><span className="label">Payment reference</span><p>{movement.paymentReference||"—"}</p></div><div><span className="label">Running balance</span><strong>{money(movement.runningBalance)}</strong></div></section>{movement.paymentBreakdown?.length>0&&<section className="mt-7"><p className="label">Payment breakdown</p><div className="mt-2 overflow-hidden rounded-xl border border-[var(--line)]">{movement.paymentBreakdown.map((payment,index)=><div className="flex items-center justify-between border-b border-[var(--line)] p-4 last:border-0" key={`${payment.method}-${index}`}><div><strong>{payment.method}</strong>{payment.reference&&<p className="text-xs text-[var(--muted)]">{payment.reference}</p>}</div><strong>{money(payment.amount)}</strong></div>)}</div></section>}<section className="mt-7 rounded-xl border border-[var(--line)] p-4"><p className="label">Source information</p><div className="mt-3 space-y-2 text-sm">{Object.entries(movement.sourceDetails||{}).filter(([,value])=>value!==""&&value!==undefined).map(([key,value])=><div className="flex justify-between gap-4" key={key}><span className="capitalize text-[var(--muted)]">{key.replaceAll(/([A-Z])/g," $1")}</span><strong className="text-right">{typeof value==="number"&&key.toLowerCase().includes("amount")||key.toLowerCase().includes("total")||key.toLowerCase().includes("balance")?money(value):value}</strong></div>)}</div></section><p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-[var(--muted)]">This financial transaction is controlled by its source record. Correct or void it from the source workflow to preserve the audit trail.</p></div><footer className="flex justify-end gap-2 border-t border-[var(--line)] p-4"><button className="btn" onClick={onClose}>Close</button><button className="btn btn-primary" onClick={onSource}>View source <ArrowRight size={16}/></button></footer></aside></div>}
+function TransactionDrawer({ movement, onClose, onSource }) {
+  return (
+    <div
+      className="fixed inset-0 z-[80] bg-black/40"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <aside className="ml-auto flex h-full w-full max-w-xl flex-col bg-white shadow-2xl">
+        <header className="flex items-start justify-between border-b border-[var(--line)] p-5">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-[var(--green)]">
+              Transaction details
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <h2 className="text-2xl font-extrabold">{movement.reference}</h2>
+              <Badge type={movement.type} />
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Close transaction details">
+            <X />
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto p-5">
+          <section
+            className={`rounded-2xl p-5 ${movement.direction === "IN" ? "bg-emerald-50" : "bg-rose-50"}`}
+          >
+            <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">
+              {movement.direction === "IN" ? "Money in" : "Money out"}
+            </p>
+            <p
+              className={`mt-2 text-3xl font-extrabold ${movement.direction === "OUT" ? "text-[var(--red)]" : "text-[var(--green)]"}`}
+            >
+              {movement.direction === "IN" ? "+" : "−"}
+              {money(movement.amount)}
+            </p>
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              {dateTime(movement.date)}
+            </p>
+          </section>
+          <section className="mt-6 grid gap-5 sm:grid-cols-2">
+            <div>
+              <span className="label">Type</span>
+              <strong>{movement.type}</strong>
+            </div>
+            <div>
+              <span className="label">Direction</span>
+              <strong>
+                {movement.direction === "IN" ? "Money In" : "Money Out"}
+              </strong>
+            </div>
+            <div>
+              <span className="label">Party</span>
+              <strong>{movement.party}</strong>
+            </div>
+            <div>
+              <span className="label">Source</span>
+              <strong>{movement.source}</strong>
+            </div>
+            <div>
+              <span className="label">Payment method</span>
+              <strong>{movement.method}</strong>
+            </div>
+            <div>
+              <span className="label">Created by</span>
+              <strong>{movement.createdBy}</strong>
+            </div>
+            <div>
+              <span className="label">Payment reference</span>
+              <p>{movement.paymentReference || "—"}</p>
+            </div>
+            <div>
+              <span className="label">Running balance</span>
+              <strong>{money(movement.runningBalance)}</strong>
+            </div>
+          </section>
+          {movement.paymentBreakdown?.length > 0 && (
+            <section className="mt-7">
+              <p className="label">Payment breakdown</p>
+              <div className="mt-2 overflow-hidden rounded-xl border border-[var(--line)]">
+                {movement.paymentBreakdown.map((payment, index) => (
+                  <div
+                    className="flex items-center justify-between border-b border-[var(--line)] p-4 last:border-0"
+                    key={`${payment.method}-${index}`}
+                  >
+                    <div>
+                      <strong>{payment.method}</strong>
+                      {payment.reference && (
+                        <p className="text-xs text-[var(--muted)]">
+                          {payment.reference}
+                        </p>
+                      )}
+                    </div>
+                    <strong>{money(payment.amount)}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+          <section className="mt-7 rounded-xl border border-[var(--line)] p-4">
+            <p className="label">Source information</p>
+            <div className="mt-3 space-y-2 text-sm">
+              {Object.entries(movement.sourceDetails || {})
+                .filter(([, value]) => value !== "" && value !== undefined)
+                .map(([key, value]) => (
+                  <div className="flex justify-between gap-4" key={key}>
+                    <span className="capitalize text-[var(--muted)]">
+                      {key.replaceAll(/([A-Z])/g, " $1")}
+                    </span>
+                    <strong className="text-right">
+                      {(typeof value === "number" &&
+                        key.toLowerCase().includes("amount")) ||
+                      key.toLowerCase().includes("total") ||
+                      key.toLowerCase().includes("balance")
+                        ? money(value)
+                        : value}
+                    </strong>
+                  </div>
+                ))}
+            </div>
+          </section>
+          <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-[var(--muted)]">
+            This financial transaction is controlled by its source record.
+            Correct or void it from the source workflow to preserve the audit
+            trail.
+          </p>
+        </div>
+        <footer className="flex justify-end gap-2 border-t border-[var(--line)] p-4">
+          <button className="btn" onClick={onClose}>
+            Close
+          </button>
+          <button className="btn btn-primary" onClick={onSource}>
+            View source <ArrowRight size={16} />
+          </button>
+        </footer>
+      </aside>
+    </div>
+  );
+}
 
-function ChartTooltip({active,payload,label}){if(!active||!payload?.length)return null;const values=Object.fromEntries(payload.map((entry)=>[entry.dataKey,entry.value]));return <div className="rounded-xl border border-[var(--line)] bg-white p-3 text-sm shadow-xl"><strong>{new Intl.DateTimeFormat("en-IN",{dateStyle:"medium"}).format(new Date(label))}</strong><p className="mt-2 text-[var(--green)]">Money In <strong className="float-right ml-6">{money(values.moneyIn)}</strong></p><p className="mt-1 text-[var(--red)]">Money Out <strong className="float-right ml-6">{money(values.moneyOut)}</strong></p><p className="mt-2 border-t pt-2">Net <strong className="float-right ml-6">{money(Number(values.moneyIn||0)-Number(values.moneyOut||0))}</strong></p></div>}
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  const values = Object.fromEntries(
+    payload.map((entry) => [entry.dataKey, entry.value]),
+  );
+  return (
+    <div className="rounded-xl border border-[var(--line)] bg-white p-3 text-sm shadow-xl">
+      <strong>
+        {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(
+          new Date(label),
+        )}
+      </strong>
+      <p className="mt-2 text-[var(--green)]">
+        Money In{" "}
+        <strong className="float-right ml-6">{money(values.moneyIn)}</strong>
+      </p>
+      <p className="mt-1 text-[var(--red)]">
+        Money Out{" "}
+        <strong className="float-right ml-6">{money(values.moneyOut)}</strong>
+      </p>
+      <p className="mt-2 border-t pt-2">
+        Net{" "}
+        <strong className="float-right ml-6">
+          {money(Number(values.moneyIn || 0) - Number(values.moneyOut || 0))}
+        </strong>
+      </p>
+    </div>
+  );
+}
 
-export default function AccountsWorkspace(){
-  const router=useRouter();
-  const[data,setData]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[search,setSearch]=useState(""),[debouncedSearch,setDebouncedSearch]=useState(""),[filters,setFilters]=useState(emptyFilters),[page,setPage]=useState(1),[preset,setPreset]=useState("all"),[detail,setDetail]=useState(null),[exporting,setExporting]=useState(false),[reloadKey,setReloadKey]=useState(0);
-  useEffect(()=>{const timer=setTimeout(()=>{setDebouncedSearch(search);setPage(1);},300);return()=>clearTimeout(timer);},[search]);
-  const query=useMemo(()=>new URLSearchParams({search:debouncedSearch,page:String(page),limit:"25",...Object.fromEntries(serializedFilterEntries(filters))}).toString(),[debouncedSearch,filters,page]);
-  useEffect(()=>{let active=true;api(`/api/accounts?${query}`).then((result)=>{if(active){setData(result);setError("");}}).catch((failure)=>{if(active){setError(failure.message);toast.error("Unable to load Accounts.");}}).finally(()=>active&&setLoading(false));return()=>{active=false;};},[query,reloadKey]);
-  function setFilter(name,value){setPage(1);setFilters((current)=>({...current,[name]:value}));}
-  function applyPreset(value){const now=new Date(),from=new Date(now),to=new Date(now);if(value==="yesterday"){from.setDate(now.getDate()-1);to.setDate(now.getDate()-1);}else if(value==="7d")from.setDate(now.getDate()-6);else if(value==="month")from.setDate(1);setPreset(value);setPage(1);setFilters((current)=>({...current,dateFrom:value==="all"?"":inputDate(from),dateTo:value==="all"?"":inputDate(to)}));}
-  function clearFilters(){setSearch("");setPreset("all");setPage(1);setFilters(emptyFilters);}
-  async function exportCsv(){setExporting(true);try{const parameters=new URLSearchParams({search:debouncedSearch,page:"1",limit:"1000",...Object.fromEntries(serializedFilterEntries(filters))});const result=await api(`/api/accounts?${parameters}`);const headers=["Date","Time","Transaction Type","Reference","Source","Party","Description","Payment Method","Direction","Money In","Money Out","Running Balance","Created By","Payment Reference"];const cell=(value)=>`"${String(value??"").replaceAll('"','""')}"`;const rows=result.movements.map((row)=>{const timestamp=new Date(row.date);return[timestamp.toLocaleDateString("en-IN"),timestamp.toLocaleTimeString("en-IN"),row.type,row.reference,row.source,row.party,row.description,row.method,row.direction,row.direction==="IN"?row.amount:"",row.direction==="OUT"?row.amount:"",row.runningBalance,row.createdBy,row.paymentReference];});const blob=new Blob([[headers,...rows].map((row)=>row.map(cell).join(",")).join("\n")],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=`accounts-ledger-${TODAY}.csv`;anchor.click();URL.revokeObjectURL(url);toast.success("Ledger exported successfully.");}catch(failure){toast.error(failure.message);}finally{setExporting(false);}}
-  const summary=data?.summary||{},pagination=data?.pagination||{page:1,pages:1,total:0,limit:25},hasFilters=Boolean(search||Object.values(filters).some(hasFilterValue));
-  return <>
-    <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="mb-2 text-xs font-extrabold uppercase tracking-[.16em] text-[var(--green)]">Financial ledger</p><h1 className="text-3xl font-extrabold tracking-tight">Accounts</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">Track money received, money paid, cash flow and payment-method balances.</p></div><button className="btn" onClick={exportCsv} disabled={exporting}>{exporting?<LoaderCircle className="loading-shimmer-icon" size={17}/>:<ArrowDownToLine size={17}/>} {exporting?"Preparing export…":"Export"}</button></header>
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><KpiCard loading={loading} label="Money In" value={summary.moneyIn} note="Current filtered period" icon={TrendingUp}/><KpiCard loading={loading} label="Money Out" value={summary.moneyOut} note="Current filtered period" icon={TrendingDown} tone="red"/><KpiCard loading={loading} label="Net Cash Flow" value={summary.netCashFlow} note="Money in minus money out" icon={CircleDollarSign} tone="blue"/><KpiCard loading={loading} label="Cash Balance" value={summary.cashBalance} note="All posted Cash movements" icon={Landmark}/><KpiCard loading={loading} label="Digital / Bank Balance" value={summary.digitalBalance} note="All posted non-cash movements" icon={WalletCards} tone="amber"/></section>
-    <section className="card mt-5 p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">Cash flow overview</p><h2 className="mt-1 text-lg font-extrabold">Money In and Money Out</h2></div><div className="flex flex-wrap gap-2">{[["today","Today"],["7d","7 Days"],["month","This Month"],["all","All Time"]].map(([value,label])=><button className={`btn !min-h-9 ${preset===value?"btn-primary":""}`} onClick={()=>applyPreset(value)} key={value}>{label}</button>)}</div></div>{loading?<div className="mt-5 h-72 loading-shimmer rounded-xl bg-slate-100"/>:data?.cashFlow?.length?<div className="mt-5 h-72"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.cashFlow}><defs><linearGradient id="accountsIn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1f6b45" stopOpacity={.28}/><stop offset="100%" stopColor="#1f6b45" stopOpacity={0}/></linearGradient><linearGradient id="accountsOut" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#c84b4b" stopOpacity={.18}/><stop offset="100%" stopColor="#c84b4b" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="date" axisLine={false} tickLine={false} tickFormatter={(value)=>new Intl.DateTimeFormat("en-IN",{day:"numeric",month:"short"}).format(new Date(value))}/><YAxis axisLine={false} tickLine={false} tickFormatter={(value)=>`₹${value>=1000?`${Math.round(value/100)/10}K`:value}`}/><Tooltip content={<ChartTooltip/>}/><Area type="monotone" dataKey="moneyIn" name="Money In" stroke="#1f6b45" strokeWidth={3} fill="url(#accountsIn)"/><Area type="monotone" dataKey="moneyOut" name="Money Out" stroke="#c84b4b" strokeWidth={3} fill="url(#accountsOut)"/></AreaChart></ResponsiveContainer></div>:<div className="grid h-72 place-items-center text-sm text-[var(--muted)]">No cash-flow activity for this period.</div>}</section>
-    <section className="mt-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">Payment methods</p><h2 className="mt-1 text-lg font-extrabold">Reconciliation summary</h2></div><span className="text-xs font-bold text-[var(--muted)]">Current filters</span></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{loading?Array.from({length:3},(_,index)=><div className="h-36 loading-shimmer rounded-xl bg-slate-100" key={index}/>):data?.paymentMethods?.map((entry)=><PaymentCard entry={entry} key={entry.method}/>)}</div></section>
-    <section className="card mt-5 p-4"><div className="relative"><Search className="absolute left-3 top-3.5 text-[var(--muted)]" size={18}/><input className="field !pl-10" value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Search invoice, purchase, expense, customer, supplier or reference..."/></div><div className="mt-3 flex flex-wrap gap-2">{[["","All"],["IN","Money In"],["OUT","Money Out"]].map(([value,label])=><button className={`btn !min-h-9 ${filters.direction===value?"btn-primary":""}`} onClick={()=>setFilter("direction",value)} key={label}>{label}</button>)}<span className="mx-1 hidden h-9 border-l border-[var(--line)] sm:block"/>{[["today","Today"],["yesterday","Yesterday"],["7d","7 Days"],["month","This Month"]].map(([value,label])=><button className={`btn !min-h-9 ${preset===value?"bg-slate-100":""}`} onClick={()=>applyPreset(value)} key={value}>{label}</button>)}</div><div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><MultiSelectFilter label="Transaction types" placeholder="All transaction types" clearLabel="All transaction types" values={filters.transactionType} options={(data?.supportedTypes||[]).map((type)=>({value:type,label:type}))} onChange={(values)=>setFilter("transactionType",values)}/><MultiSelectFilter label="Payment methods" placeholder="All payment methods" clearLabel="All payment methods" values={filters.paymentMethod} options={(data?.enabledMethods||[]).map((method)=>({value:method,label:method}))} onChange={(values)=>setFilter("paymentMethod",values)}/><MultiSelectFilter label="Sources" placeholder="All sources" clearLabel="All sources" values={filters.source} options={(data?.supportedSources||[]).map((source)=>({value:source,label:source}))} onChange={(values)=>setFilter("source",values)}/><input className="field" type="date" aria-label="From date" value={filters.dateFrom} onChange={(event)=>{setPreset("custom");setFilter("dateFrom",event.target.value);}}/><input className="field" type="date" aria-label="To date" value={filters.dateTo} onChange={(event)=>{setPreset("custom");setFilter("dateTo",event.target.value);}}/><div className="flex gap-2"><select className="field" value={`${filters.sort}:${filters.order}`} onChange={(event)=>{const[sort,order]=event.target.value.split(":");setPage(1);setFilters((current)=>({...current,sort,order}));}}><option value="date:desc">Newest first</option><option value="date:asc">Oldest first</option><option value="amount:desc">Amount high to low</option><option value="amount:asc">Amount low to high</option></select><button className="btn !px-3" onClick={clearFilters} title="Clear filters"><X size={17}/></button></div></div></section>
-    {error?<section className="card mt-5 grid min-h-72 place-items-center p-8 text-center"><div><Landmark className="mx-auto text-[var(--red)]"/><h2 className="mt-3 font-extrabold">Unable to load account transactions.</h2><p className="mt-2 text-sm text-[var(--muted)]">{error}</p><button className="btn mt-4" onClick={()=>{setLoading(true);setError("");setReloadKey((value)=>value+1);}}><RefreshCw size={16}/>Retry</button></div></section>:loading?<section className="card mt-5 p-5"><div className="space-y-4">{Array.from({length:7},(_,index)=><div className="h-16 loading-shimmer rounded-xl bg-slate-100" key={index}/>)}</div></section>:data?.movements?.length?<><section className="card table-wrap mt-5 hidden lg:block"><table><thead><tr><th>Date & time</th><th>Transaction</th><th>Reference</th><th>Party / description</th><th>Method</th><th>Money in</th><th>Money out</th><th>Running balance</th><th>Action</th></tr></thead><tbody>{data.movements.map((row)=><tr className="cursor-pointer hover:bg-[#f8faf7]" key={row.id} onClick={()=>setDetail(row)}><td className="whitespace-nowrap">{dateTime(row.date)}</td><td><Badge type={row.type}/></td><td><strong>{row.reference}</strong><p className="mt-1 text-xs text-[var(--muted)]">{row.source}</p></td><td><strong>{row.party}</strong><p className="mt-1 max-w-56 truncate text-xs text-[var(--muted)]">{row.description}{row.category&&` · ${row.category}`}</p></td><td><span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-extrabold">{row.method}</span></td><td className="font-extrabold text-[var(--green)]">{row.direction==="IN"?money(row.amount):"—"}</td><td className="font-extrabold text-[var(--red)]">{row.direction==="OUT"?money(row.amount):"—"}</td><td className={`font-extrabold ${row.runningBalance<0?"text-[var(--red)]":""}`}>{money(row.runningBalance)}</td><td><button className="grid size-9 place-items-center rounded-lg hover:bg-slate-100" onClick={(event)=>{event.stopPropagation();setDetail(row);}} aria-label={`View ${row.reference}`}><Eye size={17}/></button></td></tr>)}</tbody></table></section><section className="mt-5 space-y-3 lg:hidden">{data.movements.map((row)=><button className="card w-full p-4 text-left" onClick={()=>setDetail(row)} key={row.id}><div className="flex items-start justify-between gap-3"><div><Badge type={row.type}/><p className="mt-2 font-extrabold">{row.reference}</p><p className="mt-1 text-sm text-[var(--muted)]">{row.party}</p></div><ArrowRight size={18} className="text-[var(--muted)]"/></div><div className="mt-4 flex items-end justify-between"><div className="text-xs text-[var(--muted)]"><p>{dateTime(row.date)}</p><p className="mt-1">{row.method} · Balance {money(row.runningBalance)}</p></div><strong className={row.direction==="IN"?"text-[var(--green)]":"text-[var(--red)]"}>{row.direction==="IN"?"+":"−"}{money(row.amount)}</strong></div></button>)}</section><div className="mt-5 flex flex-col items-center justify-between gap-3 text-sm sm:flex-row"><p className="text-[var(--muted)]">Showing {(pagination.page-1)*pagination.limit+1}–{Math.min(pagination.page*pagination.limit,pagination.total)} of {pagination.total} transactions</p><div className="flex items-center gap-2"><button className="btn !min-h-9" disabled={page<=1} onClick={()=>setPage((value)=>value-1)}><ChevronLeft size={16}/>Previous</button><span className="px-2 font-bold">{page} / {pagination.pages}</span><button className="btn !min-h-9" disabled={page>=pagination.pages} onClick={()=>setPage((value)=>value+1)}>Next<ChevronRight size={16}/></button></div></div></>:<section className="card mt-5 grid min-h-72 place-items-center p-8 text-center"><div><CalendarDays className="mx-auto text-[var(--green)]" size={34}/><h2 className="mt-4 text-lg font-extrabold">{hasFilters?"No transactions found":"No account transactions yet"}</h2><p className="mt-2 max-w-md text-sm leading-6 text-[var(--muted)]">{hasFilters?"Try another search, date range or filter.":"Sales, purchases and expenses will automatically create financial entries here."}</p>{hasFilters&&<button className="btn mt-4" onClick={clearFilters}>Clear filters</button>}</div></section>}
-    {detail&&<TransactionDrawer movement={detail} onClose={()=>setDetail(null)} onSource={()=>router.push(detail.sourcePath)}/>} 
-  </>;
+export default function AccountsWorkspace() {
+  const router = useRouter();
+  const [data, setData] = useState(null),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState(""),
+    [search, setSearch] = useState(""),
+    [debouncedSearch, setDebouncedSearch] = useState(""),
+    [filters, setFilters] = useState(emptyFilters),
+    [page, setPage] = useState(1),
+    [preset, setPreset] = useState("all"),
+    [detail, setDetail] = useState(null),
+    [exporting, setExporting] = useState(false),
+    [reloadKey, setReloadKey] = useState(0);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const query = useMemo(
+    () =>
+      new URLSearchParams({
+        search: debouncedSearch,
+        page: String(page),
+        limit: "25",
+        ...Object.fromEntries(serializedFilterEntries(filters)),
+      }).toString(),
+    [debouncedSearch, filters, page],
+  );
+  useEffect(() => {
+    let active = true;
+    api(`/api/accounts?${query}`)
+      .then((result) => {
+        if (active) {
+          setData(result);
+          setError("");
+        }
+      })
+      .catch((failure) => {
+        if (active) {
+          setError(failure.message);
+          toast.error("Unable to load Accounts.");
+        }
+      })
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [query, reloadKey]);
+  function setFilter(name, value) {
+    setPage(1);
+    setFilters((current) => ({ ...current, [name]: value }));
+  }
+  function applyPreset(value) {
+    const now = new Date(),
+      from = new Date(now),
+      to = new Date(now);
+    if (value === "yesterday") {
+      from.setDate(now.getDate() - 1);
+      to.setDate(now.getDate() - 1);
+    } else if (value === "7d") from.setDate(now.getDate() - 6);
+    else if (value === "month") from.setDate(1);
+    setPreset(value);
+    setPage(1);
+    setFilters((current) => ({
+      ...current,
+      dateFrom: value === "all" ? "" : inputDate(from),
+      dateTo: value === "all" ? "" : inputDate(to),
+    }));
+  }
+  function clearFilters() {
+    setSearch("");
+    setPreset("all");
+    setPage(1);
+    setFilters(emptyFilters);
+  }
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const parameters = new URLSearchParams({
+        search: debouncedSearch,
+        page: "1",
+        limit: "1000",
+        ...Object.fromEntries(serializedFilterEntries(filters)),
+      });
+      const result = await api(`/api/accounts?${parameters}`);
+      const headers = [
+        "Date",
+        "Time",
+        "Transaction Type",
+        "Reference",
+        "Source",
+        "Party",
+        "Description",
+        "Payment Method",
+        "Direction",
+        "Money In",
+        "Money Out",
+        "Running Balance",
+        "Created By",
+        "Payment Reference",
+      ];
+      const cell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+      const rows = result.movements.map((row) => {
+        const timestamp = new Date(row.date);
+        return [
+          timestamp.toLocaleDateString("en-IN"),
+          timestamp.toLocaleTimeString("en-IN"),
+          row.type,
+          row.reference,
+          row.source,
+          row.party,
+          row.description,
+          row.method,
+          row.direction,
+          row.direction === "IN" ? row.amount : "",
+          row.direction === "OUT" ? row.amount : "",
+          row.runningBalance,
+          row.createdBy,
+          row.paymentReference,
+        ];
+      });
+      const blob = new Blob(
+          [[headers, ...rows].map((row) => row.map(cell).join(",")).join("\n")],
+          { type: "text/csv;charset=utf-8" },
+        ),
+        url = URL.createObjectURL(blob),
+        anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `accounts-ledger-${TODAY}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success("Ledger exported successfully.");
+    } catch (failure) {
+      toast.error(failure.message);
+    } finally {
+      setExporting(false);
+    }
+  }
+  const summary = data?.summary || {},
+    pagination = data?.pagination || { page: 1, pages: 1, total: 0, limit: 25 },
+    hasFilters = Boolean(search || Object.values(filters).some(hasFilterValue));
+  return (
+    <>
+      <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mb-2 text-xs font-extrabold uppercase tracking-[.16em] text-[var(--green)]">
+            Financial ledger
+          </p>
+          <h1 className="text-3xl font-extrabold tracking-tight">Accounts</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+            Track money received, money paid, cash flow and payment-method
+            balances.
+          </p>
+        </div>
+        <button className="btn" onClick={exportCsv} disabled={exporting}>
+          {exporting ? (
+            <LoaderCircle className="loading-shimmer-icon" size={17} />
+          ) : (
+            <ArrowDownToLine size={17} />
+          )}{" "}
+          {exporting ? "Preparing export…" : "Export"}
+        </button>
+      </header>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <KpiCard
+          loading={loading}
+          label="Money In"
+          value={summary.moneyIn}
+          note="Current filtered period"
+          icon={TrendingUp}
+        />
+        <KpiCard
+          loading={loading}
+          label="Money Out"
+          value={summary.moneyOut}
+          note="Current filtered period"
+          icon={TrendingDown}
+          tone="red"
+        />
+        <KpiCard
+          loading={loading}
+          label="Net Cash Flow"
+          value={summary.netCashFlow}
+          note="Money in minus money out"
+          icon={CircleDollarSign}
+          tone="blue"
+        />
+        <KpiCard
+          loading={loading}
+          label="Cash Balance"
+          value={summary.cashBalance}
+          note="All posted Cash movements"
+          icon={Landmark}
+        />
+        <KpiCard
+          loading={loading}
+          label="Digital / Bank Balance"
+          value={summary.digitalBalance}
+          note="All posted non-cash movements"
+          icon={WalletCards}
+          tone="amber"
+        />
+      </section>
+      <section className="card mt-5 p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">
+              Cash flow overview
+            </p>
+            <h2 className="mt-1 text-lg font-extrabold">
+              Money In and Money Out
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["today", "Today"],
+              ["7d", "7 Days"],
+              ["month", "This Month"],
+              ["all", "All Time"],
+            ].map(([value, label]) => (
+              <button
+                className={`btn !min-h-9 ${preset === value ? "btn-primary" : ""}`}
+                onClick={() => applyPreset(value)}
+                key={value}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {loading ? (
+          <div className="mt-5 h-72 loading-shimmer rounded-xl bg-slate-100" />
+        ) : data?.cashFlow?.length ? (
+          <div className="mt-5 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.cashFlow}>
+                <defs>
+                  <linearGradient id="accountsIn" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#1f6b45" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="#1f6b45" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="accountsOut" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#c84b4b" stopOpacity={0.18} />
+                    <stop offset="100%" stopColor="#c84b4b" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) =>
+                    new Intl.DateTimeFormat("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                    }).format(new Date(value))
+                  }
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) =>
+                    `₹${value >= 1000 ? `${Math.round(value / 100) / 10}K` : value}`
+                  }
+                />
+                <Tooltip content={<ChartTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="moneyIn"
+                  name="Money In"
+                  stroke="#1f6b45"
+                  strokeWidth={3}
+                  fill="url(#accountsIn)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="moneyOut"
+                  name="Money Out"
+                  stroke="#c84b4b"
+                  strokeWidth={3}
+                  fill="url(#accountsOut)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="grid h-72 place-items-center text-sm text-[var(--muted)]">
+            No cash-flow activity for this period.
+          </div>
+        )}
+      </section>
+      <section className="mt-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--muted)]">
+              Payment methods
+            </p>
+            <h2 className="mt-1 text-lg font-extrabold">
+              Reconciliation summary
+            </h2>
+          </div>
+          <span className="text-xs font-bold text-[var(--muted)]">
+            Current filters
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {loading
+            ? Array.from({ length: 3 }, (_, index) => (
+                <div
+                  className="h-36 loading-shimmer rounded-xl bg-slate-100"
+                  key={index}
+                />
+              ))
+            : data?.paymentMethods?.map((entry) => (
+                <PaymentCard entry={entry} key={entry.method} />
+              ))}
+        </div>
+      </section>
+      <section className="card mt-5 p-4">
+        <div className="relative">
+          <Search
+            className="absolute left-3 top-3.5 text-[var(--muted)]"
+            size={18}
+          />
+          <input
+            className="field !pl-10"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search invoice, purchase, expense, customer, supplier or reference..."
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            ["", "All"],
+            ["IN", "Money In"],
+            ["OUT", "Money Out"],
+          ].map(([value, label]) => (
+            <button
+              className={`btn !min-h-9 ${filters.direction === value ? "btn-primary" : ""}`}
+              onClick={() => setFilter("direction", value)}
+              key={label}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="mx-1 hidden h-9 border-l border-[var(--line)] sm:block" />
+          {[
+            ["today", "Today"],
+            ["yesterday", "Yesterday"],
+            ["7d", "7 Days"],
+            ["month", "This Month"],
+          ].map(([value, label]) => (
+            <button
+              className={`btn !min-h-9 ${preset === value ? "bg-slate-100" : ""}`}
+              onClick={() => applyPreset(value)}
+              key={value}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <MultiSelectFilter
+            label="Transaction types"
+            placeholder="All transaction types"
+            clearLabel="All transaction types"
+            values={filters.transactionType}
+            options={(data?.supportedTypes || []).map((type) => ({
+              value: type,
+              label: type,
+            }))}
+            onChange={(values) => setFilter("transactionType", values)}
+          />
+          <MultiSelectFilter
+            label="Payment methods"
+            placeholder="All payment methods"
+            clearLabel="All payment methods"
+            values={filters.paymentMethod}
+            options={(data?.enabledMethods || []).map((method) => ({
+              value: method,
+              label: method,
+            }))}
+            onChange={(values) => setFilter("paymentMethod", values)}
+          />
+          <MultiSelectFilter
+            label="Sources"
+            placeholder="All sources"
+            clearLabel="All sources"
+            values={filters.source}
+            options={(data?.supportedSources || []).map((source) => ({
+              value: source,
+              label: source,
+            }))}
+            onChange={(values) => setFilter("source", values)}
+          />
+          <input
+            className="field"
+            type="date"
+            aria-label="From date"
+            value={filters.dateFrom}
+            onChange={(event) => {
+              setPreset("custom");
+              setFilter("dateFrom", event.target.value);
+            }}
+          />
+          <input
+            className="field"
+            type="date"
+            aria-label="To date"
+            value={filters.dateTo}
+            onChange={(event) => {
+              setPreset("custom");
+              setFilter("dateTo", event.target.value);
+            }}
+          />
+          <div className="flex gap-2">
+            <select
+              className="field"
+              value={`${filters.sort}:${filters.order}`}
+              onChange={(event) => {
+                const [sort, order] = event.target.value.split(":");
+                setPage(1);
+                setFilters((current) => ({ ...current, sort, order }));
+              }}
+            >
+              <option value="date:desc">Newest first</option>
+              <option value="date:asc">Oldest first</option>
+              <option value="amount:desc">Amount high to low</option>
+              <option value="amount:asc">Amount low to high</option>
+            </select>
+            <button
+              className="btn !px-3"
+              onClick={clearFilters}
+              title="Clear filters"
+            >
+              <X size={17} />
+            </button>
+          </div>
+        </div>
+      </section>
+      {error ? (
+        <section className="card mt-5 grid min-h-72 place-items-center p-8 text-center">
+          <div>
+            <Landmark className="mx-auto text-[var(--red)]" />
+            <h2 className="mt-3 font-extrabold">
+              Unable to load account transactions.
+            </h2>
+            <p className="mt-2 text-sm text-[var(--muted)]">{error}</p>
+            <button
+              className="btn mt-4"
+              onClick={() => {
+                setLoading(true);
+                setError("");
+                setReloadKey((value) => value + 1);
+              }}
+            >
+              <RefreshCw size={16} />
+              Retry
+            </button>
+          </div>
+        </section>
+      ) : loading ? (
+        <section className="card mt-5 p-5">
+          <div className="space-y-4">
+            {Array.from({ length: 7 }, (_, index) => (
+              <div
+                className="h-16 loading-shimmer rounded-xl bg-slate-100"
+                key={index}
+              />
+            ))}
+          </div>
+        </section>
+      ) : data?.movements?.length ? (
+        <>
+          <section className="card table-wrap mt-5 hidden lg:block">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date & time</th>
+                  <th>Transaction</th>
+                  <th>Reference</th>
+                  <th>Party / description</th>
+                  <th>Method</th>
+                  <th>Money in</th>
+                  <th>Money out</th>
+                  <th>Running balance</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.movements.map((row) => (
+                  <tr
+                    className="cursor-pointer hover:bg-[#f8faf7]"
+                    key={row.id}
+                    onClick={() => setDetail(row)}
+                  >
+                    <td className="whitespace-nowrap">{dateTime(row.date)}</td>
+                    <td>
+                      <Badge type={row.type} />
+                    </td>
+                    <td>
+                      <strong>{row.reference}</strong>
+                      <p className="mt-1 text-xs text-[var(--muted)]">
+                        {row.source}
+                      </p>
+                    </td>
+                    <td>
+                      <strong>{row.party}</strong>
+                      <p className="mt-1 max-w-56 truncate text-xs text-[var(--muted)]">
+                        {row.description}
+                        {row.category && ` · ${row.category}`}
+                      </p>
+                    </td>
+                    <td>
+                      <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-extrabold">
+                        {row.method}
+                      </span>
+                    </td>
+                    <td className="font-extrabold text-[var(--green)]">
+                      {row.direction === "IN" ? money(row.amount) : "—"}
+                    </td>
+                    <td className="font-extrabold text-[var(--red)]">
+                      {row.direction === "OUT" ? money(row.amount) : "—"}
+                    </td>
+                    <td
+                      className={`font-extrabold ${row.runningBalance < 0 ? "text-[var(--red)]" : ""}`}
+                    >
+                      {money(row.runningBalance)}
+                    </td>
+                    <td>
+                      <button
+                        className="grid size-9 place-items-center rounded-lg hover:bg-slate-100"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDetail(row);
+                        }}
+                        aria-label={`View ${row.reference}`}
+                      >
+                        <Eye size={17} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+          <section className="mt-5 space-y-3 lg:hidden">
+            {data.movements.map((row) => (
+              <button
+                className="card w-full p-4 text-left"
+                onClick={() => setDetail(row)}
+                key={row.id}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Badge type={row.type} />
+                    <p className="mt-2 font-extrabold">{row.reference}</p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
+                      {row.party}
+                    </p>
+                  </div>
+                  <ArrowRight size={18} className="text-[var(--muted)]" />
+                </div>
+                <div className="mt-4 flex items-end justify-between">
+                  <div className="text-xs text-[var(--muted)]">
+                    <p>{dateTime(row.date)}</p>
+                    <p className="mt-1">
+                      {row.method} · Balance {money(row.runningBalance)}
+                    </p>
+                  </div>
+                  <strong
+                    className={
+                      row.direction === "IN"
+                        ? "text-[var(--green)]"
+                        : "text-[var(--red)]"
+                    }
+                  >
+                    {row.direction === "IN" ? "+" : "−"}
+                    {money(row.amount)}
+                  </strong>
+                </div>
+              </button>
+            ))}
+          </section>
+          <div className="mt-5 flex flex-col items-center justify-between gap-3 text-sm sm:flex-row">
+            <p className="text-[var(--muted)]">
+              Showing {(pagination.page - 1) * pagination.limit + 1}–
+              {Math.min(pagination.page * pagination.limit, pagination.total)}{" "}
+              of {pagination.total} transactions
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                className="btn !min-h-9"
+                disabled={page <= 1}
+                onClick={() => setPage((value) => value - 1)}
+              >
+                <ChevronLeft size={16} />
+                Previous
+              </button>
+              <span className="px-2 font-bold">
+                {page} / {pagination.pages}
+              </span>
+              <button
+                className="btn !min-h-9"
+                disabled={page >= pagination.pages}
+                onClick={() => setPage((value) => value + 1)}
+              >
+                Next
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <section className="card mt-5 grid min-h-72 place-items-center p-8 text-center">
+          <div>
+            <CalendarDays className="mx-auto text-[var(--green)]" size={34} />
+            <h2 className="mt-4 text-lg font-extrabold">
+              {hasFilters
+                ? "No transactions found"
+                : "No account transactions yet"}
+            </h2>
+            <p className="mt-2 max-w-md text-sm leading-6 text-[var(--muted)]">
+              {hasFilters
+                ? "Try another search, date range or filter."
+                : "Sales, purchases and expenses will automatically create financial entries here."}
+            </p>
+            {hasFilters && (
+              <button className="btn mt-4" onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+      {detail && (
+        <TransactionDrawer
+          movement={detail}
+          onClose={() => setDetail(null)}
+          onSource={() => router.push(detail.sourcePath)}
+        />
+      )}
+    </>
+  );
 }
