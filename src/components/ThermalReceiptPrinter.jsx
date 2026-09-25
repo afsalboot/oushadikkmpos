@@ -126,7 +126,7 @@ export function ThermalReceipt({ sale }) {
   );
 }
 
-function printThermalReceipt(source, onFinished) {
+export function printThermalReceipt(source, onFinished) {
   if (!source) return;
   const frame = document.createElement("iframe");
   frame.setAttribute("title", "Thermal receipt print");

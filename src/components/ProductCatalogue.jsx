@@ -1694,19 +1694,6 @@ function ProductEditor({
                         onChange={(e) => set("expiryDate", e.target.value)}
                       />
                     </label>
-                    <label>
-                      <FieldLabel help="The amount the shop paid for one complete package of this product.">
-                        Cost Price Per Package
-                      </FieldLabel>
-                      <input
-                        className="field"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.purchasePrice}
-                        onChange={(e) => set("purchasePrice", e.target.value)}
-                      />
-                    </label>
                   </div>
                 )}
               </Section>

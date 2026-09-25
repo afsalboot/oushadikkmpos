@@ -374,9 +374,6 @@ export default function SalesCheckoutHostV2() {
           detail: { sale: completed },
         }),
       );
-      toast.success(
-        `${saleType === "WHOLESALE" ? "Wholesale sale" : "Sale"} ${completed.invoiceNumber} completed`,
-      );
     } catch (error) {
       toast.error(error.message);
     } finally {
