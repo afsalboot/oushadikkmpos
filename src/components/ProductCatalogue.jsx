@@ -782,32 +782,6 @@ function ProductEditor({
                     onChange={(e) => set("packageSize", e.target.value)}
                   />
                 </label>
-                <label>
-                  <FieldLabel help="The outer pack used to receive and count sealed stock. This does not change the product sold inside it.">
-                    Outer Stock Pack
-                  </FieldLabel>
-                  <select
-                    className="field"
-                    value={form.stockPackType}
-                    onChange={(e) => set("stockPackType", e.target.value)}
-                  >
-                    <option>Box</option>
-                    <option>Carton</option>
-                  </select>
-                </label>
-                <label>
-                  <FieldLabel help={`Enter how many ${plural(form.packageType, 2)} are inside one ${form.stockPackType.toLowerCase()}. Example: 12 bottles per box.`}>
-                    {plural(form.packageType, 2)} per {form.stockPackType} *
-                  </FieldLabel>
-                  <input
-                    className="field"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={form.unitsPerStockPack}
-                    onChange={(e) => set("unitsPerStockPack", e.target.value)}
-                  />
-                </label>
               </div>
               <div className="mt-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">
                 <strong>
@@ -816,8 +790,7 @@ function ProductEditor({
                   {number(form.packageSize)} {displayUnit}
                 </strong>
                 <p className="mt-1">
-                  1 {form.stockPackType} = {number(form.unitsPerStockPack)}{" "}
-                  {plural(form.packageType, Number(form.unitsPerStockPack))}. Sealed stock is counted as {plural(form.packageType, 2)}; only an opened {form.packageType.toLowerCase()} is measured in {displayUnit}.
+                  Full stock is counted in {plural(form.packageType, 2).toLowerCase()}.
                 </p>
               </div>
               {edit &&
