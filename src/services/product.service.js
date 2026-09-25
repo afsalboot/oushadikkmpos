@@ -67,6 +67,7 @@ export async function createOpeningInventory({ product, input, actorId, session 
 
 export async function createProduct(input, actorId, session) {
   const normalized = normalizeProductInput(input);
+  if (!normalized.sku) normalized.sku = `PRD-${new mongoose.Types.ObjectId().toHexString().toUpperCase()}`;
   const errors = validateProductInput(normalized);
   if (errors.length) throw new Error(errors.join(". "));
   await validateProductTax(normalized);

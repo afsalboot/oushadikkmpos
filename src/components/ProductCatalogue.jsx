@@ -449,12 +449,8 @@ function ProductEditor({
           },
         )
       : null;
-  const openingSealedPackages =
-    Number(form.openingStockPacks || 0) * Number(form.unitsPerStockPack || 0) +
-    Number(form.openingPackages || 0);
-  const openingTotal =
-    openingSealedPackages * Number(form.packageSize || 0) +
-    Number(form.openingQuantity || 0);
+  const openingSealedPackages = Number(form.openingPackages || 0);
+  const openingTotal = openingSealedPackages * Number(form.packageSize || 0);
   const displayUnit =
     form.baseUnit === "ml"
       ? "ml"
@@ -464,7 +460,6 @@ function ProductEditor({
           ? "pieces"
           : form.baseUnit;
   const packageName = form.packageType.toLowerCase();
-  const stockPackPlural = form.stockPackType === "Box" ? "Boxes" : "Cartons";
   const amountLabel =
     form.baseUnit === "ml"
       ? `Volume inside One ${form.packageType} (ml)`
@@ -475,14 +470,6 @@ function ProductEditor({
       : form.baseUnit === "pcs"
         ? `Pieces in One ${form.packageType}`
         : `Amount in One ${form.packageType}`;
-  const unopenedLabel =
-    form.packageType === "Strip"
-      ? "Extra Full Strips"
-      : `Extra Unopened ${plural(form.packageType, 2)}`;
-  const looseLabel =
-    form.loosePricingMethod === LOOSE_PRICING_METHODS.COUNT_BASED
-      ? `Loose ${form.looseUnit.charAt(0).toUpperCase() + form.looseUnit.slice(1)}s Already Open`
-      : `Loose Quantity Already Open (${displayUnit})`;
   const capabilityNames =
     [
       form.allowPackageSale && "Full Package",
@@ -523,7 +510,6 @@ function ProductEditor({
     event.preventDefault();
     if (
       !form.name.trim() ||
-      !form.sku.trim() ||
       !form.categoryId ||
       !(Number(form.packageSize) > 0)
     )
@@ -567,22 +553,13 @@ function ProductEditor({
     )
       return toast.error("Complete the wholesale free scheme.");
     if (
-      !Number.isInteger(Number(form.openingStockPacks || 0)) ||
-      Number(form.openingStockPacks || 0) < 0 ||
       !Number.isInteger(Number(form.unitsPerStockPack)) ||
       Number(form.unitsPerStockPack) <= 0 ||
       !Number.isInteger(Number(form.openingPackages || 0)) ||
       Number(form.openingPackages || 0) < 0
     )
       return toast.error(
-        "Enter valid whole numbers for boxes, packages per box, and individual packages.",
-      );
-    if (
-      Number(form.unitsPerStockPack) > 1 &&
-      Number(form.openingPackages || 0) >= Number(form.unitsPerStockPack)
-    )
-      return toast.error(
-        `Extra ${plural(form.packageType, 2).toLowerCase()} must be fewer than ${form.unitsPerStockPack}; add another ${form.stockPackType.toLowerCase()} instead.`,
+        "Enter valid whole numbers for full stock and packages per box.",
       );
     if (form.batchTracking && !form.expiryDate)
       return toast.error("Expiry date is required for batch tracking.");
@@ -597,7 +574,9 @@ function ProductEditor({
       const payload = {
         ...form,
         openingPackages: undefined,
-        openingIndividualPackages: Number(form.openingPackages || 0),
+        openingStockPacks: Math.floor(openingSealedPackages / Number(form.unitsPerStockPack)),
+        openingIndividualPackages: openingSealedPackages % Number(form.unitsPerStockPack),
+        openingQuantity: 0,
         id: product?._id,
         status: form.active ? "ACTIVE" : "INACTIVE",
       };
@@ -625,7 +604,7 @@ function ProductEditor({
     <>
       <Modal onClose={onClose} wide={!mode}>
         <form onSubmit={submit}>
-          <div className="sticky -top-7 z-10 -mx-7 -mt-7 flex items-start justify-between border-b bg-white px-7 py-5">
+          <div className="sticky -top-5 z-10 -mx-5 -mt-5 flex items-start justify-between gap-4 border-b border-[var(--line)] bg-white px-5 py-4 sm:-top-7 sm:-mx-7 sm:-mt-7 sm:px-7">
             <div>
               <p className="text-xs font-extrabold uppercase tracking-[.16em] text-[var(--green)]">
                 {mode ? product.name : edit ? "Product master" : "New product"}
@@ -640,7 +619,7 @@ function ProductEditor({
                 </p>
               )}
             </div>
-            <button type="button" onClick={onClose}>
+            <button type="button" className="btn shrink-0 p-2" aria-label="Close product form" onClick={onClose}>
               <X />
             </button>
           </div>
@@ -651,7 +630,7 @@ function ProductEditor({
               hidden={Boolean(mode)}
             >
               <div className="grid gap-4 sm:grid-cols-2">
-                <label>
+                <label className="sm:col-span-2">
                   <FieldLabel help="The name shown to staff and customers. Example: Dasamoolarishtam 450 ml.">
                     Product / Medicine Name *
                   </FieldLabel>
@@ -662,18 +641,7 @@ function ProductEditor({
                     onChange={(e) => set("name", e.target.value)}
                   />
                 </label>
-                <label>
-                  <FieldLabel help="A unique internal code used to identify this product. Example: DAS-450.">
-                    Product Code (SKU)
-                  </FieldLabel>
-                  <input
-                    className="field uppercase"
-                    placeholder="Example: DAS-450"
-                    value={form.sku}
-                    onChange={(e) => set("sku", e.target.value)}
-                  />
-                </label>
-                <div>
+                <div className="min-w-0 sm:col-span-2">
                   <FieldLabel help="Enter the barcode printed on the product or scan it using a barcode scanner.">
                     Barcode (Optional)
                   </FieldLabel>
@@ -696,13 +664,13 @@ function ProductEditor({
                     onChange={(e) => set("manufacturer", e.target.value)}
                   />
                 </label>
-                <label className="sm:col-span-2">
+                <label className="min-w-0">
                   <FieldLabel help="The group this product belongs to for easier searching and reporting. Examples: Arishtam, Tablets, Oils and Choornam.">
                     Category *
                   </FieldLabel>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                     <select
-                      className="field"
+                      className="field min-w-0 flex-1"
                       value={form.categoryId}
                       onChange={(e) => set("categoryId", e.target.value)}
                     >
@@ -757,7 +725,7 @@ function ProductEditor({
               subtitle="Tell us how this product is packed and how much is inside one package."
               hidden={Boolean(mode)}
             >
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <label>
                   <FieldLabel help="How the quantity inside the package is measured. For example, Arishtam uses milliliters, Choornam uses grams, and tablets use tablets.">
                     Measured In *
@@ -1651,23 +1619,10 @@ function ProductEditor({
                 />
               </label>
               {!edit && (
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <label>
-                    <FieldLabel help={`Number of complete ${stockPackPlural.toLowerCase()} currently in stock. Each contains ${number(form.unitsPerStockPack)} ${plural(form.packageType, Number(form.unitsPerStockPack))}.`}>
-                      Full {stockPackPlural}
-                    </FieldLabel>
-                    <input
-                      className="field"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={form.openingStockPacks}
-                      onChange={(e) => set("openingStockPacks", e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <FieldLabel help={`Complete ${form.packageType.toLowerCase()}s that are outside full ${stockPackPlural.toLowerCase()}.`}>
-                      {unopenedLabel}
+                <div className="mt-5 grid gap-4">
+                  <label className="block max-w-sm">
+                    <FieldLabel help={`Enter the total number of full ${plural(form.packageType, 2).toLowerCase()} in stock, including those inside boxes or cartons.`}>
+                      Full Stock ({plural(form.packageType, 2)})
                     </FieldLabel>
                     <input
                       className="field"
@@ -1678,33 +1633,13 @@ function ProductEditor({
                       onChange={(e) => set("openingPackages", e.target.value)}
                     />
                   </label>
-                  <label>
-                    <FieldLabel help="Remaining quantity from a package that has already been opened.">
-                      {looseLabel}
-                    </FieldLabel>
-                    <input
-                      className="field"
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={form.openingQuantity}
-                      onChange={(e) => set("openingQuantity", e.target.value)}
-                    />
-                  </label>
-                  <div className="rounded-xl bg-[#f4f7f3] p-4 text-sm sm:col-span-2 lg:col-span-3">
+                  <div className="rounded-xl bg-[#f4f7f3] p-4 text-sm">
                     <FieldLabel help="This is the total stock that will be saved when the product is created.">
                       Starting Stock
                     </FieldLabel>
                     <strong className="mt-1 block">
-                      {number(form.openingStockPacks)} {form.stockPackType}
-                      {Number(form.openingStockPacks) === 1 ? "" : form.stockPackType === "Box" ? "es" : "s"} ×{" "}
-                      {number(form.unitsPerStockPack)} +{" "}
-                      {number(form.openingPackages)} extra ={" "}
                       {number(openingSealedPackages)}{" "}
                       {plural(form.packageType, openingSealedPackages)}
-                      {Number(form.openingQuantity) > 0
-                        ? ` + ${number(form.openingQuantity)} ${form.loosePricingMethod === LOOSE_PRICING_METHODS.COUNT_BASED ? form.looseUnit : form.baseUnit} open`
-                        : ""}
                     </strong>
                     <p className="mt-1 text-[var(--muted)]">
                       {form.loosePricingMethod ===
@@ -1833,7 +1768,7 @@ function ProductEditor({
                       ? "Unchanged"
                       : form.loosePricingMethod ===
                           LOOSE_PRICING_METHODS.COUNT_BASED
-                        ? `${number(form.openingPackages)} ${plural(form.packageType, Number(form.openingPackages))}${Number(form.openingQuantity) > 0 ? ` + ${number(form.openingQuantity)} ${form.looseUnit}s` : ""}`
+                        ? `${number(openingSealedPackages)} ${plural(form.packageType, openingSealedPackages)}`
                         : `${number(openingTotal)} ${form.baseUnit}`}
                   </strong>
                 </div>
@@ -1851,11 +1786,11 @@ function ProductEditor({
               </section>
             )}
           </div>
-          <div className="mt-6 flex justify-end gap-2">
-            <button type="button" className="btn" onClick={onClose}>
+          <div className="sticky -bottom-5 z-10 -mx-5 -mb-5 mt-6 flex justify-end gap-3 border-t border-[var(--line)] bg-white px-5 py-4 sm:-bottom-7 sm:-mx-7 sm:-mb-7 sm:px-7">
+            <button type="button" className="btn flex-1 sm:flex-none" onClick={onClose}>
               Cancel
             </button>
-            <button className="btn btn-primary" disabled={saving}>
+            <button className="btn btn-primary flex-1 sm:flex-none" disabled={saving}>
               {saving
                 ? "Saving…"
                 : mode
