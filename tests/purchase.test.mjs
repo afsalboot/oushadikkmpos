@@ -5,12 +5,13 @@ import {calculatePurchaseTotals,receivedPackageQuantity} from "../src/lib/purcha
 test("free packages increase received inventory without increasing purchase cost",()=>{
   const item={packageQuantity:10,freeQuantity:2,unitCost:120};
   assert.equal(receivedPackageQuantity(item),12);
-  assert.deepEqual(calculatePurchaseTotals([item]),{subtotal:1200,additionalCharges:0,discountType:"FIXED",discountValue:0,discount:0,taxableAmount:1200,totalGst:0,cgst:0,sgst:0,igst:0,total:1200});
+  const result=calculatePurchaseTotals([item]);
+  assert.equal(result.subtotal,1200);assert.equal(result.total,1200);assert.equal(result.totalGst,0);assert.equal(result.taxLines[0].lineTotal,1200);
 });
 
 test("purchase totals apply charges and percentage discounts once",()=>{
   const totals=calculatePurchaseTotals([{packageQuantity:10,freeQuantity:5,unitCost:100}],{additionalCharges:200,discountType:"PERCENTAGE",discountValue:10});
-  assert.deepEqual(totals,{subtotal:1000,additionalCharges:200,discountType:"PERCENTAGE",discountValue:10,discount:100,taxableAmount:900,totalGst:0,cgst:0,sgst:0,igst:0,total:1100});
+  assert.equal(totals.total,1100);assert.equal(totals.taxableAmount,1100);assert.equal(totals.taxLines[0].taxableAmount,900);assert.equal(totals.discount,100);assert.equal(totals.totalGst,0);
 });
 
 test("purchase GST preserves inclusive and exclusive invoice treatment",()=>{

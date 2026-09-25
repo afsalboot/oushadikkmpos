@@ -8,6 +8,7 @@ import {
   Purchase,
   Sale,
   StockTransaction,
+  AuditLog,
 } from "@/models";
 import { WHOLESALE_UNITS, validateWholesaleProduct } from "@/lib/wholesale";
 import {
@@ -31,7 +32,7 @@ function productIds(values) {
 export async function PATCH(request) {
   let session;
   try {
-    await requireSession("products.edit");
+    const actor=await requireSession("products.edit");
     await connectDb();
     const body = await request.json();
     const ids = productIds(body.ids);
@@ -198,6 +199,7 @@ export async function PATCH(request) {
     session = await mongoose.startSession();
     await session.withTransaction(async () => {
       await Product.bulkWrite(operations, { session });
+      await AuditLog.insertMany(products.map((product,index)=>({actorId:actor.sub,action:"PRODUCT_BULK_UPDATED",module:"products",targetType:"Product",targetId:product._id,description:"Bulk product update",metadata:{before:product,changes:operations[index].updateOne.update.$set}})),{session});
     });
     return ok({ matched: products.length, updated: operations.length });
   } catch (error) {

@@ -664,7 +664,7 @@ function ProductEditor({
                 </label>
                 <label>
                   <FieldLabel help="A unique internal code used to identify this product. Example: DAS-450.">
-                    Product Code (SKU) *
+                    Product Code (SKU)
                   </FieldLabel>
                   <input
                     className="field uppercase"

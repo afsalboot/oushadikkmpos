@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Printer } from "lucide-react";
-import OushadhiLogo from "@/components/branding/OushadhiLogo";
+import {gstStateName} from "@/lib/gst-states";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -15,6 +15,7 @@ const dateTime = (value) =>
   new Intl.DateTimeFormat("en-IN", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone:"Asia/Kolkata",
   }).format(new Date(value));
 
 const paymentLabel = (sale) =>
@@ -41,27 +42,41 @@ function itemDescription(item) {
 }
 
 export function ThermalReceipt({ sale }) {
-  const showGst = sale.gstEnabled && sale.showGstOnInvoice !== false;
-  const detailed = showGst && sale.gstDisplayStyle !== "COMPACT";
+  const showGst = Boolean(sale.gstEnabled);
+  const detailed = showGst;
+  const registered=sale.registrationSnapshot?.status==="REGULAR"||sale.registrationSnapshot?.status==="COMPOSITION"||showGst;
+  const heading={COMMERCIAL_INVOICE:"Invoice",TAX_INVOICE:"Tax Invoice",BILL_OF_SUPPLY:"Bill of Supply",INVOICE_CUM_BILL_OF_SUPPLY:"Invoice-cum-Bill of Supply",CREDIT_NOTE:"Credit Note",DEBIT_NOTE:"Debit Note"}[sale.documentType]||"Invoice";
   return (
     <div className="thermal-receipt">
       <header className="receipt-center">
-        <div className="receipt-wordmark"><OushadhiLogo showPos={false} className="!text-black" /></div>
+        <h1>{sale.storeSnapshot?.legalName||sale.storeSnapshot?.name||"Supplier"}</h1>
+        {sale.storeSnapshot?.legalName&&sale.storeSnapshot?.name!==sale.storeSnapshot?.legalName&&<p>{sale.storeSnapshot?.name}</p>}
+        <p><b>{heading}</b></p>
+        {sale.documentStatus==="CANCELLED"&&<p><b>CANCELLED — {sale.cancellationReason}</b></p>}
         {sale.storeSnapshot?.address && <p>{sale.storeSnapshot.address}</p>}
         {sale.storeSnapshot?.phone && <p>{sale.storeSnapshot.phone}</p>}
-        {showGst && sale.storeSnapshot?.gstin && (
+        {registered && sale.storeSnapshot?.gstin && (
           <p><b>GSTIN: {sale.storeSnapshot.gstin}</b></p>
         )}
       </header>
       <div className="receipt-rule" />
       <dl className="receipt-meta">
         <div><dt>Invoice</dt><dd>{sale.invoiceNumber}</dd></div>
-        <div><dt>Date</dt><dd>{dateTime(sale.createdAt)}</dd></div>
-        <div><dt>Cashier</dt><dd>{sale.actorId?.name || sale.cashierSnapshot?.name || "Cashier"}</dd></div>
+        <div><dt>Date</dt><dd>{dateTime(sale.invoiceDate||sale.createdAt)}</dd></div>
+        <div><dt>Cashier</dt><dd>{sale.cashierSnapshot?.name || sale.actorId?.name || "Cashier"}</dd></div>
         <div>
           <dt>Customer</dt>
           <dd>{sale.customerSnapshot?.name || "Walk-in Customer"}</dd>
         </div>
+        {(sale.customerSnapshot?.billingAddress||sale.customerSnapshot?.address)&&<div><dt>Bill to</dt><dd>{sale.customerSnapshot.billingAddress||sale.customerSnapshot.address}</dd></div>}
+        {sale.customerSnapshot?.gstin&&<div><dt>Customer GSTIN</dt><dd>{sale.customerSnapshot.gstin}</dd></div>}
+        {registered&&sale.storeSnapshot?.stateCode&&<div><dt>Supplier state</dt><dd>{gstStateName(sale.storeSnapshot.stateCode)} ({sale.storeSnapshot.stateCode})</dd></div>}
+        {sale.customerSnapshot?.stateCode&&<div><dt>Recipient state</dt><dd>{gstStateName(sale.customerSnapshot.stateCode)} ({sale.customerSnapshot.stateCode})</dd></div>}
+        {registered&&<div><dt>Place of supply</dt><dd>{gstStateName(sale.placeOfSupply)} ({sale.placeOfSupply})</dd></div>}
+        {(sale.supplyContext?.deliveryAddress||sale.customerSnapshot?.shippingAddress)&&<div><dt>Deliver to</dt><dd>{sale.supplyContext?.deliveryAddress||sale.customerSnapshot.shippingAddress}</dd></div>}
+        {registered&&<div><dt>Reverse charge</dt><dd>No</dd></div>}
+        {sale.originalInvoiceNumber&&<div><dt>Original invoice</dt><dd>{sale.originalInvoiceNumber}</dd></div>}
+        {sale.reason&&<div><dt>Reason</dt><dd>{sale.reason}</dd></div>}
         {sale.customerSnapshot?.doctorName && (
           <div><dt>Doctor</dt><dd>{sale.customerSnapshot.doctorName}</dd></div>
         )}
@@ -72,7 +87,9 @@ export function ThermalReceipt({ sale }) {
         {sale.items?.map((item, index) => (
           <div className="receipt-item" key={index}>
             <strong>{item.name}</strong>
-            {showGst && <small>HSN {item.hsnCode || "—"} · GST {item.gstRate || 0}%</small>}
+            {registered&&<small>HSN {item.hsnCode||"Not recorded"}{showGst&&` · GST ${item.gstRate||0}%`}</small>}
+            {Number(item.discount)>0&&<small>Discount: {money(item.discount)}</small>}
+            {showGst&&<small>Taxable: {money(item.taxableValue)} · {sale.taxType==="IGST"?<>IGST {item.igstRate??item.gstRate}%: {money(item.igst)}</>:<>CGST {item.cgstRate??Number(item.gstRate||0)/2}%: {money(item.cgst)} · {sale.taxType==="CGST_UTGST"?"UTGST":"SGST"} {item.sgstRate||item.utgstRate||Number(item.gstRate||0)/2}%: {money(sale.taxType==="CGST_UTGST"?item.utgst:item.sgst)}</>}</small>}
             <div><span>{itemDescription(item)}</span><b>{money(item.total)}</b></div>
           </div>
         ))}
@@ -87,7 +104,7 @@ export function ThermalReceipt({ sale }) {
             <div><dt>IGST</dt><dd>{money(sale.igst)}</dd></div>
           ) : <>
             <div><dt>CGST</dt><dd>{money(sale.cgst)}</dd></div>
-            <div><dt>SGST</dt><dd>{money(sale.sgst)}</dd></div>
+            <div><dt>{sale.taxType==="CGST_UTGST"?"UTGST":"SGST"}</dt><dd>{money(sale.taxType==="CGST_UTGST"?sale.utgst:sale.sgst)}</dd></div>
           </>}
           <div><dt>Total GST</dt><dd>{money(sale.tax)}</dd></div>
         </> : <div><dt>GST</dt><dd>{money(sale.tax)}</dd></div>)}
@@ -100,6 +117,8 @@ export function ThermalReceipt({ sale }) {
       </dl>
       <div className="receipt-rule" />
       <footer className="receipt-center">
+        {sale.registrationSnapshot?.status==="COMPOSITION"&&<p>Composition taxable person, not eligible to collect tax on supplies.</p>}
+        {registered&&<p style={{marginTop:18}}>Authorised signature: __________________</p>}
         <strong>Thank you for your purchase</strong>
         <p>വീണ്ടും സന്ദർശിക്കുക</p>
       </footer>
@@ -122,9 +141,9 @@ function printThermalReceipt(source, onFinished) {
     const target = frame.contentWindow;
     const receipt = documentRef.querySelector(".thermal-receipt");
     const renderedHeight = receipt?.getBoundingClientRect().height || receipt?.scrollHeight || 0;
-    const pageHeight = Math.max(60, Math.min(500, Math.ceil(renderedHeight * 25.4 / 96) + 1));
+    const pageHeight = Math.max(60, Math.ceil(renderedHeight * 25.4 / 96) + 1);
     const pageStyle = documentRef.createElement("style");
-    pageStyle.textContent = `@page{size:80mm ${pageHeight}mm;margin:0}html,body{height:${pageHeight}mm!important;overflow:hidden!important}`;
+    pageStyle.textContent = `@page{size:80mm ${pageHeight}mm;margin:0}html,body{height:auto!important;overflow:visible!important}`;
     documentRef.head.appendChild(pageStyle);
     target.focus();
     let finished = false;

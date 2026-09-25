@@ -14,6 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import {calculatePurchaseTotals} from "@/lib/purchase-calculations";
+import {usesUtgst} from "@/lib/gst-compliance";
 
 const TODAY = new Date().toLocaleDateString("en-CA");
 const money = (value) =>
@@ -138,7 +140,7 @@ function PurchaseItem({ item, onChange, onRemove, gstEnabled, taxType }) {
   const pluralPackage = `${packageName}${packageName.toLowerCase().endsWith("s") ? "" : "s"}`;
   const quantity = Number(item.packageQuantity || 0),
     cost = Number(item.unitCost || 0),
-    rate = Number(item.gstRate || 0),
+    rate = gstEnabled ? Number(item.gstRate || 0) : 0,
     gross = quantity * cost;
   const included = item.gstPriceMode !== "EXCLUSIVE";
   const taxable = included && rate ? gross / (1 + rate / 100) : gross;
@@ -536,14 +538,14 @@ export default function PurchaseForm({
     return () =>
       window.removeEventListener("oushadi-purchase-barcode-product", scanned);
   }, []);
-  const gstEnabled = Boolean(settings?.gst?.enabled),
+  const gstEnabled = Boolean(form.supplier?.taxNumber),
     storeStateCode = String(settings?.store?.stateCode || "32"),
     supplierStateCode = String(form.supplier?.taxNumber || "").slice(0, 2),
     taxType =
       gstEnabled && supplierStateCode && supplierStateCode !== storeStateCode
         ? "IGST"
         : gstEnabled
-          ? "CGST_SGST"
+          ? usesUtgst(storeStateCode) ? "CGST_UTGST" : "CGST_SGST"
           : "NONE";
   const supplierResults = useMemo(
     () =>
@@ -568,47 +570,12 @@ export default function PurchaseForm({
     [products, productQuery],
   );
   const totals = useMemo(() => {
-    let subtotal = 0,
-      totalGst = 0;
-    for (const item of form.items) {
-      const gross =
-          Number(item.packageQuantity || 0) * Number(item.unitCost || 0),
-        rate = Number(item.gstRate || 0),
-        included = item.gstPriceMode !== "EXCLUSIVE",
-        taxable = included && rate ? gross / (1 + rate / 100) : gross;
-      subtotal += gross;
-      totalGst += gstEnabled
-        ? included
-          ? gross - taxable
-          : (taxable * rate) / 100
-        : 0;
+    try {
+      const result=calculatePurchaseTotals(form.items.map(item=>({...item,gstRate:gstEnabled?item.gstRate:0,taxType})),{...form,additionalCharges:Number(form.additionalCharges||0),discountValue:Number(form.discountValue||0)});
+      return {...result,charges:result.additionalCharges,taxable:result.taxableAmount};
+    } catch(error) {
+      return {subtotal:0,charges:0,discount:0,taxable:0,totalGst:0,cgst:0,sgst:0,utgst:0,igst:0,total:0,error:error.message};
     }
-    const charges = Number(form.additionalCharges || 0),
-      value = Number(form.discountValue || 0),
-      discount =
-        form.discountType === "PERCENTAGE" ? (subtotal * value) / 100 : value,
-      exclusiveGst = form.items.reduce(
-        (sum, item) =>
-          item.gstPriceMode === "EXCLUSIVE"
-            ? sum +
-              (Number(item.packageQuantity || 0) *
-                Number(item.unitCost || 0) *
-                Number(item.gstRate || 0)) /
-                100
-            : sum,
-        0,
-      );
-    return {
-      subtotal,
-      charges,
-      discount,
-      taxable: Math.max(0, subtotal - discount),
-      totalGst,
-      cgst: taxType === "CGST_SGST" ? totalGst / 2 : 0,
-      sgst: taxType === "CGST_SGST" ? totalGst / 2 : 0,
-      igst: taxType === "IGST" ? totalGst : 0,
-      total: Math.max(0, subtotal + exclusiveGst + charges - discount),
-    };
   }, [form, gstEnabled, taxType]);
   const counts = useMemo(
     () => ({
@@ -633,6 +600,7 @@ export default function PurchaseForm({
       ),
     }));
   async function save(purchaseStatus) {
+    if(totals.error)return toast.error(totals.error);
     if (!form.supplierId) return toast.error("Please select a supplier.");
     if (!form.items.length)
       return toast.error("Please add at least one product.");
@@ -818,7 +786,7 @@ export default function PurchaseForm({
                   <span>
                     <span className="label">Tax Type</span>
                     <strong>
-                      {taxType === "IGST" ? "IGST" : "CGST + SGST"}
+                      {taxType === "IGST" ? "IGST" : taxType === "CGST_UTGST" ? "CGST + UTGST" : "CGST + SGST"}
                     </strong>
                   </span>
                 </div>
@@ -1094,15 +1062,15 @@ export default function PurchaseForm({
                   <span>Taxable Amount</span>
                   <strong>{money(totals.taxable)}</strong>
                 </div>
-                {gstEnabled && taxType === "CGST_SGST" && (
+                {gstEnabled && ["CGST_SGST","CGST_UTGST"].includes(taxType) && (
                   <>
                     <div className="mt-2 flex justify-between">
                       <span>CGST</span>
                       <strong>{money(totals.cgst)}</strong>
                     </div>
                     <div className="mt-2 flex justify-between">
-                      <span>SGST</span>
-                      <strong>{money(totals.sgst)}</strong>
+                      <span>{taxType === "CGST_UTGST" ? "UTGST" : "SGST"}</span>
+                      <strong>{money(totals.sgst+totals.utgst)}</strong>
                     </div>
                   </>
                 )}

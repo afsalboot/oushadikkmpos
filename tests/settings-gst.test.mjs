@@ -18,11 +18,12 @@ test("GST state must match the GSTIN state prefix",()=>{
   assert.equal(validateSettings(input)["store.stateCode"],"Store state must match the first two digits of the GSTIN.");
 });
 
-test("valid GST registration settings can be enabled",()=>{
+test("plausible GSTIN alone cannot enable collection for an unregistered supplier",()=>{
   const input=settings();
   input.gst.enabled=true;
   input.store.gstin="32ABCDE1234F1Z5";
   input.store.stateCode="32";
+  assert.ok(validateSettings(input)["gst.enabled"]);
   assert.equal(validateSettings(input)["store.gstin"],undefined);
   assert.equal(validateSettings(input)["store.stateCode"],undefined);
 });

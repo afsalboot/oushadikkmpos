@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { connectDb } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { ok, fail, apiError } from "@/lib/api";
-import { Customer, Sale } from "@/models";
+import { Customer, Sale, AuditLog } from "@/models";
 import {customerFields,findDuplicateCustomer} from "@/services/customer.service";
 
 export async function GET(_request, { params }) {
@@ -23,14 +23,20 @@ export async function GET(_request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
-    await requireSession("customers.edit"); await connectDb();
+    const actor=await requireSession("customers.edit"); await connectDb();
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) return fail("Invalid customer");
     const body = await request.json();
-    const fields = customerFields(body);
+    const before=await Customer.findById(id).lean();
+    if(!before)return fail("Customer not found",404);
+    const fields = customerFields({...before,...body});
     if (!fields.name) return fail("Customer name is required");
     const duplicate=await findDuplicateCustomer(fields,null,id);if(duplicate)return fail(`Customer already exists: ${duplicate.name}`,409);
-    const customer = await Customer.findByIdAndUpdate(id, { $set: fields }, { returnDocument:"after", runValidators: true });
+    let customer;
+    await mongoose.connection.transaction(async session=>{
+      customer=await Customer.findByIdAndUpdate(id,{$set:fields},{returnDocument:"after",runValidators:true,session});
+      await AuditLog.create([{actorId:actor.sub,action:"CUSTOMER_UPDATED",module:"customers",targetType:"Customer",targetId:id,description:"Updated customer details",metadata:{before,after:fields}}],{session});
+    });
     if (!customer) return fail("Customer not found", 404);
     return ok(customer);
   } catch (error) { return apiError(error); }

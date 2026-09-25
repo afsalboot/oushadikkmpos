@@ -41,11 +41,11 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
-    await requireSession("products.edit");
+    const actor=await requireSession("products.edit");
     await connectDb();
     const body = await request.json();
     if (!mongoose.isValidObjectId(body.id)) return fail("Invalid product");
-    return ok(await updateProduct(body.id, body));
+    return ok(await updateProduct(body.id, body, actor));
   } catch (error) {
     return apiError(error);
   }

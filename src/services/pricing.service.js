@@ -1,6 +1,6 @@
 import {calculateGstInvoice} from "./gst.service.js";
+import {money, sumMoney, multiplyMoney} from "../lib/money.js";
 
-const money=(value)=>Number((Number(value||0)+Number.EPSILON).toFixed(2));
 const clamp=(value,min,max)=>Math.min(max,Math.max(min,Number(value)||0));
 const discountConfig=(settings)=>settings?.discount||{};
 
@@ -25,7 +25,7 @@ function eligible(item,settings){
   return true;
 }
 
-const requestedAmount=(base,type,value)=>type==="PERCENTAGE"?money(base*Number(value||0)/100):money(value);
+const requestedAmount=(base,type,value)=>type==="PERCENTAGE"?multiplyMoney(base,Number(value||0)/100):money(value);
 
 export function calculateDiscount({items=[],cartSubtotal,discount={},settings,currentUser={}}){
   const config=discountConfig(settings),subtotal=money(cartSubtotal??items.reduce((sum,item)=>sum+Number(item.amount??item.total??0),0)),errors=[];
@@ -63,14 +63,16 @@ export function calculateDiscount({items=[],cartSubtotal,discount={},settings,cu
   totalDiscount=clamp(totalDiscount,0,subtotal);
   const staffPercent=Number(config.staffMaxPercentage??config.maxStaffPercentage??0),staffFixed=Number(config.staffMaxFixed??0),approvalPercent=Number(config.approvalPercentage??0),approvalFixed=Number(config.approvalFixedAmount??0),effectivePercent=subtotal?totalDiscount/subtotal*100:0;
   const reason=String(discount.reason||"").trim(),reasonEntry=(config.reasons||[]).find(entry=>entry.active!==false&&entry.name===reason);
-  if(config.requireReason&&!reason)errors.push("Select or enter a discount reason.");
+  if(config.requireReason&&totalDiscount>0&&!reason)errors.push("Select or enter a discount reason.");
   const approvalRequired=role==="STAFF"&&totalDiscount>0&&(effectivePercent>staffPercent||totalDiscount>staffFixed||effectivePercent>approvalPercent||totalDiscount>approvalFixed||reasonEntry?.requireApproval===true);
   return{itemDiscount,cartDiscount,automaticDiscount,totalDiscount,subtotalAfterDiscount:money(subtotal-totalDiscount),approvalRequired,allowedWithoutApproval:{percentage:staffPercent,fixed:staffFixed},validationErrors:[...new Set(errors)],lineDiscounts,discountType:cartType,discountValue:cartValue,reason};
 }
 
 export function calculateSalePricing({items=[],discount={},settings,currentUser,paymentMethod,placeOfSupply}){
   const subtotal=money(items.reduce((sum,item)=>sum+Number(item.amount??item.total??0),0)),discountSummary=calculateDiscount({items,cartSubtotal:subtotal,discount,settings,currentUser});
-  const gst=calculateGstInvoice({lines:items,discount:discountSummary.totalDiscount,settings,placeOfSupply});
+  const gst=calculateGstInvoice({lines:items,discount:sumMoney([discountSummary.cartDiscount,discountSummary.automaticDiscount]),lineDiscounts:discountSummary.lineDiscounts,discountEligible:items.map(item=>eligible(item,settings)),settings,placeOfSupply});
+  discountSummary.totalDiscount=gst.discount;
+  discountSummary.subtotalAfterDiscount=money(subtotal-gst.discount);
   const roundOff=settings?.roundOff?.enabled?calculateRoundOff(gst.total,settings.roundOff,paymentMethod):0,total=money(gst.total+roundOff);
   return{subtotal,...discountSummary,gst,beforeRoundOff:gst.total,roundOff,total,roundingSummary:{enabled:Boolean(settings?.roundOff?.enabled),beforeRoundOff:gst.total,roundOffAmount:roundOff,finalAmount:total,method:String(settings?.roundOff?.method||"NEAREST").toUpperCase(),precision:settings?.roundOff?.precision==="CUSTOM"?Number(settings?.roundOff?.customPrecision):Number(settings?.roundOff?.precision)||(settings?.roundOff?.method==="NEAREST_050"?.5:1),paymentScope:String(settings?.roundOff?.paymentScope||"ALL").toUpperCase()}};
 }

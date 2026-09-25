@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { Category, InventoryBatch, Product, Purchase, Sale, Settings, StockTransaction } from "@/models";
+import { Category, InventoryBatch, Product, Purchase, Sale, Settings, StockTransaction, AuditLog } from "@/models";
 import { calculatePhysicalStock, formatPhysicalStock, getLooseUnit, isCountBasedProduct, isLowStock } from "@/services/inventory.service";
 import { normalizeProductInput, validateProductInput } from "@/lib/product-validation";
 
@@ -77,7 +77,7 @@ export async function createProduct(input, actorId, session) {
   return product;
 }
 
-export async function updateProduct(id, input) {
+export async function updateProduct(id, input, actor) {
   const existing = await Product.findById(id);
   if (!existing) throw new Error("Product not found");
   const normalized = normalizeProductInput({ ...existing.toObject(), ...input, openingPackages: 0, openingQuantity: 0 });
@@ -89,8 +89,12 @@ export async function updateProduct(id, input) {
   const batches = await InventoryBatch.find({ productId: existing._id }).lean();
   const stock = calculatePhysicalStock(batches,existing);
   if (stock.hasStock && normalized.packageSize !== existing.packageSize) throw new Error("Package size cannot change while stock exists. Adjust stock to zero first.");
+  const before=existing.toObject();
   existing.set(productFields(normalized));
-  await existing.save();
+  await mongoose.connection.transaction(async session=>{
+    await existing.save({session});
+    await AuditLog.create([{actorId:actor?.sub,action:"PRODUCT_UPDATED",module:"products",targetType:"Product",targetId:existing._id,description:"Updated product including tax configuration",metadata:{before,after:existing.toObject()}}],{session});
+  });
   return existing;
 }
 

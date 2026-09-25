@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 import Link from "next/link";
+import {checkoutFetch} from "@/lib/checkout-request";
 import { useEffect, useMemo, useState } from "react";
 import {
   Barcode,
@@ -35,7 +36,7 @@ const money = (v) =>
       Number(v || 0),
     );
 const api = async (u, o) => {
-  const r = await fetch(u, o),
+  const r = await checkoutFetch(u, o),
     j = await r.json();
   if (!r.ok) throw Error(j.error);
   return j.data;

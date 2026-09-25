@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
-import {DocumentCounter,Expense,ExpenseCategory,InventoryBatch,Product,Purchase,StockTransaction,Supplier} from "@/models";
+import {DocumentCounter,Expense,ExpenseCategory,InventoryBatch,Product,Purchase,StockTransaction,Supplier,Settings} from "@/models";
 import {maxDocumentSequence,nextDocumentNumber} from "@/services/document-number.service";
 import {calculatePurchaseTotals,purchaseMoney as money,receivedPackageQuantity} from "@/lib/purchase-calculations";
+import {gstinError,validState,usesUtgst} from "@/lib/gst-compliance";
 import {queryValues} from "@/lib/filter-utils";
 
 export const PURCHASE_PAYMENT_METHODS=["CASH","UPI","CARD","BANK"];
@@ -26,7 +27,10 @@ export async function preparePurchase(body,session){
   const ids=body.items.map((item)=>text(item.productId));if(ids.some((id)=>!mongoose.isValidObjectId(id)))throw new Error("A purchase item has an invalid product");
   const products=await Product.find({_id:{$in:ids},active:true}).session(session);const byId=new Map(products.map((product)=>[String(product._id),product]));
   const seen=new Set();
-  const storeStateCode=text(body.storeStateCode||"32");const supplierStateCode=text(body.supplierStateCode||supplier.taxNumber?.slice(0,2));const taxType=body.gstEnabled&&supplierStateCode?(supplierStateCode===storeStateCode?"CGST_SGST":"IGST"):"NONE";
+  const storeSettings=await Settings.findOne({key:"global"}).session(session).lean();
+  const storeStateCode=text(storeSettings?.store?.stateCode||"32"),supplierStateCode=text(supplier.taxNumber?.slice(0,2));
+  if(body.gstEnabled&&(gstinError(supplier.taxNumber)||!validState(storeStateCode)))throw new Error("A valid supplier GSTIN and store state are required to record purchase GST");
+  const taxType=body.gstEnabled?(supplierStateCode===storeStateCode?usesUtgst(storeStateCode)?"CGST_UTGST":"CGST_SGST":"IGST"):"NONE";
   const items=body.items.map((input)=>{
     const product=byId.get(text(input.productId));if(!product)throw new Error("A selected product is unavailable");
     const packageQuantity=Number(input.packageQuantity),freeQuantity=Number(input.freeQuantity||0),unitCost=money(input.unitCost);
@@ -42,13 +46,13 @@ export async function preparePurchase(body,session){
     const gstRate=body.gstEnabled?Math.max(0,Number(input.gstRate??product.gstRate??0)):0;const gstPriceMode=input.gstPriceMode==="EXCLUSIVE"?"EXCLUSIVE":"INCLUSIVE";const gross=money(packageQuantity*unitCost);const taxableAmount=money(gstPriceMode==="INCLUSIVE"&&gstRate?gross/(1+gstRate/100):gross);const totalGst=money(gstPriceMode==="INCLUSIVE"?gross-taxableAmount:taxableAmount*gstRate/100);const itemTaxType=gstRate?taxType:"NONE";const cgst=itemTaxType==="CGST_SGST"?money(totalGst/2):0,sgst=cgst,igst=itemTaxType==="IGST"?totalGst:0;
     return{productId:product._id,productSnapshot:{name:product.name,sku:product.sku,packageType:product.packageType,packageSize:product.packageSize,baseUnit:product.baseUnit},name:product.name,hsnCode:text(product.hsnCode),batchNumber,manufacturingDate,expiryDate,packageQuantity,freeQuantity,unitCost,total:gross,gstRate,gstPriceMode,taxType:itemTaxType,taxableAmount,cgst,sgst,igst,totalGst,lineTotal:money(gross+(gstPriceMode==="EXCLUSIVE"?totalGst:0))};
   });
-  const totals=calculatePurchaseTotals(items,body);const purchaseStatus=body.purchaseStatus==="DRAFT"?"DRAFT":"RECEIVED";
+  const totals=calculatePurchaseTotals(items,body);totals.taxLines.forEach((tax,index)=>Object.assign(items[index],tax));const purchaseStatus=body.purchaseStatus==="DRAFT"?"DRAFT":"RECEIVED";
   return{supplier,items,byId,supplierStateCode,storeStateCode,taxType,purchasedAt:dateValue(body.purchasedAt,"purchase date")||new Date(),purchaseStatus,...totals,...paymentFields(body,totals.total,purchaseStatus)};
 }
 
 const purchaseFields=(body,prepared,actorId)=>({
   supplierId:prepared.supplier._id,supplierSnapshot:{name:prepared.supplier.name,phone:prepared.supplier.phone,email:prepared.supplier.email,taxNumber:prepared.supplier.taxNumber},supplierInvoiceNumber:text(body.supplierInvoiceNumber),notes:text(body.notes),items:prepared.items,
-  subtotal:prepared.subtotal,taxableAmount:prepared.taxableAmount,totalGst:prepared.totalGst,cgst:prepared.cgst,sgst:prepared.sgst,igst:prepared.igst,taxType:prepared.taxType,supplierStateCode:prepared.supplierStateCode,storeStateCode:prepared.storeStateCode,additionalCharges:prepared.additionalCharges,discountType:prepared.discountType,discountValue:prepared.discountValue,discount:prepared.discount,total:prepared.total,
+  subtotal:prepared.subtotal,taxableAmount:prepared.taxableAmount,totalGst:prepared.totalGst,utgst:prepared.utgst,additionalChargesGstRate:prepared.additionalChargesGstRate,additionalChargesTaxType:prepared.additionalChargesTaxType,additionalChargesTax:prepared.additionalChargesTax,cgst:prepared.cgst,sgst:prepared.sgst,igst:prepared.igst,taxType:prepared.taxType,supplierStateCode:prepared.supplierStateCode,storeStateCode:prepared.storeStateCode,additionalCharges:prepared.additionalCharges,discountType:prepared.discountType,discountValue:prepared.discountValue,discount:prepared.discount,total:prepared.total,
   paymentStatus:prepared.paymentStatus,paymentMethod:prepared.paymentMethod,amountPaid:prepared.amountPaid,balanceDue:prepared.balanceDue,paymentReference:prepared.paymentReference,purchaseStatus:prepared.purchaseStatus,purchasedAt:prepared.purchasedAt,actorId,
 });
 

@@ -71,6 +71,8 @@ export function buildCustomerSnapshot(customer, doctorName) {
         customerType: customerValue(customer, "customerType") || "RETAIL",
         businessName: customerValue(customer, "businessName") || "",
         gstin: customerValue(customer, "gstin") || "",
+        stateCode:customerValue(customer,"stateCode")||String(customerValue(customer,"gstin")||"").slice(0,2),
+        registrationStatus:customerValue(customer,"gstin")?"REGISTERED":"UNREGISTERED",
         billingAddress:
           customerValue(customer, "billingAddress") ||
           customerValue(customer, "address") ||

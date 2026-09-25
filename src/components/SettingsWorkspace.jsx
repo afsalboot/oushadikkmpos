@@ -831,181 +831,32 @@ const configs = {
     ],
   },
   gst: {
-    title: "GST & Tax",
-    description:
-      "Configure GST registration, product tax rates and checkout behaviour.",
-    groups: [
-      {
-        title: "GST Registration",
-        fields: [
-          {
-            path: "gst.enabled",
-            label: "Enable GST calculations",
-            type: "toggle",
-            note: "Requires a valid GSTIN that matches the selected store state.",
-          },
-          {
-            path: "store.gstin",
-            label: "Store GSTIN",
-            required: true,
-            requiresGst: true,
-            note: "The first two digits are the GST state code.",
-          },
-          {
-            path: "store.stateCode",
-            label: "Store State / UT",
-            type: "select",
-            options: GST_STATES,
-            requiresGst: true,
-          },
-        ],
-      },
-      {
-        title: "GST Calculation Method",
-        fields: [
-          {
-            path: "gst.calculationMethod",
-            label: "Calculation method",
-            type: "radioCards",
-            requiresGst: true,
-            options: [
-              [
-                "PRODUCT",
-                "Product-wise",
-                "Use each product's configured GST rate.",
-                "Recommended",
-              ],
-              ["CART", "Cart total", "Apply one GST rate to the taxable cart."],
-            ],
-          },
-          {
-            path: "gst.cartRatePreset",
-            label: "Cart GST Rate",
-            type: "select",
-            options: gstRates,
-            requiresGst: true,
-            whenValue: ["gst.calculationMethod", "CART"],
-          },
-          {
-            path: "gst.cartRate",
-            label: "Custom Cart GST Rate",
-            type: "number",
-            suffix: "%",
-            requiresGst: true,
-            whenValue: ["gst.cartRatePreset", "CUSTOM"],
-          },
-        ],
-      },
-      {
-        title: "Price Treatment",
-        fields: [
-          {
-            path: "gst.priceMode",
-            label: "Price mode",
-            type: "radioCards",
-            requiresGst: true,
-            options: [
-              [
-                "INCLUSIVE",
-                "GST inclusive",
-                "Tax is already included in the selling price.",
-              ],
-              ["EXCLUSIVE", "GST exclusive", "Tax is added at checkout."],
-            ],
-          },
-        ],
-      },
-      {
-        title: "Product Tax Defaults",
-        fields: [
-          {
-            path: "gst.defaultRatePreset",
-            label: "Default GST Rate",
-            type: "select",
-            options: gstRates,
-            requiresGst: true,
-          },
-          {
-            path: "gst.defaultRate",
-            label: "Custom Default GST Rate",
-            type: "number",
-            suffix: "%",
-            requiresGst: true,
-            whenValue: ["gst.defaultRatePreset", "CUSTOM"],
-          },
-          {
-            path: "gst.requireHsn",
-            label: "Require HSN for taxable products",
-            type: "toggle",
-            requiresGst: true,
-          },
-          {
-            path: "gst.allowProductSpecificRate",
-            label: "Allow product-specific rates",
-            type: "toggle",
-            requiresGst: true,
-          },
-        ],
-      },
-      {
-        title: "GST Display",
-        fields: [
-          {
-            path: "gst.showInCart",
-            label: "Show in cart",
-            type: "toggle",
-            requiresGst: true,
-          },
-          {
-            path: "gst.showInCheckout",
-            label: "Show at checkout",
-            type: "toggle",
-            requiresGst: true,
-          },
-          {
-            path: "gst.showOnInvoice",
-            label: "Show on invoice",
-            type: "toggle",
-            requiresGst: true,
-          },
-          {
-            path: "gst.displayStyle",
-            label: "Breakdown style",
-            type: "radioCards",
-            requiresGst: true,
-            options: [
-              ["COMPACT", "Compact", "Show a single GST total."],
-              ["DETAILED", "Detailed", "Show taxable value and tax split."],
-            ],
-          },
-        ],
-      },
-      {
-        title: "Tax Determination",
-        fields: [
-          {
-            path: "gst.taxDetermination",
-            label: "Tax type",
-            type: "radioCards",
-            requiresGst: true,
-            options: [
-              [
-                "AUTOMATIC",
-                "Automatic",
-                "Use the store and place-of-supply states.",
-                "Recommended",
-              ],
-              [
-                "INTRASTATE",
-                "CGST + SGST",
-                "Always split GST into equal state and central tax.",
-              ],
-              ["INTERSTATE", "IGST", "Always apply integrated GST."],
-            ],
-          },
-        ],
-      },
-    ],
+    title:"GST & Tax",
+    description:"Use commercial invoices while unregistered. Registration changes apply only to new invoices.",
+    groups:[
+      {title:"Registration",fields:[
+        {path:"gst.registrationStatus",label:"GST registration status",type:"select",options:[["UNREGISTERED","Not registered"],["REGULAR","Regular taxpayer"],["COMPOSITION","Composition taxpayer"],["INACTIVE","Inactive registration"]]},
+        {path:"gst.enabled",label:"Collect GST (regular registration only)",type:"toggle",note:"Keep off while unregistered or under composition. New GST invoices require a verified registration profile."},
+        {path:"store.legalName",label:"Legal business name"},
+        {path:"store.address",label:"Business address",type:"textarea"},
+        {path:"store.gstin",label:"GSTIN",note:"Format and checksum are checked. They do not establish active registration."},
+        {path:"store.stateCode",label:"State / UT",type:"select",options:GST_STATES},
+        {path:"gst.effectiveFrom",label:"Registration effective from",note:"YYYY-MM-DD"},
+        {path:"gst.effectiveTo",label:"Registration effective until (optional)",note:"YYYY-MM-DD"},
+        {path:"gst.verificationReference",label:"Registration verification reference",note:"Record the GST Portal check or professional verification reference and date."},
+        {path:"gst.precedingYearTurnover",label:"Preceding financial year turnover",type:"number",note:"PAN-level aggregate turnover, in rupees."},
+        {path:"gst.highestTurnover",label:"Highest annual turnover since FY 2017–18",type:"number",note:"Used to prevent issuing documents that need an unsupported IRP/QR workflow."}
+      ]},
+      {title:"Price treatment",fields:[
+        {path:"gst.priceMode",label:"Store price mode",type:"select",options:[["INCLUSIVE","GST inclusive"],["EXCLUSIVE","GST exclusive"]]},
+        {path:"gst.defaultRate",label:"New-product default rate",type:"number",note:"Existing products retain their own rates. Verify classification before GST billing."}
+      ]},
+      {title:"Checkout display",fields:[
+        {path:"gst.showInCart",label:"Show tax in cart",type:"toggle"},
+        {path:"gst.showInCheckout",label:"Show tax at checkout",type:"toggle"},
+        {path:"gst.showDetailedBreakdown",label:"Detailed checkout breakdown",type:"toggle",note:"Required invoice particulars always print."}
+      ]}
+    ]
   },
   inventory: {
     title: "Inventory Rules",

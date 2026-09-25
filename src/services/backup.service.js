@@ -6,8 +6,10 @@ import {mkdir,readdir,readFile,rename,stat,writeFile} from "node:fs/promises";
 import path from "node:path";
 import mongoose from "mongoose";
 import {connectDb} from "../lib/db.js";
-import {AuditLog,Category,Customer,DocumentCounter,Expense,ExpenseCategory,InventoryBatch,Product,Purchase,Sale,Settings,StaffRole,StockTransaction,Supplier,User} from "../models/index.js";
+import {AuditLog,Category,Customer,DocumentCounter,Expense,ExpenseCategory,InventoryBatch,Product,Purchase,Sale,Settings,StaffRole,StockTransaction,Supplier,User,FiscalGuard} from "../models/index.js";
 import {getSettings,invalidateSettingsCache} from "./settings.service.js";
+
+import {assertRestorePreservesDocuments} from "../lib/fiscal-integrity.js";
 
 const FORMAT="oushadi-pos-backup";
 const VERSION=1;
@@ -42,7 +44,21 @@ export async function createBackup({type="manual",actor}={}){if(!["manual","auto
 
 export async function readBackup(name){const file=safeName(name);if(usesDatabaseBackupStorage())return readGridBackup(await backupBucket(),file);return readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ await ensureDirectory(),file));}
 
-export async function restoreBackup(archive,actor){if(global.oushadiRestoreInProgress)throw new Error("Another database restore is already running");global.oushadiRestoreInProgress=true;let session;try{await connectDb();const payload=decryptArchive(archive),safetyBackup=await createBackup({type:"manual",actor});session=await mongoose.startSession();await session.withTransaction(async()=>{for(const Model of Object.values(models))await Model.deleteMany({}).session(session);for(const[name,Model]of Object.entries(models)){const rows=payload.database[name];if(rows.length)await Model.insertMany(rows,{session,ordered:true});}await AuditLog.create([{actorId:actorId(actor),action:"BACKUP_RESTORED",module:"backup",targetType:"Backup",description:"Database restored from encrypted backup",metadata:{sourceCreatedAt:payload.createdAt,safetyBackup:safetyBackup.name}}],{session});},{readConcern:{level:"snapshot"},writeConcern:{w:"majority"}});invalidateSettingsCache();return{restored:true,sourceCreatedAt:payload.createdAt,safetyBackup:safetyBackup.name,counts:Object.fromEntries(Object.entries(payload.database).map(([name,rows])=>[name,rows.length]))};}finally{global.oushadiRestoreInProgress=false;if(session)await session.endSession();}}
+export async function restoreBackup(archive,actor){if(global.oushadiRestoreInProgress)throw new Error("Another database restore is already running");global.oushadiRestoreInProgress=true;let session;try{await connectDb();const payload=decryptArchive(archive),safetyBackup=await createBackup({type:"manual",actor});session=await mongoose.startSession();await session.withTransaction(async()=>{
+await FiscalGuard.findOneAndUpdate({key:"issuance"},{$inc:{revision:1}},{upsert:true,session});
+const currentSales=await Sale.find({}).session(session).lean();
+assertRestorePreservesDocuments(currentSales,payload.database.sales);
+// Never roll back audit history or counter high-water marks.
+const currentLogs=await AuditLog.find({}).session(session).lean();
+const logs=new Map(payload.database.auditLogs.map(row=>[String(row._id),row]));
+for(const row of currentLogs)logs.set(String(row._id),row);
+payload.database.auditLogs=[...logs.values()];
+const counters=new Map(payload.database.documentCounters.map(row=>[row.key,row]));
+for(const row of await DocumentCounter.find({}).session(session).lean()){
+const archived=counters.get(row.key);if(!archived||row.sequence>archived.sequence)counters.set(row.key,row);
+}
+payload.database.documentCounters=[...counters.values()];
+for(const Model of Object.values(models))await Model.deleteMany({}).session(session);for(const[name,Model]of Object.entries(models)){const rows=payload.database[name];if(rows.length)await Model.insertMany(rows,{session,ordered:true});}await AuditLog.create([{actorId:actorId(actor),action:"BACKUP_RESTORED",module:"backup",targetType:"Backup",description:"Database restored from encrypted backup",metadata:{sourceCreatedAt:payload.createdAt,safetyBackup:safetyBackup.name}}],{session});},{readConcern:{level:"snapshot"},writeConcern:{w:"majority"}});invalidateSettingsCache();return{restored:true,sourceCreatedAt:payload.createdAt,safetyBackup:safetyBackup.name,counts:Object.fromEntries(Object.entries(payload.database).map(([name,rows])=>[name,rows.length]))};}finally{global.oushadiRestoreInProgress=false;if(session)await session.endSession();}}
 
 export async function getBackupStatus({runDue=true}={}){if(runDue)await runDueAutomaticBackup();const settings=await getSettings(),backups=await listBackups(),automatic=backups.filter((item)=>item.type==="AUTOMATIC"),last=backups[0]||null,lastAutomatic=automatic[0]||null,frequency=settings.backup.frequency;return{storage:usesDatabaseBackupStorage()?"mongodb":"filesystem",configured:Boolean(encryptionSecret()),keySource:process.env.BACKUP_ENCRYPTION_KEY?"BACKUP_ENCRYPTION_KEY":null,directory:await backupDirectory(),automaticEnabled:settings.backup.automaticEnabled,frequency,lastBackup:last,lastAutomaticBackup:lastAutomatic,nextAutomaticAt:settings.backup.automaticEnabled?(lastAutomatic?nextAutomaticDate(lastAutomatic.createdAt,frequency):new Date()).toISOString():null,backups};}
 

@@ -1,0 +1,181 @@
+﻿{
+  "auditDate": "2026-09-10",
+  "scope": "Pure calculation and static assertions only; BUG assertions confirm defects, not compliance.",
+  "checks": 24,
+  "results": [
+    {
+      "name": "01 Intrastate exclusive",
+      "observed": {
+        "base": 1000,
+        "tax": 180,
+        "cgst": 90,
+        "sgst": 90,
+        "igst": 0,
+        "total": 1180
+      }
+    },
+    {
+      "name": "02 Interstate explicit POS",
+      "observed": {
+        "base": 1000,
+        "tax": 180,
+        "cgst": 0,
+        "sgst": 0,
+        "igst": 180,
+        "total": 1180
+      }
+    },
+    {
+      "name": "03 Multiple rates",
+      "observed": {
+        "base": 2000,
+        "tax": 230,
+        "cgst": 115,
+        "sgst": 115,
+        "igst": 0,
+        "total": 2230
+      }
+    },
+    {
+      "name": "04 Inclusive",
+      "observed": {
+        "base": 1000,
+        "tax": 180,
+        "cgst": 90,
+        "sgst": 90,
+        "igst": 0,
+        "total": 1180
+      }
+    },
+    {
+      "name": "05 Exclusive",
+      "observed": 1180
+    },
+    {
+      "name": "06 Invoice discount",
+      "observed": {
+        "base": 900,
+        "tax": 162,
+        "cgst": 81,
+        "sgst": 81,
+        "igst": 0,
+        "total": 1062
+      }
+    },
+    {
+      "name": "07 Exempt",
+      "observed": {
+        "base": 1000,
+        "tax": 0,
+        "cgst": 0,
+        "sgst": 0,
+        "igst": 0,
+        "total": 1000
+      }
+    },
+    {
+      "name": "08 Credit/debit note model absent",
+      "observed": false
+    },
+    {
+      "name": "09 Sale cancellation endpoint absent",
+      "observed": false
+    },
+    {
+      "name": "10 B2B receipt GSTIN omitted",
+      "observed": false
+    },
+    {
+      "name": "11 B2C no address fallback",
+      "observed": "CGST_SGST"
+    },
+    {
+      "name": "12 Current unregistered mode",
+      "observed": {
+        "base": 1000,
+        "tax": 0,
+        "cgst": 0,
+        "sgst": 0,
+        "igst": 0,
+        "total": 1000
+      }
+    },
+    {
+      "name": "BUG item-specific discount redistributed across rates",
+      "observed": {
+        "base": 1900,
+        "tax": 218.5,
+        "cgst": 109.25,
+        "sgst": 109.25,
+        "igst": 0,
+        "total": 2118.5
+      }
+    },
+    {
+      "name": "BUG discount allocation exceeds requested discount",
+      "observed": {
+        "claimed": 0.02,
+        "allocated": 0.03,
+        "total": 0.01
+      }
+    },
+    {
+      "name": "BUG CART overrides classifications",
+      "observed": 100
+    },
+    {
+      "name": "BUG forced intrastate overrides interstate POS",
+      "observed": "CGST_SGST"
+    },
+    {
+      "name": "BUG invalid POS accepted",
+      "observed": "99"
+    },
+    {
+      "name": "BUG checkout drops price mode",
+      "observed": {
+        "preview": 110.25,
+        "server": 105
+      }
+    },
+    {
+      "name": "BUG invoice number too long",
+      "observed": {
+        "number": "INV-20260910120000-001",
+        "length": 22
+      }
+    },
+    {
+      "name": "BUG purchase header taxable value",
+      "observed": {
+        "base": 105,
+        "tax": 5,
+        "total": 105
+      }
+    },
+    {
+      "name": "BUG purchase pre-tax discount not applied to GST",
+      "observed": {
+        "base": 900,
+        "tax": 180,
+        "total": 1080
+      }
+    },
+    {
+      "name": "BUG purchase split overstates tax",
+      "observed": {
+        "cgst": 0.03,
+        "sgst": 0.03,
+        "tax": 0.05
+      }
+    },
+    {
+      "name": "Registration validation is syntactic, not verification",
+      "observed": {}
+    },
+    {
+      "name": "BUG sales reporting excludes credit invoices",
+      "observed": true
+    }
+  ]
+}

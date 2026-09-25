@@ -67,6 +67,8 @@ const reportGroups = [
   {
     label: "Sales",
     items: [
+      {id:"gst-register",label:"Fiscal Sales Register",description:"Issued invoices, recipient details and tax components",icon:FileBarChart},
+      {id:"hsn-summary",label:"HSN and Tax Summary",description:"Snapshot totals by HSN, rate and place of supply",icon:FileBarChart},
       {
         id: "sales",
         label: "Sales Report",

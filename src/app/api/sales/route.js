@@ -10,6 +10,8 @@ import {
   Sale,
   Settings,
   StockTransaction,
+  AuditLog,
+  FiscalGuard,
 } from "@/models";
 import {
   deductCountBasedLooseStock,
@@ -19,8 +21,7 @@ import {
   isCountBasedProduct,
 } from "@/services/inventory.service";
 import {
-  maxDocumentSequence,
-  nextDocumentNumber,
+  nextInvoiceNumber,
 } from "@/services/document-number.service";
 import { createCustomer } from "@/services/customer.service";
 import {
@@ -31,9 +32,11 @@ import {
 } from "@/lib/sale-customer";
 import { calculateSalePricing } from "@/services/pricing.service";
 import { buildWholesaleLine, wholesaleLooseRate } from "@/lib/wholesale";
+import {assertRegistration,resolveSupply,validateFiscalLines,registrationStatus,financialYear,GST_RULE_VERSION} from "@/lib/gst-compliance";
+import {requestHash,assertRetryMatches} from "@/lib/fiscal-integrity";
+import {money,multiplyMoney} from "@/lib/money";
 
-const amount = (value) =>
-  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const amount = money;
 const escapeRegex = (value) =>
   String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -266,6 +269,12 @@ export async function POST(request) {
     const session = await requireSession("sales.create");
     await connectDb();
     const body = await request.json();
+    await Promise.all([Sale.init(),FiscalGuard.init()]);
+    const requestKey=String(request.headers.get('Idempotency-Key')||'');
+    if(!/^[a-zA-Z0-9-]{16,80}$/.test(requestKey))return fail('A checkout retry key is required. Refresh checkout and try again.',422);
+    const hash=requestHash(body);
+    const previous=await Sale.findOne({requestKey}).lean();
+    if(previous)return ok(assertRetryMatches(previous,hash,session.sub));
     const saleType = body.saleType === "WHOLESALE" ? "WHOLESALE" : "SALE";
     if (!Array.isArray(body.items) || !body.items.length)
       return fail("Add at least one item to the cart");
@@ -282,6 +291,9 @@ export async function POST(request) {
     dbSession = await mongoose.startSession();
     let completedSale;
     await dbSession.withTransaction(async () => {
+      await FiscalGuard.findOneAndUpdate({key:'issuance'},{$inc:{revision:1}},{upsert:true,session:dbSession});
+      const retried=await Sale.findOne({requestKey}).session(dbSession).lean();
+      if(retried){completedSale=assertRetryMatches(retried,hash,session.sub);return;}
       let customer = null;
       if (customerType === "EXISTING") {
         if (!mongoose.isValidObjectId(body.customerId))
@@ -328,6 +340,8 @@ export async function POST(request) {
       const settings = await Settings.findOne({ key: "global" }).session(
         dbSession,
       );
+      assertRegistration(settings);
+      const supplyContext=resolveSupply(settings,customer,body.supplyContext||{});
       const saleItems = [];
       const stockRows = [];
       for (const item of body.items) {
@@ -369,9 +383,7 @@ export async function POST(request) {
               "MIXTURE_SALE",
               settings,
             );
-            const total = amount(
-              baseQuantity * Number(product.loosePricePerUnit),
-            );
+            const total = multiplyMoney(baseQuantity,product.loosePricePerUnit);
             ingredientTotal += total;
             ingredients.push({
               productId: product._id,
@@ -621,7 +633,7 @@ export async function POST(request) {
             saleMode === "PACKAGE"
               ? Number(product.packageSellingPrice)
               : Number(product.loosePricePerUnit);
-          const total = amount(quantity * unitPrice);
+          const total = multiplyMoney(quantity,unitPrice);
           saleItems.push({
             kind: "PRODUCT",
             productId: product._id,
@@ -663,9 +675,7 @@ export async function POST(request) {
         throw new Error(
           "Every taxable product needs an HSN code before GST checkout",
         );
-      const placeOfSupply = /^\d{2}$/.test(String(body.placeOfSupply || ""))
-        ? String(body.placeOfSupply)
-        : String(settings?.store?.stateCode || "");
+      const placeOfSupply = supplyContext.placeOfSupply;
       const creditRequested = body.credit === true;
       const submittedPayments = Array.isArray(body.payments)
           ? body.payments
@@ -724,6 +734,8 @@ export async function POST(request) {
       gstInvoice.lines.forEach((tax, index) =>
         Object.assign(saleItems[index], {
           total: tax.total,
+          discount: tax.discount,
+          cgstRate:tax.cgstRate,sgstRate:tax.sgstRate,utgstRate:tax.utgstRate,igstRate:tax.igstRate,utgst:tax.utgst,
           gstRate: tax.gstRate,
           gstPriceMode: tax.gstPriceMode,
           taxableValue: tax.taxableValue,
@@ -737,6 +749,7 @@ export async function POST(request) {
       );
       const roundOff = pricing.roundOff,
         total = pricing.total;
+      const documentType=validateFiscalLines(saleItems,settings,supplyContext,total);
       const requestedPayments = Array.isArray(body.payments)
           ? body.payments
           : [
@@ -805,18 +818,13 @@ export async function POST(request) {
         saleType === "WHOLESALE"
           ? settings?.invoice?.wholesalePrefix || "WSI"
           : settings?.invoice?.prefix || "INV";
-      const priorInvoices = await Sale.find({ invoiceNumber: /-(\d+)$/ })
-        .select("invoiceNumber")
-        .session(dbSession)
-        .lean();
-      const invoiceNumber = await nextDocumentNumber({
+      const invoiceDate=new Date();
+      const invoiceNumber = await nextInvoiceNumber({
         Counter: DocumentCounter,
         prefix,
-        value: new Date(),
+        value: invoiceDate,
         session: dbSession,
-        minimumSequence: maxDocumentSequence(
-          priorInvoices.map((entry) => entry.invoiceNumber),
-        ),
+        registrationKey:registrationStatus(settings)==="UNREGISTERED"?"UNREGISTERED":settings.store.gstin,
       });
       const wholesaleSummary = saleItems.reduce(
         (summary, item) => ({
@@ -831,6 +839,10 @@ export async function POST(request) {
         [
           {
             invoiceNumber,
+            requestKey,requestHash:hash,
+            invoiceDate,financialYear:financialYear(invoiceDate),documentType,documentStatus:"FINALIZED",supplyContext,
+            registrationSnapshot:{status:registrationStatus(settings),effectiveFrom:settings?.gst?.effectiveFrom,gstin:settings?.store?.gstin},
+            taxRuleVersion:GST_RULE_VERSION,utgst:gstInvoice.utgst,
             saleType,
             wholesaleSummary,
             customerType: customer ? "EXISTING" : "WALK_IN",
@@ -908,9 +920,12 @@ export async function POST(request) {
           })),
           { session: dbSession, ordered: true },
         );
+      await AuditLog.create([{actorId:session.sub,action:'INVOICE_FINALIZED',module:'sales',targetType:'Sale',targetId:completedSale._id,description:`Issued ${invoiceNumber}`,metadata:{invoiceNumber,documentType,total,tax:gstInvoice.tax,placeOfSupply,ruleVersion:GST_RULE_VERSION}}],{session:dbSession});
     });
     return ok(completedSale, 201);
   } catch (error) {
+    // Plain validation errors abort the transaction and are safe to correct/retry.
+    if(error?.constructor===Error&&!error.status)error.status=422;
     return apiError(error);
   } finally {
     if (dbSession) await dbSession.endSession();

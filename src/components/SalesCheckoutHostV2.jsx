@@ -11,8 +11,10 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { calculateGstInvoice } from "@/services/gst.service";
+import { calculateSalePricing } from "@/services/pricing.service";
+import { GST_STATES } from "@/lib/gst-states";
 import { isWholesaleCustomer } from "@/lib/sale-customer";
+import {checkoutFetch} from "@/lib/checkout-request";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -31,7 +33,7 @@ const lineTotal = (item) =>
         ? Number(item.looseQuantity || 0) * Number(item.loosePricePerUnit || 0)
         : Number(item.quantity || 0) * Number(item.packageSellingPrice || 0);
 async function api(url, options) {
-  const response = await fetch(url, options);
+  const response = await checkoutFetch(url, options);
   const json = await response.json();
   if (!response.ok) throw new Error(json.error);
   return json.data;
@@ -58,7 +60,9 @@ export default function SalesCheckoutHostV2() {
     [saving, setSaving] = useState(false),
     [settings, setSettings] = useState(null);
   const [saleType, setSaleType] = useState("SALE");
-  const placeOfSupply = settings?.store?.stateCode || "";
+  const [newGstin,setNewGstin]=useState("");
+  const [fulfilment,setFulfilment]=useState("COUNTER"),[deliveryAddress,setDeliveryAddress]=useState(""),[deliveryStateCode,setDeliveryStateCode]=useState(""),[recipientStateCode,setRecipientStateCode]=useState(""),[discountReason,setDiscountReason]=useState("");
+  const placeOfSupply=fulfilment==="DELIVERY"?(deliveryStateCode||settings?.store?.stateCode):customerType==="NEW"&&!newGstin?(recipientStateCode||settings?.store?.stateCode):selected&&!selected.gstin?(selected.stateCode||settings?.store?.stateCode):settings?.store?.stateCode||"";
   useEffect(() => {
     const handle = (event) => {
       const checkoutCart = event.detail?.cart || [];
@@ -77,6 +81,7 @@ export default function SalesCheckoutHostV2() {
         nextSaleType === "WHOLESALE"
           ? Number(preselected?.defaultDiscount || 0)
           : 0;
+      setFulfilment("COUNTER");setDeliveryAddress("");setDeliveryStateCode("");setRecipientStateCode("");setDiscountReason("");
       setSaleType(nextSaleType);
       setCart(checkoutCart);
       setCustomerType(
@@ -164,44 +169,12 @@ export default function SalesCheckoutHostV2() {
       !discountEnabled ||
       !Number.isFinite(discountLimit) ||
       enteredDiscount <= discountLimit;
-  const discount =
-      discountEnabled && discountValid
-        ? amount(
-            Math.min(
-              subtotal,
-              discountType === "PERCENTAGE"
-                ? (subtotal * enteredDiscount) / 100
-                : enteredDiscount,
-            ),
-          )
-        : 0,
-    gstInvoice = calculateGstInvoice({
-      lines: cart.map((item) => ({
-        amount: lineTotal(item),
-        gstRate:
-          item.kind === "MIX" ? settings?.gst?.defaultRate : item.gstRate,
-        useDefaultGstRate: item.kind === "MIX" ? true : item.useDefaultGstRate,
-        taxable: item.kind === "MIX" ? true : item.taxable,
-        gstExempt: item.kind === "MIX" ? false : item.gstExempt,
-      })),
-      discount,
-      settings,
-      placeOfSupply,
-    }),
-    roundMethod = settings?.roundOff?.method,
-    roundStep = settings?.roundOff?.enabled
-      ? roundMethod === "NEAREST_050"
-        ? 0.5
-        : 1
-      : 0;
-  const total = !roundStep
-    ? gstInvoice.total
-    : roundMethod === "UP"
-      ? amount(Math.ceil(gstInvoice.total))
-      : roundMethod === "DOWN"
-        ? amount(Math.floor(gstInvoice.total))
-        : amount(Math.round(gstInvoice.total / roundStep) * roundStep);
-  const roundOff = amount(total - gstInvoice.total),
+  const pricing=calculateSalePricing({
+    items:cart.map(item=>({...item,amount:lineTotal(item),gstRate:item.kind==="MIX"?settings?.gst?.defaultRate:item.gstRate,useDefaultGstRate:item.kind==="MIX"?true:item.useDefaultGstRate})),
+    discount:{type:discountType,value:discountEnabled&&discountValid?enteredDiscount:0,reason:discountReason},
+    settings,currentUser:{role:settings?._capabilities?.role||"STAFF"},paymentMethod:payment,placeOfSupply
+  });
+  const discount=pricing.totalDiscount,gstInvoice=pricing.gst,total=pricing.total,roundOff=pricing.roundOff,
     change = amount(Number(cashReceived || 0) - total),
     splitRemaining = amount(
       total - Number(splitCash || 0) - Number(splitUpi || 0),
@@ -291,6 +264,8 @@ export default function SalesCheckoutHostV2() {
       );
     }
     const form = Object.fromEntries(new FormData(event.currentTarget));
+    if(pricing.validationErrors.length)return toast.error(pricing.validationErrors[0]);
+    if(fulfilment==="DELIVERY"&&(!deliveryAddress.trim()||!deliveryStateCode))return toast.error("Enter delivery address and state");
     if (customerType === "NEW") {
       const match = await findDuplicate(form);
       if (match) {
@@ -355,6 +330,7 @@ export default function SalesCheckoutHostV2() {
               customerType: "WHOLESALE",
               businessName: form.businessName,
               gstin: form.gstin,
+              stateCode:recipientStateCode,
               billingAddress: form.billingAddress,
               shippingAddress: form.shippingAddress,
               creditLimit: form.creditLimit,
@@ -367,6 +343,7 @@ export default function SalesCheckoutHostV2() {
               email: form.email,
               address: form.address,
               customerType: "RETAIL",
+              gstin:form.retailGstin,stateCode:recipientStateCode,
             }
         : undefined;
     setSaving(true);
@@ -383,7 +360,8 @@ export default function SalesCheckoutHostV2() {
           doctorName: form.doctorName,
           discountType,
           discountValue: enteredDiscount,
-          placeOfSupply,
+          supplyContext:{fulfilment,deliveryAddress,deliveryStateCode},
+          discountReason,
           payments,
           credit: payment === "CREDIT",
         }),
@@ -640,6 +618,11 @@ export default function SalesCheckoutHostV2() {
                     )}
                   </div>
                 )}
+                <div className="mt-4 grid gap-3">
+                  <label><span className="label">Fulfilment</span><select className="field" value={fulfilment} onChange={e=>setFulfilment(e.target.value)}><option value="COUNTER">Counter sale</option><option value="DELIVERY">Delivery of goods</option></select></label>
+                  {fulfilment==="DELIVERY"&&<><label><span className="label">Delivery address</span><textarea className="field" value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} required/></label><label><span className="label">Delivery state</span><select className="field" value={deliveryStateCode} onChange={e=>setDeliveryStateCode(e.target.value)} required><option value="">Select state</option>{GST_STATES.map(([code,name])=><option key={code} value={code}>{name}</option>)}</select></label></>}
+                  {settings?.discount?.enabled&&<label><span className="label">Discount reason</span><input className="field" value={discountReason} onChange={e=>setDiscountReason(e.target.value)} /></label>}
+                </div>
                 {customerType === "NEW" && (
                   <div className="mt-4 space-y-3">
                     <label>
@@ -657,6 +640,8 @@ export default function SalesCheckoutHostV2() {
                         <input className="field" name="businessName" />
                       </label>
                     )}
+                    <label><span className="label">Customer state</span><select className="field" value={recipientStateCode} onChange={e=>setRecipientStateCode(e.target.value)}><option value="">Not recorded</option>{GST_STATES.map(([code,name])=><option key={code} value={code}>{name}</option>)}</select></label>
+                    {saleType!=="WHOLESALE"&&<label><span className="label">GSTIN (registered customer only)</span><input className="field uppercase" name="retailGstin" value={newGstin} onChange={e=>setNewGstin(e.target.value.toUpperCase())} maxLength={15}/></label>}
                     <label>
                       <span className="label">Phone</span>
                       <input
@@ -677,7 +662,7 @@ export default function SalesCheckoutHostV2() {
                           <span className="label">GSTIN</span>
                           <input
                             className="field uppercase"
-                            name="gstin"
+                            name="gstin" value={newGstin} onChange={e=>setNewGstin(e.target.value.toUpperCase())}
                             maxLength={15}
                             placeholder="Optional"
                           />
@@ -884,8 +869,8 @@ export default function SalesCheckoutHostV2() {
                               <strong>{money(gstInvoice.cgst)}</strong>
                             </div>
                             <div className="mt-2 flex justify-between">
-                              <span>SGST</span>
-                              <strong>{money(gstInvoice.sgst)}</strong>
+                              <span>{gstInvoice.taxType==="CGST_UTGST"?"UTGST":"SGST"}</span>
+                              <strong>{money(gstInvoice.taxType==="CGST_UTGST"?gstInvoice.utgst:gstInvoice.sgst)}</strong>
                             </div>
                           </>
                         )}
