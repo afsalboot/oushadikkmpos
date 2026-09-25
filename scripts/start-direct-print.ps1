@@ -12,19 +12,19 @@ try {
         throw 'Set POS80 as the Windows default printer before opening direct-print mode.'
     }
 
-    $receiptEdgeCandidates = @(
-        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-        "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
-        "$env:LOCALAPPDATA\Microsoft\Edge\Application\msedge.exe"
+    $receiptBrowserCandidates = @(
+        "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+        "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+        "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
     )
-    $receiptEdge = $receiptEdgeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (!$receiptEdge) { throw 'Microsoft Edge was not found.' }
+    $receiptBrowser = $receiptBrowserCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (!$receiptBrowser) { throw 'Google Chrome is required for this direct-print launcher.' }
 
-    # Separate profile prevents an existing ordinary Edge session from swallowing
+    # Separate profile prevents an existing ordinary browser session from swallowing
     # the printing flags. No account-wide policy or default-printer changes.
-    $receiptProfile = Join-Path $env:LOCALAPPDATA 'OushadhiPOS\DirectPrintEdge'
+    $receiptProfile = Join-Path $env:LOCALAPPDATA 'OushadhiPOS\DirectPrintChrome'
     function Get-ReceiptBrowser {
-        Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" |
+        Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" |
             Where-Object {
                 $_.CommandLine -and
                 $_.CommandLine -notmatch '--type=' -and
@@ -52,7 +52,7 @@ try {
     if ($CheckOnly) { Write-Output 'Configuration check passed; no browser opened and no receipt printed.'; exit 0 }
 
     # This is the interactive POS window the cashier will use.
-    Start-Process -FilePath $receiptEdge -ArgumentList $receiptArguments -WindowStyle Normal
+    Start-Process -FilePath $receiptBrowser -ArgumentList $receiptArguments -WindowStyle Normal
     $receiptVerifiedBrowser = $null
     for ($receiptAttempt = 0; $receiptAttempt -lt 20; $receiptAttempt++) {
         $receiptVerifiedBrowser = Get-ReceiptBrowser
@@ -62,9 +62,9 @@ try {
     if (!$receiptVerifiedBrowser -or
         $receiptVerifiedBrowser.CommandLine -notmatch '(?:^|\s)--kiosk-printing(?:\s|$)' -or
         $receiptVerifiedBrowser.CommandLine -notmatch '(?:^|\s)--use-system-default-printer(?:\s|$)') {
-        throw 'Direct-print launch could not be verified. Do not use an ordinary Edge or installed-app shortcut for silent printing.'
+        throw 'Direct-print launch could not be verified. Do not use an ordinary browser or installed-app shortcut for silent printing.'
     }
-    Write-Output "Verified dedicated Edge process $($receiptVerifiedBrowser.ProcessId): silent-print and default-printer flags are active."
+    Write-Output "Verified dedicated Chrome process $($receiptVerifiedBrowser.ProcessId): silent-print and default-printer flags are active."
     Write-Output 'Physical printing is not verified until an existing receipt is reprinted in this window.'
 } catch {
     Write-Error $_
