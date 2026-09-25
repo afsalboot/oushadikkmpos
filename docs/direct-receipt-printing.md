@@ -1,5 +1,7 @@
 # Direct receipt printing on the checkout computer
 
+Use the command-file launchers below, not the installed Oushadhi app icon or a normal browser shortcut. They may look identical, but only the dedicated launch enables silent printing. The launcher now checks the running Edge process for both required flags and reports a failure if they are absent; it never forcibly closes another browser session.
+
 Double-click **Open POS Direct Print.cmd** for the hosted shop, or **Open Local POS Direct Print.cmd** for localhost:3000 (the local server must already be running).
 
 The launcher verifies that POS80 is the Windows default printer and opens a dedicated Edge app window with silent-print flags. Log in once in this separate browser profile. Use this window for checkout and receipt reprinting: successful checkout already invokes the same printer as the Print button. Browser processing and printer startup still take time; this removes the manual confirmation step.

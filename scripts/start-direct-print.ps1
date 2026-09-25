@@ -23,6 +23,21 @@ try {
     # Separate profile prevents an existing ordinary Edge session from swallowing
     # the printing flags. No account-wide policy or default-printer changes.
     $receiptProfile = Join-Path $env:LOCALAPPDATA 'OushadhiPOS\DirectPrintEdge'
+    function Get-ReceiptBrowser {
+        Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" |
+            Where-Object {
+                $_.CommandLine -and
+                $_.CommandLine -notmatch '--type=' -and
+                $_.CommandLine.Contains($receiptProfile)
+            } | Select-Object -First 1
+    }
+    $receiptExistingBrowser = Get-ReceiptBrowser
+    if ($receiptExistingBrowser -and (
+        $receiptExistingBrowser.CommandLine -notmatch '(?:^|\s)--kiosk-printing(?:\s|$)' -or
+        $receiptExistingBrowser.CommandLine -notmatch '(?:^|\s)--use-system-default-printer(?:\s|$)'
+    )) {
+        throw 'The dedicated POS profile is already open without direct-print flags. Close its windows and run this launcher again.'
+    }
     $receiptArguments = @(
         ('--user-data-dir="' + $receiptProfile + '"'),
         '--kiosk-printing',
@@ -38,6 +53,19 @@ try {
 
     # This is the interactive POS window the cashier will use.
     Start-Process -FilePath $receiptEdge -ArgumentList $receiptArguments -WindowStyle Normal
+    $receiptVerifiedBrowser = $null
+    for ($receiptAttempt = 0; $receiptAttempt -lt 20; $receiptAttempt++) {
+        $receiptVerifiedBrowser = Get-ReceiptBrowser
+        if ($receiptVerifiedBrowser) { break }
+        Start-Sleep -Milliseconds 500
+    }
+    if (!$receiptVerifiedBrowser -or
+        $receiptVerifiedBrowser.CommandLine -notmatch '(?:^|\s)--kiosk-printing(?:\s|$)' -or
+        $receiptVerifiedBrowser.CommandLine -notmatch '(?:^|\s)--use-system-default-printer(?:\s|$)') {
+        throw 'Direct-print launch could not be verified. Do not use an ordinary Edge or installed-app shortcut for silent printing.'
+    }
+    Write-Output "Verified dedicated Edge process $($receiptVerifiedBrowser.ProcessId): silent-print and default-printer flags are active."
+    Write-Output 'Physical printing is not verified until an existing receipt is reprinted in this window.'
 } catch {
     Write-Error $_
     exit 1
