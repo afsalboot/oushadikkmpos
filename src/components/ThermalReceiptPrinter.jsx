@@ -139,11 +139,10 @@ export function printThermalReceipt(source, onFinished) {
   frame.onload = async () => {
     try { await documentRef.fonts.load('400 26px "OushadhiPrint"'); await documentRef.fonts.ready; } catch { /* Use the serif fallback if the font cannot be loaded. */ }
     const target = frame.contentWindow;
-    const receipt = documentRef.querySelector(".thermal-receipt");
-    const renderedHeight = receipt?.getBoundingClientRect().height || receipt?.scrollHeight || 0;
-    const pageHeight = Math.max(60, Math.ceil(renderedHeight * 25.4 / 96) + 1);
     const pageStyle = documentRef.createElement("style");
-    pageStyle.textContent = `@page{size:80mm ${pageHeight}mm;margin:0}html,body{height:auto!important;overflow:visible!important}`;
+    // A shorter custom page can be centred on the printer's selected sheet.
+    // Use that sheet size and let the receipt flow from its top edge.
+    pageStyle.textContent = "@page{size:auto;margin:0}html,body{height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}";
     documentRef.head.appendChild(pageStyle);
     target.focus();
     let finished = false;

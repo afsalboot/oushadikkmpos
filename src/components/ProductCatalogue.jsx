@@ -7,8 +7,6 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   AlertTriangle,
   Archive,
-  ArrowDown,
-  ArrowUp,
   Boxes,
   Check,
   CheckCircle2,
@@ -379,6 +377,7 @@ function ProductEditor({
   suppliers,
   settings,
   onCategory,
+  onStockSaved,
   onClose,
   onSaved,
 }) {
@@ -399,6 +398,7 @@ function ProductEditor({
   );
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [stockSaving, setStockSaving] = useState(false);
   const focusedTitle = {
     sale: "Edit Product Sale",
     pricing: "Edit Pricing",
@@ -508,6 +508,7 @@ function ProductEditor({
   }
   async function submit(event) {
     event.preventDefault();
+    if (stockSaving) return;
     if (
       !form.name.trim() ||
       !form.categoryId ||
@@ -1572,7 +1573,7 @@ function ProductEditor({
               hidden={Boolean(mode)}
               subtitle={
                 edit
-                  ? "Current inventory is changed only through ledger-backed adjustments."
+                  ? "Set the full stock currently available and record the reason for the change."
                   : "Enter stock already available in your shop. Future stock can be added through Purchases."
               }
             >
@@ -1591,6 +1592,15 @@ function ProductEditor({
                   onChange={(e) => set("reorderLevel", e.target.value)}
                 />
               </label>
+              {edit && (
+                <AdjustmentModal
+                  product={product}
+                  embedded
+                  disabled={saving}
+                  onBusyChange={setStockSaving}
+                  onSaved={onStockSaved}
+                />
+              )}
               {!edit && (
                 <div className="mt-5 grid gap-4">
                   <label className="block max-w-sm">
@@ -1750,7 +1760,7 @@ function ProductEditor({
             <button type="button" className="btn flex-1 sm:flex-none" onClick={onClose}>
               Cancel
             </button>
-            <button className="btn btn-primary flex-1 sm:flex-none" disabled={saving}>
+            <button className="btn btn-primary flex-1 sm:flex-none" disabled={saving || stockSaving}>
               {saving
                 ? "Saving…"
                 : mode
@@ -1778,200 +1788,111 @@ function ProductEditor({
 
 function AdjustmentModal({
   product,
-  defaultDirection = "INCREASE",
   onClose,
   onSaved,
+  embedded = false,
+  disabled = false,
+  onBusyChange,
 }) {
-  const countBased =
-    product.loosePricingMethod === LOOSE_PRICING_METHODS.COUNT_BASED;
-  const unitsPerStockPack = Math.max(1, Number(product.unitsPerStockPack || 1));
-  const stockPackType = product.stockPackType || "Box";
-  const stockPackPlural = stockPackType === "Box" ? "Boxes" : "Cartons";
-  const currentSealedPackages = Number(product.stock?.sealedPackages || 0);
-  const currentStockPacks = Math.floor(currentSealedPackages / unitsPerStockPack);
-  const currentExtraPackages = currentSealedPackages % unitsPerStockPack;
-  const [direction, setDirection] = useState(defaultDirection);
+  const [stock, setStock] = useState(product.stock || {});
+  const [fullStock, setFullStock] = useState(String(product.stock?.sealedPackages || 0));
+  const [reason, setReason] = useState("Physical Count Correction");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [stockEntry, setStockEntry] = useState({
-    stockPacks: countBased ? currentStockPacks : 0,
-    extraPackages: countBased ? currentExtraPackages : 0,
-    openQuantity: countBased ? Number(product.stock?.openQuantity || 0) : 0,
-  });
-  const previewSealedPackages =
-    Number(stockEntry.stockPacks || 0) * unitsPerStockPack +
-    Number(stockEntry.extraPackages || 0);
+  const currentFullStock = Number(stock.sealedPackages || 0);
+  const difference = Number(fullStock) - currentFullStock;
+  const countBased = product.loosePricingMethod === LOOSE_PRICING_METHODS.COUNT_BASED;
+
   async function submit(event) {
     event.preventDefault();
-    const values = Object.fromEntries(new FormData(event.currentTarget));
-    const stockPacks = Number(values.stockPacks || 0);
-    const extraPackages = Number(values.extraPackages || 0);
-    const openQuantity = Number(values.openQuantity || 0);
-    if (!Number.isInteger(stockPacks) || stockPacks < 0)
-      return toast.error(`Enter a valid number of ${stockPackPlural.toLowerCase()}.`);
-    if (!Number.isInteger(extraPackages) || extraPackages < 0)
-      return toast.error(`Enter a valid number of extra ${plural(product.packageType, 2).toLowerCase()}.`);
-    if (unitsPerStockPack > 1 && extraPackages >= unitsPerStockPack)
-      return toast.error(`Extra ${plural(product.packageType, 2).toLowerCase()} must be fewer than ${unitsPerStockPack}; add another ${stockPackType.toLowerCase()} instead.`);
-    if (!Number.isFinite(openQuantity) || openQuantity < 0 || (countBased && !Number.isInteger(openQuantity)))
-      return toast.error(`${countBased ? product.looseUnit : product.baseUnit} quantity must be a non-negative ${countBased ? "whole number" : "number"}.`);
-    const sealedPackages = stockPacks * unitsPerStockPack + extraPackages;
-    const adjustmentQuantity = sealedPackages * Number(product.packageSize || 0) + openQuantity;
-    if (!countBased && !(adjustmentQuantity > 0))
-      return toast.error("Enter at least one box, package, or opened quantity.");
+    event.stopPropagation();
+    if (saving || disabled) return;
+    const sealedPackages = Number(fullStock);
+    if (fullStock.trim() === "" || !Number.isSafeInteger(sealedPackages) || sealedPackages < 0)
+      return toast.error("Enter a non-negative whole number for full stock.");
+    if (sealedPackages === currentFullStock)
+      return toast.error("Enter a different full stock quantity.");
     setSaving(true);
+    onBusyChange?.(true);
     try {
-      await api(
-        `/api/products/${product._id}/${countBased ? "stock" : "adjustment"}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            countBased
-              ? {
-                  ...values,
-                  sealedPackages,
-                  openQuantity,
-                  note: values.notes,
-                }
-              : { ...values, quantity: adjustmentQuantity, direction },
-          ),
-        },
-      );
+      const updated = await api(`/api/products/${product._id}/stock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullStockOnly: true,
+          sealedPackages,
+          expectedSealedPackages: currentFullStock,
+          reason,
+          note: notes,
+        }),
+      });
+      setStock(updated);
+      setFullStock(String(updated.sealedPackages));
+      setNotes("");
       toast.success("Stock adjusted successfully.");
-      onSaved();
+      onSaved?.(updated);
     } catch (error) {
       toast.error(error.message);
     } finally {
       setSaving(false);
+      onBusyChange?.(false);
     }
   }
-  return (
-    <Modal onClose={onClose}>
-      <form onSubmit={submit}>
-        <div className="flex justify-between">
+  const content = (
+    <>
+      {!embedded && (
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--green)]">
-              Stock adjustment
-            </p>
+            <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--green)]">Stock adjustment</p>
             <h2 className="mt-1 text-2xl font-extrabold">{product.name}</h2>
           </div>
-          <button type="button" onClick={onClose}>
-            <X />
-          </button>
+          <button type="button" onClick={onClose} disabled={saving} aria-label="Close stock adjustment"><X /></button>
         </div>
-        <div className="mt-5 rounded-xl bg-[#f4f7f3] p-4">
-          <span className="text-xs uppercase text-[var(--muted)]">
-            Current inventory
-          </span>
-          <strong className="mt-1 block">{product.stockLabel}</strong>
-          {!countBased && (
-            <small>
-              {number(product.stock?.totalBaseQuantity)} {product.baseUnit}{" "}
-              total
-            </small>
-          )}
-        </div>
-        {!countBased && (
-          <div className="mt-5 grid grid-cols-2 rounded-xl bg-[#eef2ed] p-1">
-            <button
-              type="button"
-              className={`rounded-lg p-3 font-bold ${direction === "INCREASE" ? "bg-white text-[var(--green)] shadow-sm" : ""}`}
-              onClick={() => setDirection("INCREASE")}
-            >
-              <ArrowUp className="mr-2 inline" size={16} />
-              Increase
-            </button>
-            <button
-              type="button"
-              className={`rounded-lg p-3 font-bold ${direction === "DECREASE" ? "bg-white text-red-700 shadow-sm" : ""}`}
-              onClick={() => setDirection("DECREASE")}
-            >
-              <ArrowDown className="mr-2 inline" size={16} />
-              Decrease
-            </button>
-          </div>
+      )}
+      <div className="mt-5 rounded-xl bg-[#f4f7f3] p-4 text-sm">
+        <span className="text-xs uppercase text-[var(--muted)]">Current full stock</span>
+        <strong className="mt-1 block">{number(currentFullStock)} {plural(product.packageType, currentFullStock)}</strong>
+        {Number(stock.openQuantity) > 0 && (
+          <p className="mt-1 text-[var(--muted)]">
+            Open stock: {number(stock.openQuantity)} {countBased ? product.looseUnit : product.baseUnit}. This stays unchanged.
+          </p>
         )}
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl bg-emerald-50 p-3 text-sm sm:col-span-2">
-            1 {stockPackType} = <strong>{unitsPerStockPack} {plural(product.packageType, unitsPerStockPack)}</strong>. {countBased ? "Set the complete physical count below." : `${direction === "INCREASE" ? "Add" : "Remove"} boxes, individual packages, or opened ${product.baseUnit}.`}
-          </div>
-          <label>
-            <span className="label">{countBased ? "Current" : direction === "INCREASE" ? "Add" : "Remove"} {stockPackPlural}</span>
-            <input
-              className="field"
-              name="stockPacks"
-              type="number"
-              min="0"
-              step="1"
-              value={stockEntry.stockPacks}
-              onChange={(event) => setStockEntry((current) => ({ ...current, stockPacks: event.target.value }))}
-              required
-            />
-          </label>
-          <label>
-            <span className="label">{countBased ? "Current extra" : direction === "INCREASE" ? "Add extra" : "Remove extra"} {plural(product.packageType, 2)}</span>
-            <input
-              className="field"
-              name="extraPackages"
-              type="number"
-              min="0"
-              step="1"
-              value={stockEntry.extraPackages}
-              onChange={(event) => setStockEntry((current) => ({ ...current, extraPackages: event.target.value }))}
-              required
-            />
-          </label>
-          <label>
-            <span className="label">
-              {countBased ? "Open loose stock currently remaining" : `${direction === "INCREASE" ? "Add" : "Remove"} opened quantity`} ({countBased ? product.looseUnit : product.baseUnit})
-            </span>
-            <input
-              className="field"
-              name="openQuantity"
-              type="number"
-              min="0"
-              step={countBased ? "1" : "any"}
-              value={stockEntry.openQuantity}
-              onChange={(event) => setStockEntry((current) => ({ ...current, openQuantity: event.target.value }))}
-              required
-            />
-          </label>
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-sm sm:col-span-2">
-            <strong>{number(stockEntry.stockPacks)} {Number(stockEntry.stockPacks) === 1 ? stockPackType : stockPackPlural} × {unitsPerStockPack} + {number(stockEntry.extraPackages)} extra = {number(previewSealedPackages)} {plural(product.packageType, previewSealedPackages)}</strong>
-            {Number(stockEntry.openQuantity) > 0 && <span> + {number(stockEntry.openQuantity)} {countBased ? product.looseUnit : product.baseUnit} open</span>}
-          </div>
-          <label>
-            <span className="label">Reason *</span>
-            <select className="field" name="reason" required>
-              {[
-                "Physical Count Correction",
-                "Damage",
-                "Expired",
-                "Broken Package",
-                "Lost Stock",
-                "Manual Correction",
-                "Other",
-              ].map((reason) => (
-                <option key={reason}>{reason}</option>
-              ))}
-            </select>
-          </label>
-          <label className="sm:col-span-2">
-            <span className="label">Notes</span>
-            <textarea className="field min-h-24" name="notes" />
-          </label>
-        </div>
-        <div className="mt-6 flex justify-end gap-2">
-          <button type="button" className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" disabled={saving}>
-            {saving ? "Adjusting…" : "Confirm adjustment"}
-          </button>
-        </div>
-      </form>
-    </Modal>
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <label>
+          <FieldLabel help="Enter the total number of full packages currently in stock. Use zero to clear full stock.">
+            Full Stock ({plural(product.packageType, 2)})
+          </FieldLabel>
+          <input className="field" type="number" min="0" step="1" value={fullStock}
+            disabled={saving || disabled}
+            onChange={(event) => setFullStock(event.target.value)} />
+        </label>
+        <label>
+          <span className="label">Reason *</span>
+          <select className="field" value={reason} disabled={saving || disabled} onChange={(event) => setReason(event.target.value)}>
+            {["Physical Count Correction", "Damage", "Expired", "Broken Package", "Lost Stock", "Manual Correction", "Other"].map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
+        <label className="sm:col-span-2">
+          <span className="label">Notes</span>
+          <textarea className="field min-h-20" value={notes} disabled={saving || disabled} onChange={(event) => setNotes(event.target.value)} />
+        </label>
+      </div>
+      <div className="mt-3 text-sm text-[var(--muted)]" aria-live="polite">
+        {fullStock.trim() !== "" && Number.isSafeInteger(Number(fullStock)) && Number(fullStock) >= 0
+          ? difference === 0 ? "No stock change." : `${difference > 0 ? "Add" : "Remove"} ${number(Math.abs(difference))} ${plural(product.packageType, Math.abs(difference)).toLowerCase()}.`
+          : "Enter a valid full stock quantity."}
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        {!embedded && <button type="button" className="btn" onClick={onClose} disabled={saving}>Cancel</button>}
+        <button type="button" className="btn btn-primary" onClick={submit} disabled={saving || disabled || difference === 0}>
+          {saving ? "Applying…" : "Apply Stock Change"}
+        </button>
+      </div>
+      {embedded && <p className="mt-2 text-xs text-[var(--muted)]">Apply stock changes here before saving other product details.</p>}
+    </>
   );
+  return embedded ? <div>{content}</div> : <Modal onClose={saving ? () => {} : onClose}><form onSubmit={submit}>{content}</form></Modal>;
 }
 
 function ProductDrawer({
@@ -3505,7 +3426,6 @@ export default function ProductCatalogue() {
     [editorMode, setEditorMode] = useState(null),
     [drawer, setDrawer] = useState(null),
     [adjustment, setAdjustment] = useState(null),
-    [adjustDirection, setAdjustDirection] = useState("INCREASE"),
     [importOpen, setImportOpen] = useState(false),
     [selected, setSelected] = useState(() => new Set()),
     [bulkUpdateOpen, setBulkUpdateOpen] = useState(false),
@@ -3823,11 +3743,9 @@ export default function ProductCatalogue() {
     viewStockHistory: () => openDrawer(product._id, "stockHistory"),
     viewSalesHistory: () => openDrawer(product._id, "salesHistory"),
     add: () => {
-      setAdjustDirection("INCREASE");
       setAdjustment(product);
     },
     adjust: () => {
-      setAdjustDirection("INCREASE");
       setAdjustment(product);
     },
     duplicate: () =>
@@ -4205,6 +4123,7 @@ export default function ProductCatalogue() {
           categories={categories}
           suppliers={suppliers}
           settings={settings}
+          onStockSaved={() => load()}
           onCategory={(item) =>
             setCategories((current) =>
               [...current, item].sort((a, b) => a.name.localeCompare(b.name)),
@@ -4239,7 +4158,6 @@ export default function ProductCatalogue() {
       {adjustment && (
         <AdjustmentModal
           product={adjustment}
-          defaultDirection={adjustDirection}
           onClose={() => setAdjustment(null)}
           onSaved={() => {
             setAdjustment(null);
