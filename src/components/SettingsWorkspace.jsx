@@ -44,7 +44,7 @@ const sectionGroups = [
         id: "store",
         label: "Store & Business",
         icon: Building2,
-        keywords: "business legal logo currency timezone gstin",
+        keywords: "business address currency timezone gstin",
       },
     ],
   },
@@ -234,10 +234,6 @@ const configs = {
       {
         title: "Business details",
         fields: [
-          { path: "store.name", label: "Store name", required: true },
-          { path: "store.legalName", label: "Business / legal name" },
-          { path: "store.phone", label: "Phone" },
-          { path: "store.email", label: "Email", type: "email" },
           { path: "store.gstin", label: "GSTIN" },
           { path: "store.address", label: "Address", type: "textarea" },
           {
@@ -251,11 +247,6 @@ const configs = {
             label: "Timezone",
             type: "select",
             options: [["Asia/Kolkata", "Asia/Kolkata"]],
-          },
-          {
-            path: "store.logoUrl",
-            label: "Store logo URL",
-            note: "Use a managed image URL; secrets and large image data are never stored in Settings.",
           },
         ],
       },

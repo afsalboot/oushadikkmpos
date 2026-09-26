@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Printer } from "lucide-react";
-import { gstStateName } from "@/lib/gst-states";
+import { gstStateName } from "./gst-states";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
