@@ -1371,7 +1371,6 @@ export default function SalesWorkspaceModern() {
                           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
                             <label className="flex items-center gap-2 font-bold">
                               <input type="checkbox" checked={i.saleMode === "WHOLESALE"}
-                                disabled={!i.wholesaleEnabled}
                                 onChange={(e) => updateCartItem(i, e.target.checked)} />
                               Wholesale
                             </label>

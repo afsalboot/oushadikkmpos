@@ -3,6 +3,20 @@ const amount = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100
 export const WHOLESALE_UNITS = ["Piece", "Tablet", "Bottle", "Packet", "Jar", "Box", "Carton"];
 export const FREE_SCHEME_TYPES = ["SAME_PRODUCT", "DIFFERENT_PRODUCT"];
 
+// Resolve unconfigured products at sale time, including existing records.
+export function resolveWholesaleProduct(product) {
+  if (product?.wholesaleEnabled) return product;
+  const source = typeof product?.toObject === "function" ? product.toObject() : product;
+  return { ...source, wholesaleEnabled: true,
+    wholesalePricingMethod: "FIXED", wholesalePrice: Number(product?.packageSellingPrice || 0),
+    wholesaleMinQty: 1, wholesaleSaleUnit: "PACKAGE", wholesaleUnit: product?.packageType,
+    unitsPerWholesalePack: 1, wholesalePackEnabled: false, wholesalePackPrice: null,
+    wholesalePriceTiers: [], freeSchemeEnabled: false,
+    allowWholesaleLooseSale: Boolean(product?.allowLooseSale),
+    wholesaleLoosePrice: Number(product?.loosePricePerUnit || 0),
+  };
+}
+
 export function wholesalePackConversion(product) {
   const wholesaleUnit = product?.wholesaleUnit || product?.packageType;
   const configured = Number(product?.unitsPerWholesalePack || 1);
@@ -25,6 +39,7 @@ export function normalizeWholesaleTiers(tiers = []) {
 }
 
 export function wholesaleBasePrice(product) {
+  product = resolveWholesaleProduct(product);
   if (product?.wholesalePricingMethod === "DISCOUNT_FROM_RETAIL") {
     const discount = Number(product?.wholesaleDiscountPercent || 0);
     return amount(Number(product?.packageSellingPrice || 0) * (1 - discount / 100));
@@ -33,12 +48,14 @@ export function wholesaleBasePrice(product) {
 }
 
 export function wholesaleLooseRate(product) {
+  product = resolveWholesaleProduct(product);
   if (Number.isFinite(product?.wholesaleLoosePrice))
     return amount(product.wholesaleLoosePrice);
   return amount(wholesaleBasePrice(product) / Number(product?.packageSize || 1));
 }
 
 export function wholesaleRate(product, paidPackageQuantity, sellBy) {
+  product = resolveWholesaleProduct(product);
   const quantity = Number(paidPackageQuantity || 0);
   const tiers = (product?.wholesalePricingMethod === "DISCOUNT_FROM_RETAIL"
     ? []
@@ -70,7 +87,7 @@ export function automaticFreeQuantity(product, paidPackageQuantity) {
 }
 
 export function buildWholesaleLine(product, { sellBy, quantity, manualFreeQuantity = null, manualFreeReason = "" } = {}) {
-  if (!product?.wholesaleEnabled) throw new Error(`${product?.name || "Product"} is not enabled for wholesale sales`);
+  product = resolveWholesaleProduct(product);
   const orderedQuantity = Number(quantity);
   if (!Number.isInteger(orderedQuantity) || orderedQuantity <= 0) throw new Error("Wholesale quantity must be a positive whole number");
   const wholesaleUnit = product.wholesaleUnit || product.packageType;

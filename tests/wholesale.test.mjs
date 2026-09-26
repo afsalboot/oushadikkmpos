@@ -39,7 +39,7 @@ test("regular cart wholesale respects eligibility, minimum and free stock", () =
   const item = { ...product, kind: "PRODUCT", saleMode: "PACKAGE", quantity: 120, stock: { sealedPackages: 120 } };
   assert.throws(() => setCartItemWholesale(item, true), /Insufficient sealed stock/);
   assert.throws(() => setCartItemWholesale({ ...item, quantity: 1 }, true), /Minimum wholesale order/);
-  assert.throws(() => setCartItemWholesale({ ...item, wholesaleEnabled: false }, true), /not enabled/);
+  assert.equal(setCartItemWholesale({ ...item, wholesaleEnabled: false, packageSellingPrice: 100 }, true).wholesaleTotal, 12000);
   assert.throws(() => setCartItemWholesale({ ...item, saleMode: "LOOSE" }, true), /package products/);
 });
 
@@ -55,6 +55,22 @@ test("mixed cart percentage discount applies only to the selected wholesale line
   assert.equal(result.totalDiscount, 20);
   assert.equal(result.total, 280);
   assert.deepEqual(result.lineDiscounts, [0, 20]);
+});
+
+test("existing disabled and future default products support wholesale at their selling price", () => {
+  for (const wholesaleEnabled of [false, undefined]) {
+    const source = { name: "New product", packageType: "Bottle", packageSellingPrice: 60,
+      wholesaleEnabled, wholesalePrice: 0, wholesaleMinQty: 99,
+      wholesaleUnit: "Carton", unitsPerWholesalePack: 12,
+      wholesalePriceTiers: [{ quantity: 1, price: 0 }], freeSchemeEnabled: true,
+      freeSchemeBuyQty: 1, freeSchemeFreeQty: 5 };
+    const line = buildWholesaleLine(source, { sellBy: "Bottle", quantity: 1 });
+    assert.equal(line.unitPrice, 60);
+    assert.equal(line.total, 60);
+    assert.equal(line.freeQuantity, 0);
+    assert.equal(line.paidPackageQuantity, 1);
+    assert.equal(source.wholesaleEnabled, wholesaleEnabled);
+  }
 });
 
 test("wholesale carton conversion and scheme use box quantities", () => {
