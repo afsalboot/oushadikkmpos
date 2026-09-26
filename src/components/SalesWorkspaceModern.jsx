@@ -542,9 +542,8 @@ export default function SalesWorkspaceModern() {
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("All"),
     [cart, setCart] = useState([]),
-    [billDiscount, setBillDiscount] = useState(""),
-    [billDiscountReason, setBillDiscountReason] = useState(""),
-    [enablingDiscount, setEnablingDiscount] = useState(false),
+    [wholesaleDiscountEnabled, setWholesaleDiscountEnabled] = useState(false),
+    [wholesaleDiscountPercent, setWholesaleDiscountPercent] = useState(""),
     [saleCustomer, setSaleCustomer] = useState(null),
     [heldSales, setHeldSales] = useState([]),
     [heldOpen, setHeldOpen] = useState(false),
@@ -673,7 +672,7 @@ export default function SalesWorkspaceModern() {
       event.stopImmediatePropagation();
       window.dispatchEvent(
         new CustomEvent("oushadi-open-checkout", {
-          detail: { cart, source: "PROCEED_PAYMENT", discount: { type: "PERCENTAGE", value: billDiscount, reason: billDiscountReason } },
+          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, wholesaleDiscountPercent },
         }),
       );
     };
@@ -684,12 +683,12 @@ export default function SalesWorkspaceModern() {
       layout?.classList.remove("sales-cart-grid");
       workspace?.classList.remove("sales-cart-workspace");
     };
-  }, [cart, mode, billDiscount, billDiscountReason]);
+  }, [cart, mode, wholesaleDiscountEnabled, wholesaleDiscountPercent]);
   useEffect(() => {
     const completed = () => {
       setCart([]);
-      setBillDiscount("");
-      setBillDiscountReason("");
+      setWholesaleDiscountEnabled(false);
+      setWholesaleDiscountPercent("");
       api("/api/products?sales=true")
         .then(setProducts)
         .catch(() => {});
@@ -751,14 +750,14 @@ export default function SalesWorkspaceModern() {
             id: crypto.randomUUID(),
             label: `Sale ${current.length + 1}`,
             cart,
-            billDiscount,
-            billDiscountReason,
+            wholesaleDiscountEnabled,
+            wholesaleDiscountPercent,
             heldAt: new Date().toISOString(),
           },
         ]);
       setCart([]);
-      setBillDiscount("");
-      setBillDiscountReason("");
+      setWholesaleDiscountEnabled(false);
+      setWholesaleDiscountPercent("");
       setQuick(null);
       setMode("PRODUCT");
       toast.success(
@@ -774,7 +773,7 @@ export default function SalesWorkspaceModern() {
       links.forEach((link) =>
         link.removeEventListener("click", start, { capture: true }),
       );
-  }, [cart, billDiscount, billDiscountReason]);
+  }, [cart, wholesaleDiscountEnabled, wholesaleDiscountPercent]);
   const cats = useMemo(
       () => [
         ...new Set(products.map((p) => p.categoryId?.name).filter(Boolean)),
@@ -804,9 +803,8 @@ export default function SalesWorkspaceModern() {
       return filter === "All" || p.categoryId?.name === filter;
     });
   const subtotal = cart.reduce((s, i) => s + total(i), 0),
-    billDiscountEnabled = Boolean(settings?.discount?.enabled && settings.discount.cartLevel !== false && settings.discount.allowPercentage !== false),
     cartPricing = calculateSalePricing({
-      discount: { type: "PERCENTAGE", value: billDiscount, reason: billDiscountReason },
+      wholesaleDiscount: wholesaleDiscountEnabled ? wholesaleDiscountPercent || 0 : undefined,
       items: cart.map((i) => ({ ...i, discount: undefined, amount: total(i),
         gstRate: i.kind === "MIX" ? settings?.gst?.defaultRate : i.gstRate,
         useDefaultGstRate: i.kind === "MIX" ? true : i.useDefaultGstRate,
@@ -891,15 +889,15 @@ export default function SalesWorkspaceModern() {
           id: crypto.randomUUID(),
           label: `Sale ${current.length + 1}`,
           cart,
-          billDiscount,
-          billDiscountReason,
+          wholesaleDiscountEnabled,
+          wholesaleDiscountPercent,
           customer: saleCustomer,
           heldAt: new Date().toISOString(),
         },
       ]);
     setCart([]);
-    setBillDiscount("");
-    setBillDiscountReason("");
+    setWholesaleDiscountEnabled(false);
+    setWholesaleDiscountPercent("");
     setSaleCustomer(null);
     sessionStorage.removeItem("oushadi-preselected-customer");
     setQuick(null);
@@ -918,8 +916,8 @@ export default function SalesWorkspaceModern() {
               id: crypto.randomUUID(),
               label: `Sale ${remaining.length + 1}`,
               cart,
-            billDiscount,
-            billDiscountReason,
+              wholesaleDiscountEnabled,
+              wholesaleDiscountPercent,
               customer: saleCustomer,
               heldAt: new Date().toISOString(),
             },
@@ -927,8 +925,8 @@ export default function SalesWorkspaceModern() {
         : remaining;
     });
     setCart(sale.cart.map((item) => ({ ...item, discount: undefined })));
-    setBillDiscount(sale.billDiscount || "");
-    setBillDiscountReason(sale.billDiscountReason || "");
+    setWholesaleDiscountEnabled(Boolean(sale.wholesaleDiscountEnabled));
+    setWholesaleDiscountPercent(sale.wholesaleDiscountPercent || "");
     setSaleCustomer(sale.customer || null);
     if (sale.customer)
       sessionStorage.setItem(
@@ -943,18 +941,6 @@ export default function SalesWorkspaceModern() {
   function removeHeldSale(sale) {
     setHeldSales((current) => current.filter((item) => item.id !== sale.id));
     toast.success(`${sale.label} removed`);
-  }
-  async function enableBillDiscounts() {
-    setEnablingDiscount(true);
-    try {
-      const saved = await api("/api/settings", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discount: { enabled: true, cartLevel: true, allowPercentage: true } }),
-      });
-      setSettings((current) => ({ ...saved, _capabilities: current?._capabilities }));
-      toast.success("Bill discounts enabled in Settings");
-    } catch (error) { toast.error(error.message); }
-    finally { setEnablingDiscount(false); }
   }
   function selectProduct(product) {
     const canSellLoose = product.allowLooseSale &&
@@ -1100,8 +1086,8 @@ export default function SalesWorkspaceModern() {
       });
       toast.success(`Sale ${sale.invoiceNumber} completed`);
       setCart([]);
-      setBillDiscount("");
-      setBillDiscountReason("");
+      setWholesaleDiscountEnabled(false);
+      setWholesaleDiscountPercent("");
       setCheckout(false);
       setProducts(await api("/api/products?sales=true"));
     } catch (error) {
@@ -1316,7 +1302,7 @@ export default function SalesWorkspaceModern() {
                         confirmText: "Clear all",
                         cancelText: "Cancel",
                         variant: "warning",
-                      })) && (setCart([]), setBillDiscount(""), setBillDiscountReason(""))
+                      })) && (setCart([]), setWholesaleDiscountEnabled(false), setWholesaleDiscountPercent(""))
                     }
                   >
                     Clear all
@@ -1400,16 +1386,6 @@ export default function SalesWorkspaceModern() {
                           </Badge>
                           <span>{quantityLabel}</span>
                         </div>
-                        {i.kind === "PRODUCT" && ["PACKAGE", "WHOLESALE"].includes(i.saleMode) && (
-                          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-                            <label className="flex items-center gap-2 font-bold">
-                              <input type="checkbox" checked={i.saleMode === "WHOLESALE"}
-                                onChange={(e) => updateCartItem(i, e.target.checked)} />
-                              Wholesale
-                            </label>
-                            {i.saleMode === "WHOLESALE" && i.freeQuantity > 0 && <span>+{i.freeQuantity} free</span>}
-                          </div>
-                        )}
                         <div className="mt-3 flex items-end justify-between gap-2">
                           {i.kind !== "MIX" && ["PACKAGE", "WHOLESALE"].includes(i.saleMode) ? (
                             <Step
@@ -1459,26 +1435,20 @@ export default function SalesWorkspaceModern() {
               )}
             </div>
             <div className="sales-cart-summary border-t">
-              <label className="mb-3 flex items-center justify-between gap-3 text-sm font-bold">
-                Bill discount %
-                <input className="field !min-h-9 !w-24" type="number" min="0" max="100" step="0.01"
-                  aria-label="Bill discount percentage" value={billDiscount} placeholder="0"
-                  onChange={(e) => { const value = e.target.value;
-                    if (value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100)) setBillDiscount(value);
-                  }} />
+              <label className="mb-3 flex items-center gap-2 text-sm font-bold">
+                <input type="checkbox" className="size-4 accent-[var(--green)]"
+                  checked={wholesaleDiscountEnabled}
+                  onChange={(e) => { setWholesaleDiscountEnabled(e.target.checked); if (!e.target.checked) setWholesaleDiscountPercent(""); }} />
+                Wholesale
               </label>
-              {!billDiscountEnabled && <div className="mb-3 text-xs text-amber-800">
-                {settings ? "Bill percentage discounts are disabled in Settings." : "Loading discount settings…"}
-                {settings?._capabilities?.edit ? <button type="button" className="btn mt-2 !min-h-8 !text-xs"
-                  disabled={enablingDiscount} onClick={enableBillDiscounts}>
-                  {enablingDiscount ? "Enabling…" : "Enable bill discounts"}
-                </button> : settings && <p>Ask an administrator to enable bill discounts.</p>}
-              </div>}
-              {Number(billDiscount) > 0 && settings?.discount?.requireReason && <label className="mb-3 block text-xs">
-                Discount reason
-                <input className="field mt-1" value={billDiscountReason} onChange={(e) => setBillDiscountReason(e.target.value)} />
+              {wholesaleDiscountEnabled && <label className="mb-3 flex items-center justify-between gap-3 text-sm">
+                Wholesale discount %
+                <input type="number" className="field !min-h-9 !w-24" min="0" max="100" step="0.01"
+                  aria-label="Wholesale discount percentage" placeholder="0" value={wholesaleDiscountPercent}
+                  onChange={(e) => { const value = e.target.value;
+                    if (value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100)) setWholesaleDiscountPercent(value);
+                  }} />
               </label>}
-              {Number(billDiscount) > 0 && cartPricing.validationErrors.map((error) => <p key={error} className="mb-2 text-xs text-red-700">{error}</p>)}
 
               {cartPricing.totalDiscount > 0 && <div className="flex justify-between text-sm"><span>Discount</span><b>-{money(cartPricing.totalDiscount)}</b></div>}
               <div className="flex justify-between">
@@ -1497,7 +1467,7 @@ export default function SalesWorkspaceModern() {
               </div>
               <button
                 data-cart-payment
-                disabled={!cart.length || (Number(billDiscount) > 0 && (!billDiscountEnabled || cartPricing.validationErrors.length > 0))}
+                disabled={!cart.length}
                 className="btn btn-primary mt-4 w-full"
                 onClick={() =>
                   document.querySelector('[href="/sales/new"]')?.click()

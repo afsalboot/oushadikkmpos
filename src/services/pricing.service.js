@@ -68,9 +68,23 @@ export function calculateDiscount({items=[],cartSubtotal,discount={},settings,cu
   return{itemDiscount,cartDiscount,automaticDiscount,totalDiscount,subtotalAfterDiscount:money(subtotal-totalDiscount),approvalRequired,allowedWithoutApproval:{percentage:staffPercent,fixed:staffFixed},validationErrors:[...new Set(errors)],lineDiscounts,discountType:cartType,discountValue:cartValue,reason};
 }
 
-export function calculateSalePricing({items=[],discount={},settings,currentUser,paymentMethod,placeOfSupply}){
-  const subtotal=money(items.reduce((sum,item)=>sum+Number(item.amount??item.total??0),0)),discountSummary=calculateDiscount({items,cartSubtotal:subtotal,discount,settings,currentUser});
-  const gst=calculateGstInvoice({lines:items,discount:sumMoney([discountSummary.cartDiscount,discountSummary.automaticDiscount]),lineDiscounts:discountSummary.lineDiscounts,discountEligible:items.map(item=>eligible(item,settings)),settings,placeOfSupply});
+export function calculateWholesaleDiscount(items, subtotal, percentage) {
+  const value = Number(percentage);
+  const valid = Number.isFinite(value) && value >= 0 && value <= 100;
+  const totalDiscount = valid ? multiplyMoney(subtotal, value / 100) : 0;
+  return { itemDiscount: 0, cartDiscount: totalDiscount, automaticDiscount: 0,
+    totalDiscount, subtotalAfterDiscount: money(subtotal - totalDiscount),
+    approvalRequired: false, lineDiscounts: items.map(() => 0),
+    discountType: "PERCENTAGE", discountValue: valid ? value : 0,
+    reason: "Wholesale discount",
+    validationErrors: valid ? [] : ["Wholesale discount must be between 0% and 100%."],
+  };
+}
+
+export function calculateSalePricing({items=[],discount={},wholesaleDiscount,settings,currentUser,paymentMethod,placeOfSupply}){
+  const isWholesaleDiscount = wholesaleDiscount !== undefined && wholesaleDiscount !== null;
+  const subtotal=money(items.reduce((sum,item)=>sum+Number(item.amount??item.total??0),0)),discountSummary=isWholesaleDiscount ? calculateWholesaleDiscount(items,subtotal,wholesaleDiscount) : calculateDiscount({items,cartSubtotal:subtotal,discount,settings,currentUser});
+  const gst=calculateGstInvoice({lines:items,discount:sumMoney([discountSummary.cartDiscount,discountSummary.automaticDiscount]),lineDiscounts:discountSummary.lineDiscounts,discountEligible:items.map(item=>isWholesaleDiscount || eligible(item,settings)),settings,placeOfSupply});
   discountSummary.totalDiscount=gst.discount;
   discountSummary.subtotalAfterDiscount=money(subtotal-gst.discount);
   const roundOff=settings?.roundOff?.enabled?calculateRoundOff(gst.total,settings.roundOff,paymentMethod):0,total=money(gst.total+roundOff);

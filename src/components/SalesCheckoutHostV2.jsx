@@ -60,6 +60,7 @@ export default function SalesCheckoutHostV2() {
     [saving, setSaving] = useState(false),
     [settings, setSettings] = useState(null);
   const [saleType, setSaleType] = useState("SALE");
+  const [wholesaleDiscountEnabled, setWholesaleDiscountEnabled] = useState(false);
   const [newGstin,setNewGstin]=useState("");
   const [fulfilment,setFulfilment]=useState("COUNTER"),[deliveryAddress,setDeliveryAddress]=useState(""),[deliveryStateCode,setDeliveryStateCode]=useState(""),[recipientStateCode,setRecipientStateCode]=useState(""),[discountReason,setDiscountReason]=useState("");
   const placeOfSupply=fulfilment==="DELIVERY"?(deliveryStateCode||settings?.store?.stateCode):customerType==="NEW"&&!newGstin?(recipientStateCode||settings?.store?.stateCode):selected&&!selected.gstin?(selected.stateCode||settings?.store?.stateCode):settings?.store?.stateCode||"";
@@ -81,10 +82,11 @@ export default function SalesCheckoutHostV2() {
         nextSaleType === "WHOLESALE"
           ? Number(preselected?.defaultDiscount || 0)
           : 0;
-      const billDiscount = event.detail?.discount;
-      setFulfilment("COUNTER");setDeliveryAddress("");setDeliveryStateCode("");setRecipientStateCode("");setDiscountReason(billDiscount?.reason || "");
+      const wholesaleDiscount = event.detail?.wholesaleDiscountEnabled === true;
+      setWholesaleDiscountEnabled(wholesaleDiscount);
+      setFulfilment("COUNTER");setDeliveryAddress("");setDeliveryStateCode("");setRecipientStateCode("");setDiscountReason("");
       setSaleType(nextSaleType);
-      setCart(billDiscount ? checkoutCart.map((item) => ({ ...item, discount: undefined })) : checkoutCart);
+      setCart(checkoutCart.map((item) => ({ ...item, discount: undefined })));
       setCustomerType(
         preselected
           ? "EXISTING"
@@ -95,8 +97,8 @@ export default function SalesCheckoutHostV2() {
       setSelected(preselected);
       setQuery("");
       setResults([]);
-      setDiscountValue(billDiscount ? String(billDiscount.value || "") : customerDiscount > 0 ? String(customerDiscount) : "");
-      setDiscountType(billDiscount ? "PERCENTAGE" : "FIXED");
+      setDiscountValue(wholesaleDiscount ? String(event.detail?.wholesaleDiscountPercent || "") : "");
+      setDiscountType("PERCENTAGE");
       setPayment("CASH");
       setCashReceived("");
       setSplitCash("");
@@ -109,7 +111,7 @@ export default function SalesCheckoutHostV2() {
         .then((value) => {
           setSettings(value);
           setDiscountType(
-            billDiscount || customerDiscount > 0
+            wholesaleDiscount || customerDiscount > 0
               ? "PERCENTAGE"
               : value?.discount?.allowFixed === false &&
                   value?.discount?.allowPercentage !== false
@@ -160,20 +162,14 @@ export default function SalesCheckoutHostV2() {
     () => amount(cart.reduce((sum, item) => sum + lineTotal(item), 0)),
     [cart],
   );
-  const discountEnabled =
-      settings?.discount?.enabled && settings.discount.cartLevel !== false,
-    enteredDiscount = Math.max(0, Number(discountValue) || 0),
-    discountLimit =
-      discountType === "PERCENTAGE"
-        ? Number(settings?.discount?.maxPercentage ?? settings?.discount?.maxStaffPercentage)
-        : Number(settings?.discount?.maxFixedAmount),
-    discountValid =
-      enteredDiscount === 0 || (discountEnabled &&
-      (discountType !== "PERCENTAGE" || settings?.discount?.allowPercentage !== false) &&
-      (!Number.isFinite(discountLimit) || enteredDiscount <= discountLimit));
+  const discountEnabled = wholesaleDiscountEnabled,
+    enteredDiscount = Number(discountValue || 0),
+    discountLimit = 100,
+    discountValid = !wholesaleDiscountEnabled || (Number.isFinite(enteredDiscount) && enteredDiscount >= 0 && enteredDiscount <= 100);
   const pricing=calculateSalePricing({
+    wholesaleDiscount: wholesaleDiscountEnabled ? enteredDiscount : undefined,
     items:cart.map(item=>({...item,amount:lineTotal(item),gstRate:item.kind==="MIX"?settings?.gst?.defaultRate:item.gstRate,useDefaultGstRate:item.kind==="MIX"?true:item.useDefaultGstRate})),
-    discount:{type:discountType,value:discountEnabled&&discountValid?enteredDiscount:0,reason:discountReason},
+    discount:{type:"PERCENTAGE",value:0,reason:discountReason},
     settings,currentUser:{role:settings?._capabilities?.role||"STAFF"},paymentMethod:payment,placeOfSupply
   });
   const discount=pricing.totalDiscount,gstInvoice=pricing.gst,total=pricing.total,roundOff=pricing.roundOff,
@@ -362,7 +358,9 @@ export default function SalesCheckoutHostV2() {
           customer: newCustomer,
           doctorName: form.doctorName,
           discountType,
-          discountValue: enteredDiscount,
+          discountValue: 0,
+          wholesaleDiscountEnabled,
+          wholesaleDiscountPercent: wholesaleDiscountEnabled ? enteredDiscount : 0,
           supplyContext:{fulfilment,deliveryAddress,deliveryStateCode},
           discountReason,
           payments,
@@ -621,7 +619,6 @@ export default function SalesCheckoutHostV2() {
                 <div className="mt-4 grid gap-3">
                   <label><span className="label">Fulfilment</span><select className="field" value={fulfilment} onChange={e=>setFulfilment(e.target.value)}><option value="COUNTER">Counter sale</option><option value="DELIVERY">Delivery of goods</option></select></label>
                   {fulfilment==="DELIVERY"&&<><label><span className="label">Delivery address</span><textarea className="field" value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} required/></label><label><span className="label">Delivery state</span><select className="field" value={deliveryStateCode} onChange={e=>setDeliveryStateCode(e.target.value)} required><option value="">Select state</option>{GST_STATES.map(([code,name])=><option key={code} value={code}>{name}</option>)}</select></label></>}
-                  {settings?.discount?.enabled&&<label><span className="label">Discount reason</span><input className="field" value={discountReason} onChange={e=>setDiscountReason(e.target.value)} /></label>}
                 </div>
                 {customerType === "NEW" && (
                   <div className="mt-4 space-y-3">
@@ -774,11 +771,16 @@ export default function SalesCheckoutHostV2() {
                       <span>Subtotal</span>
                       <strong>{money(subtotal)}</strong>
                     </div>
+                    <label className="mt-3 flex items-center gap-2 text-sm font-bold">
+                      <input type="checkbox" checked={wholesaleDiscountEnabled}
+                        onChange={(event) => { setWholesaleDiscountEnabled(event.target.checked); setDiscountType("PERCENTAGE"); setDiscountValue(""); }} />
+                      Wholesale
+                    </label>
                     {discountEnabled && (
                       <>
                         <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
-                          {settings.discount.allowFixed !== false &&
-                            settings.discount.allowPercentage !== false && (
+                          {!wholesaleDiscountEnabled && settings?.discount?.allowFixed !== false &&
+                            settings?.discount?.allowPercentage !== false && (
                               <select
                                 className="field !min-h-10"
                                 value={discountType}
@@ -794,13 +796,13 @@ export default function SalesCheckoutHostV2() {
                             )}
                           <label
                             className={
-                              settings.discount.allowFixed !== false &&
-                              settings.discount.allowPercentage !== false
+                              !wholesaleDiscountEnabled && settings?.discount?.allowFixed !== false &&
+                              settings?.discount?.allowPercentage !== false
                                 ? ""
                                 : "col-span-2"
                             }
                           >
-                            <span className="sr-only">Discount value</span>
+                            <span className="label">Wholesale discount %</span>
                             <input
                               className="field !min-h-10"
                               type="number"
@@ -832,7 +834,7 @@ export default function SalesCheckoutHostV2() {
                           </p>
                         )}
                         <div className="flex justify-between text-[var(--green)]">
-                          <span>Discount</span>
+                          <span>Wholesale discount</span>
                           <strong>-{money(discount)}</strong>
                         </div>
                       </>

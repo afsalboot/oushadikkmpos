@@ -695,9 +695,8 @@ export async function POST(request) {
         saleType === "WHOLESALE" && !(Number(body.discountValue) > 0)
           ? Number(customer?.defaultDiscount || 0)
           : null;
-      if (Number(body.discountValue ?? body.discount) > 0 && !settings?.discount?.enabled)
-        throw new Error("Discounts are disabled in Settings. Enable bill discounts before checkout.");
       const pricing = calculateSalePricing({
+        wholesaleDiscount: body.wholesaleDiscountEnabled === true ? body.wholesaleDiscountPercent ?? 0 : undefined,
         items: saleItems.map((item, index) => ({
           amount: item.total,
           gstRate: item.gstRate,
