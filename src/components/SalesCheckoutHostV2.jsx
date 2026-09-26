@@ -81,9 +81,10 @@ export default function SalesCheckoutHostV2() {
         nextSaleType === "WHOLESALE"
           ? Number(preselected?.defaultDiscount || 0)
           : 0;
-      setFulfilment("COUNTER");setDeliveryAddress("");setDeliveryStateCode("");setRecipientStateCode("");setDiscountReason("");
+      const billDiscount = event.detail?.discount;
+      setFulfilment("COUNTER");setDeliveryAddress("");setDeliveryStateCode("");setRecipientStateCode("");setDiscountReason(billDiscount?.reason || "");
       setSaleType(nextSaleType);
-      setCart(checkoutCart);
+      setCart(billDiscount ? checkoutCart.map((item) => ({ ...item, discount: undefined })) : checkoutCart);
       setCustomerType(
         preselected
           ? "EXISTING"
@@ -94,7 +95,8 @@ export default function SalesCheckoutHostV2() {
       setSelected(preselected);
       setQuery("");
       setResults([]);
-      setDiscountValue(customerDiscount > 0 ? String(customerDiscount) : "");
+      setDiscountValue(billDiscount ? String(billDiscount.value || "") : customerDiscount > 0 ? String(customerDiscount) : "");
+      setDiscountType(billDiscount ? "PERCENTAGE" : "FIXED");
       setPayment("CASH");
       setCashReceived("");
       setSplitCash("");
@@ -107,7 +109,7 @@ export default function SalesCheckoutHostV2() {
         .then((value) => {
           setSettings(value);
           setDiscountType(
-            customerDiscount > 0
+            billDiscount || customerDiscount > 0
               ? "PERCENTAGE"
               : value?.discount?.allowFixed === false &&
                   value?.discount?.allowPercentage !== false
@@ -163,12 +165,12 @@ export default function SalesCheckoutHostV2() {
     enteredDiscount = Math.max(0, Number(discountValue) || 0),
     discountLimit =
       discountType === "PERCENTAGE"
-        ? Number(settings?.discount?.maxStaffPercentage)
+        ? Number(settings?.discount?.maxPercentage ?? settings?.discount?.maxStaffPercentage)
         : Number(settings?.discount?.maxFixedAmount),
     discountValid =
-      !discountEnabled ||
-      !Number.isFinite(discountLimit) ||
-      enteredDiscount <= discountLimit;
+      enteredDiscount === 0 || (discountEnabled &&
+      (discountType !== "PERCENTAGE" || settings?.discount?.allowPercentage !== false) &&
+      (!Number.isFinite(discountLimit) || enteredDiscount <= discountLimit));
   const pricing=calculateSalePricing({
     items:cart.map(item=>({...item,amount:lineTotal(item),gstRate:item.kind==="MIX"?settings?.gst?.defaultRate:item.gstRate,useDefaultGstRate:item.kind==="MIX"?true:item.useDefaultGstRate})),
     discount:{type:discountType,value:discountEnabled&&discountValid?enteredDiscount:0,reason:discountReason},
