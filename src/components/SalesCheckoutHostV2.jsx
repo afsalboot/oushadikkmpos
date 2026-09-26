@@ -294,6 +294,7 @@ export default function SalesCheckoutHostV2() {
               quantity: item.quantity,
               manualFreeQuantity: item.manualFreeQuantity,
               manualFreeReason: item.manualFreeReason,
+              discount: item.discount,
             }
           : {
               kind: "PRODUCT",

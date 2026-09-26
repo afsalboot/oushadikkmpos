@@ -22,9 +22,9 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { calculateGstInvoice } from "@/services/gst.service";
 import { useConfirm } from "@/components/ConfirmDialog";
-import WholesaleSalesPanel from "@/components/WholesaleSalesPanel";
+import { setCartItemWholesale } from "@/lib/wholesale";
+import { calculateSalePricing } from "@/services/pricing.service";
 const money = (v) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -66,6 +66,8 @@ const sealed = (p) => Number(p.stock?.sealedPackages || 0),
 const total = (i) =>
   i.kind === "MIX"
     ? i.packageSellingPrice
+    : i.saleMode === "WHOLESALE"
+      ? i.wholesaleTotal
     : i.saleMode === "LOOSE"
       ? Number(i.looseQuantity) * i.loosePricePerUnit
       : i.quantity * i.packageSellingPrice;
@@ -696,7 +698,7 @@ export default function SalesWorkspaceModern() {
       if (!product) return;
       setMode("PRODUCT");
       setSearch("");
-      if (product.allowLooseSale) {
+      if (product.allowLooseSale && (countBased(product) ? opened(product) > 0 || sealed(product) > 0 : stock(product) > 0)) {
         setQuick(product);
         return toast.info(
           `${product.name}: choose full package or loose sale.`,
@@ -706,7 +708,7 @@ export default function SalesWorkspaceModern() {
         existing = cart.find(
           (item) =>
             item.kind === "PRODUCT" &&
-            item.saleMode === "PACKAGE" &&
+            ["PACKAGE", "WHOLESALE"].includes(item.saleMode) &&
             String(item.productId || item._id) === String(product._id),
         );
       if (!product.allowPackageSale || available <= 0)
@@ -793,30 +795,18 @@ export default function SalesWorkspaceModern() {
       return filter === "All" || p.categoryId?.name === filter;
     });
   const subtotal = cart.reduce((s, i) => s + total(i), 0),
-    cartGst = calculateGstInvoice({
-      lines: cart.map((i) => ({
-        amount: total(i),
+    cartPricing = calculateSalePricing({
+      items: cart.map((i) => ({ ...i, amount: total(i),
         gstRate: i.kind === "MIX" ? settings?.gst?.defaultRate : i.gstRate,
         useDefaultGstRate: i.kind === "MIX" ? true : i.useDefaultGstRate,
-        taxable: i.kind === "MIX" ? true : i.taxable,
-        gstExempt: i.kind === "MIX" ? false : i.gstExempt,
       })),
       settings,
+      currentUser: { role: settings?._capabilities?.role || "STAFF" },
       placeOfSupply: settings?.store?.stateCode,
     }),
-    roundMethod = settings?.roundOff?.method,
-    step = settings?.roundOff?.enabled
-      ? roundMethod === "NEAREST_050"
-        ? 0.5
-        : 1
-      : 0,
-    grand = !step
-      ? cartGst.total
-      : roundMethod === "UP"
-        ? Math.ceil(cartGst.total)
-        : roundMethod === "DOWN"
-          ? Math.floor(cartGst.total)
-          : Math.round(cartGst.total / step) * step,
+    cartGst = cartPricing.gst,
+    step = settings?.roundOff?.enabled,
+    grand = cartPricing.total,
     ingredientsTotal = mix.reduce(
       (s, i) => s + Number(i.mixQuantity || 0) * i.loosePricePerUnit,
       0,
@@ -935,7 +925,34 @@ export default function SalesWorkspaceModern() {
     setHeldSales((current) => current.filter((item) => item.id !== sale.id));
     toast.success(`${sale.label} removed`);
   }
+  function selectProduct(product) {
+    const canSellLoose = product.allowLooseSale &&
+      (countBased(product) ? opened(product) > 0 || sealed(product) > 0 : stock(product) > 0);
+    if (canSellLoose) return setQuick(product);
+    const available = sealed(product);
+    const existing = cart.find((item) => item.kind === "PRODUCT" &&
+      ["PACKAGE", "WHOLESALE"].includes(item.saleMode) &&
+      String(item.productId || item._id) === String(product._id));
+    if (!product.allowPackageSale || available <= 0)
+      return toast.error(`${product.name} has no full ${product.packageType}s available`);
+    if (existing && Number(existing.quantity) >= available)
+      return toast.error(`Only ${available} ${product.packageType}${available === 1 ? "" : "s"} available`);
+    add({ ...product, kind: "PRODUCT", saleMode: "PACKAGE", quantity: 1,
+      looseQuantity: 0, openPackageCounts: [], baseUnit: product.baseUnit });
+  }
+  function updateCartItem(item, enabled, quantity = item.quantity) {
+    try {
+      const updated = setCartItemWholesale(item, enabled, quantity);
+      setCart((current) => current.map((x) => x._id === item._id ? updated : x));
+    } catch (error) { toast.error(error.message); }
+  }
   function add(i) {
+    const wholesaleItem = cart.find((x) => x._id === i._id && x.saleMode === "WHOLESALE");
+    if (wholesaleItem) {
+      updateCartItem(wholesaleItem, true, wholesaleItem.quantity + i.quantity);
+      setQuick(null);
+      return;
+    }
     setCart((c) =>
       i.saleMode === "PACKAGE" && c.some((x) => x._id === i._id)
         ? c.map((x) =>
@@ -1118,14 +1135,6 @@ export default function SalesWorkspaceModern() {
             <FlaskConical className="mr-2 inline" size={16} />
             Custom Mix
           </button>
-          <button
-            data-wholesale-active={mode === "WHOLESALE" || undefined}
-            className={`rounded-lg px-4 py-2.5 font-extrabold ${mode === "WHOLESALE" ? "bg-[var(--green)] text-white" : "text-[var(--muted)]"}`}
-            onClick={() => setMode("WHOLESALE")}
-          >
-            <Package className="mr-2 inline" size={16} />
-            Wholesale
-          </button>
         </div>
         <div className="relative flex-1">
           <Search className="absolute left-4 top-3" size={18} />
@@ -1207,21 +1216,13 @@ export default function SalesWorkspaceModern() {
           ))}
         </div>
       )}
-      {mode === "WHOLESALE" && (
-        <WholesaleSalesPanel
-          products={products}
-          search={search}
-          filter={filter}
-          settings={settings}
-        />
-      )}
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
         <main className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {shown.map((p) => (
             <article
               className="card flex min-h-60 cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md"
               key={p._id}
-              onClick={() => (mode === "PRODUCT" ? setQuick(p) : ingredient(p))}
+              onClick={() => (mode === "PRODUCT" ? selectProduct(p) : ingredient(p))}
             >
               <div className="flex justify-between">
                 <Badge t="green">{p.categoryId?.name}</Badge>
@@ -1292,14 +1293,11 @@ export default function SalesWorkspaceModern() {
               <button
                 type="button"
                 className="sales-cart-customer"
-                disabled={!cart.length}
+                disabled
                 title={
                   cart.length
                     ? "Change customer during checkout"
                     : "Add a product before selecting a customer"
-                }
-                onClick={() =>
-                  document.querySelector("[data-cart-payment]")?.click()
                 }
               >
                 <span className="min-w-0 text-left">
@@ -1310,10 +1308,6 @@ export default function SalesWorkspaceModern() {
                     {saleCustomer?.name || "Walk-in customer"}
                   </b>
                 </span>
-                <ChevronRight
-                  className="shrink-0 text-[var(--muted)]"
-                  size={17}
-                />
               </button>
             </div>
             <div className="sales-cart-list">
@@ -1324,7 +1318,7 @@ export default function SalesWorkspaceModern() {
                         ? "Composite Sale"
                         : i.saleMode === "LOOSE"
                           ? "Loose Sale"
-                          : "Package Sale",
+                          : i.saleMode === "WHOLESALE" ? "Wholesale" : "Package Sale",
                     quantityLabel =
                       i.kind === "MIX"
                         ? `1 ${i.packageType}`
@@ -1336,7 +1330,7 @@ export default function SalesWorkspaceModern() {
                         ? `${i.ingredients.length} ingredients`
                         : i.saleMode === "LOOSE"
                           ? `${money(i.loosePricePerUnit)} per ${i.baseUnit}`
-                          : `${money(i.packageSellingPrice)} × ${i.quantity}`;
+                          : `${money(i.saleMode === "WHOLESALE" ? i.wholesalePriceApplied : i.packageSellingPrice)} × ${i.quantity}`;
                   return (
                     <article className="sales-cart-item" key={i._id}>
                       <div className="sales-cart-thumb" aria-hidden="true">
@@ -1373,18 +1367,34 @@ export default function SalesWorkspaceModern() {
                           </Badge>
                           <span>{quantityLabel}</span>
                         </div>
+                        {i.kind === "PRODUCT" && ["PACKAGE", "WHOLESALE"].includes(i.saleMode) && (
+                          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+                            <label className="flex items-center gap-2 font-bold">
+                              <input type="checkbox" checked={i.saleMode === "WHOLESALE"}
+                                disabled={!i.wholesaleEnabled}
+                                onChange={(e) => updateCartItem(i, e.target.checked)} />
+                              Wholesale
+                            </label>
+                            {i.saleMode === "WHOLESALE" && <label className="flex items-center gap-2">
+                              Discount %
+                              <input className="field !min-h-8 !w-20 !p-1" type="number" min="0" max="100" step="0.01"
+                                aria-label={`Wholesale discount percentage for ${i.name}`}
+                                disabled={!settings?.discount?.enabled || settings.discount.itemLevel === false || settings.discount.allowPercentage === false}
+                                value={i.discount?.value ?? ""}
+                                onChange={(e) => { const value = e.target.value;
+                                  if (value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 100)) return;
+                                  setCart((c) => c.map((x) => x._id === i._id ? { ...x, discount: { type: "PERCENTAGE", value } } : x));
+                                }} />
+                            </label>}
+                            {i.saleMode === "WHOLESALE" && i.freeQuantity > 0 && <span>+{i.freeQuantity} free</span>}
+                          </div>
+                        )}
                         <div className="mt-3 flex items-end justify-between gap-2">
-                          {i.kind !== "MIX" && i.saleMode === "PACKAGE" ? (
+                          {i.kind !== "MIX" && ["PACKAGE", "WHOLESALE"].includes(i.saleMode) ? (
                             <Step
                               value={i.quantity}
                               max={sealed(i)}
-                              onChange={(quantity) =>
-                                setCart((c) =>
-                                  c.map((x) =>
-                                    x._id === i._id ? { ...x, quantity } : x,
-                                  ),
-                                )
-                              }
+                              onChange={(quantity) => updateCartItem(i, i.saleMode === "WHOLESALE", quantity)}
                             />
                           ) : i.kind !== "MIX" && i.saleMode === "LOOSE" ? (
                             <LooseQuantity
@@ -1428,6 +1438,7 @@ export default function SalesWorkspaceModern() {
               )}
             </div>
             <div className="sales-cart-summary border-t">
+              {cartPricing.totalDiscount > 0 && <div className="flex justify-between text-sm"><span>Discount</span><b>-{money(cartPricing.totalDiscount)}</b></div>}
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <b className="tabular-nums">{money(subtotal)}</b>

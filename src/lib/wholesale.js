@@ -128,6 +128,18 @@ export function buildWholesaleCartItem(product, line) {
   };
 }
 
+// Keep the regular cart key stable when switching a package line to wholesale.
+export function setCartItemWholesale(item, enabled, quantity = item.quantity) {
+  if (item.kind !== "PRODUCT" || !["PACKAGE", "WHOLESALE"].includes(item.saleMode))
+    throw new Error("Wholesale selection is available for package products");
+  if (!enabled) return { ...item, saleMode: "PACKAGE", quantity, discount: undefined };
+  const line = buildWholesaleLine(item, { sellBy: item.packageType, quantity });
+  const outgoing = line.paidPackageQuantity + (item.freeSchemeType === "DIFFERENT_PRODUCT" ? 0 : line.freeQuantity);
+  if (outgoing > Number(item.stock?.sealedPackages || 0))
+    throw new Error(`Insufficient sealed stock for ${item.name}`);
+  return { ...buildWholesaleCartItem(item, line), _id: item._id };
+}
+
 export function validateWholesaleProduct(product) {
   const errors = [];
   if (!product.wholesaleEnabled) return errors;

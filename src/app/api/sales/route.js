@@ -423,7 +423,7 @@ export async function POST(request) {
           });
         } else {
           const product = productById.get(String(item.productId));
-          if (saleType === "WHOLESALE") {
+          if (saleType === "WHOLESALE" || item.saleMode === "WHOLESALE") {
             if (item.sellBy === "LOOSE") {
               if (!product.allowWholesaleLooseSale || !product.allowLooseSale)
                 throw new Error(

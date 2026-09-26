@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { automaticFreeQuantity, buildWholesaleCartItem, buildWholesaleLine, wholesaleLooseRate, wholesaleRate } from "../src/lib/wholesale.js";
+import { automaticFreeQuantity, buildWholesaleCartItem, buildWholesaleLine, setCartItemWholesale, wholesaleLooseRate, wholesaleRate } from "../src/lib/wholesale.js";
 import { Product, Sale } from "../src/models/index.js";
+import { calculateSalePricing } from "../src/services/pricing.service.js";
 
 const product = {
   name: "Abhayarishtam",
@@ -17,6 +18,44 @@ const product = {
   freeSchemeBuyQty: 10,
   freeSchemeFreeQty: 1,
 };
+
+test("regular cart wholesale toggle preserves identity and recalculates quantity tiers", () => {
+  const item = { ...product, _id: "product-1", productId: "product-1", kind: "PRODUCT", saleMode: "PACKAGE", quantity: 120, stock: { sealedPackages: 500 } };
+  const wholesale = setCartItemWholesale(item, true);
+  assert.equal(wholesale._id, item._id);
+  assert.equal(wholesale.productId, item.productId);
+  assert.equal(wholesale.wholesaleTotal, 120 * 84);
+  const discounted = { ...wholesale, discount: { type: "PERCENTAGE", value: 5 } };
+  const updated = setCartItemWholesale(discounted, true, 240);
+  assert.equal(updated.wholesaleTotal, 240 * 84);
+  assert.equal(updated.discount.value, 5);
+  const retail = setCartItemWholesale(updated, false);
+  assert.equal(retail.saleMode, "PACKAGE");
+  assert.equal(retail.quantity, 240);
+  assert.equal(retail.discount, undefined);
+});
+
+test("regular cart wholesale respects eligibility, minimum and free stock", () => {
+  const item = { ...product, kind: "PRODUCT", saleMode: "PACKAGE", quantity: 120, stock: { sealedPackages: 120 } };
+  assert.throws(() => setCartItemWholesale(item, true), /Insufficient sealed stock/);
+  assert.throws(() => setCartItemWholesale({ ...item, quantity: 1 }, true), /Minimum wholesale order/);
+  assert.throws(() => setCartItemWholesale({ ...item, wholesaleEnabled: false }, true), /not enabled/);
+  assert.throws(() => setCartItemWholesale({ ...item, saleMode: "LOOSE" }, true), /package products/);
+});
+
+test("mixed cart percentage discount applies only to the selected wholesale line", () => {
+  const result = calculateSalePricing({
+    items: [
+      { kind: "PRODUCT", saleMode: "PACKAGE", amount: 100 },
+      { kind: "PRODUCT", saleMode: "WHOLESALE", amount: 200, discount: { type: "PERCENTAGE", value: 10 } },
+    ],
+    settings: { discount: { enabled: true, itemLevel: true, allowPercentage: true }, gst: { enabled: false }, roundOff: { enabled: false } },
+    currentUser: { role: "ADMIN" },
+  });
+  assert.equal(result.totalDiscount, 20);
+  assert.equal(result.total, 280);
+  assert.deepEqual(result.lineDiscounts, [0, 20]);
+});
 
 test("wholesale carton conversion and scheme use box quantities", () => {
   const line = buildWholesaleLine(product, { sellBy: "Carton", quantity: 10 });
