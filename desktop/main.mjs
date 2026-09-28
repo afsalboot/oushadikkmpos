@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, session, ipcMain } from "electron";
+import { app, BrowserWindow, WebContentsView, dialog, Menu, session, ipcMain } from "electron";
 import { printReceipt } from "./receipt-print.mjs";
 import { fileURLToPath } from "node:url";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -14,6 +14,7 @@ if (smoke) app.setPath("userData", mkdtempSync(join(tmpdir(), "oushadhi-desktop-
 let smokePrintCount = 0;
 const offlinePath = fileURLToPath(new URL("./offline.html", import.meta.url));
 let mainWindow;
+let appView;
 let loading = false;
 let localBackup;
 async function backupAction(action) {
@@ -60,7 +61,7 @@ function getSavedPrinter() {
 async function selectReceiptPrinter() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   try {
-    const printers = await mainWindow.webContents.getPrintersAsync();
+    const printers = await appView.webContents.getPrintersAsync();
     if (!printers.length) {
       await dialog.showMessageBox(mainWindow, { type: "warning", title: "Receipt printer",
         message: "No printers found.", detail: "Connect the printer and install its Windows driver, then try again." });
@@ -91,9 +92,9 @@ async function loadPos() {
   if (loading || !mainWindow || mainWindow.isDestroyed()) return;
   loading = true;
   try {
-    await mainWindow.loadURL(startUrl);
+    await appView.webContents.loadURL(startUrl);
     if (printSmoke) {
-      await mainWindow.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+      await appView.webContents.executeJavaScript(`new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Receipt adapter timed out; bridge=' + Boolean(window.oushadhiDesktop) + '; print=' + frame.contentWindow.print.toString())), 10000);
         const frame = document.createElement('iframe');
         frame.title = 'Thermal receipt print';
@@ -111,7 +112,10 @@ async function loadPos() {
       console.log("Receipt adapter passed: one IPC request, afterprint cleanup, no physical printing.");
     }
     if (smoke) {
-      console.log(`Desktop smoke passed: ${new URL(mainWindow.webContents.getURL()).origin}`);
+      const chromeColor = await mainWindow.webContents.executeJavaScript("getComputedStyle(document.body).backgroundColor");
+      if (chromeColor !== "rgb(24, 61, 43)" || appView.getBounds().y !== 40) throw new Error("Desktop title bar layout failed.");
+      console.log("Green title bar and reserved content area verified.");
+      console.log(`Desktop smoke passed: ${new URL(appView.webContents.getURL()).origin}`);
       app.exit(0);
     }
   } catch (error) {
@@ -120,7 +124,7 @@ async function loadPos() {
       app.exit(1);
       return;
     }
-    if (!mainWindow.isDestroyed()) await mainWindow.loadFile(offlinePath);
+    if (!mainWindow.isDestroyed()) await appView.webContents.loadFile(offlinePath);
   } finally {
     loading = false;
   }
@@ -135,7 +139,17 @@ function createWindow() {
     minWidth: 900,
     minHeight: 640,
     show: false,
-    backgroundColor: "#f5f7f5",
+    backgroundColor: "#183d2b",
+    titleBarStyle: "hidden",
+    titleBarOverlay: { color: "#183d2b", symbolColor: "#ffffff", height: 40 },
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: fileURLToPath(new URL("./chrome-preload.cjs", import.meta.url)),
+      sandbox: true, contextIsolation: true, nodeIntegration: false,
+    },
+  });
+  mainWindow.setMenuBarVisibility(false);
+  appView = new WebContentsView({
     webPreferences: {
       preload: fileURLToPath(new URL("./preload.cjs", import.meta.url)),
       nodeIntegration: false,
@@ -146,8 +160,16 @@ function createWindow() {
       devTools: !app.isPackaged,
     },
   });
+  mainWindow.contentView.addChildView(appView);
+  const resizeContent = () => {
+    const [width, height] = mainWindow.getContentSize();
+    appView.setBounds({ x: 0, y: 40, width, height: Math.max(1, height - 40) });
+  };
+  resizeContent();
+  mainWindow.on("resize", resizeContent);
+  void mainWindow.loadFile(fileURLToPath(new URL("./chrome.html", import.meta.url)));
   mainWindow.once("ready-to-show", () => { if (!smoke) mainWindow.show(); });
-  const contents = mainWindow.webContents;
+  const contents = appView.webContents;
   for (const event of ["will-navigate", "will-redirect"]) {
     contents.on(event, (e, url) => {
       if (!isTrustedUrl(url, startUrl)) e.preventDefault();
@@ -156,7 +178,11 @@ function createWindow() {
   contents.setWindowOpenHandler(() => ({ action: "deny" }));
   contents.on("will-attach-webview", (event) => event.preventDefault());
   contents.on("render-process-gone", () => { void loadPos(); });
-  mainWindow.on("closed", () => { mainWindow = null; });
+  mainWindow.on("closed", () => {
+    if (appView && !appView.webContents.isDestroyed()) appView.webContents.close();
+    appView = null;
+    mainWindow = null;
+  });
   void loadPos();
 }
 
@@ -171,6 +197,11 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   app.whenReady().then(async () => {
+    ipcMain.on("chrome:menu", (event, label) => {
+      if (event.sender !== mainWindow?.webContents || !["POS", "Edit", "View"].includes(label)) return;
+      appView.webContents.focus();
+      Menu.getApplicationMenu()?.items.find((item) => item.label === label)?.submenu?.popup({ window: mainWindow, y: 40 });
+    });
     localBackup = new LocalBackup({
       configPath: join(app.getPath("userData"), `desktop-backup-${new URL(startUrl).host.replaceAll(":", "_")}.json`),
       request: (path, options) => session.defaultSession.fetch(new URL(path, startUrl).href, {
@@ -180,7 +211,7 @@ if (!app.requestSingleInstanceLock()) {
     await localBackup.load();
     let printQueue = Promise.resolve();
     ipcMain.handle("receipt:print", (event, html) => {
-      if (event.sender !== mainWindow?.webContents || event.senderFrame !== event.sender.mainFrame ||
+      if (event.sender !== appView?.webContents || event.senderFrame !== event.sender.mainFrame ||
           !isTrustedUrl(event.senderFrame.url, startUrl)) throw new Error("Untrusted print request.");
       if (printSmoke) {
         if (!html.includes("Desktop print verification")) throw new Error("Unexpected test receipt.");
@@ -200,12 +231,12 @@ if (!app.requestSingleInstanceLock()) {
     });
     app.setAppUserModelId("com.oushadhi.pos");
     session.defaultSession.setPermissionCheckHandler((contents, permission, origin, details) =>
-      contents === mainWindow?.webContents && permission === "media" &&
+      contents === appView?.webContents && permission === "media" &&
       details.mediaType === "video" && isTrustedUrl(origin, startUrl));
     session.defaultSession.setPermissionRequestHandler(async (contents, permission, callback, details) => {
       const cameraOnly = permission === "media" && details.mediaTypes?.length > 0 &&
         details.mediaTypes.every((type) => type === "video");
-      if (contents !== mainWindow?.webContents || !cameraOnly ||
+      if (contents !== appView?.webContents || !cameraOnly ||
           !isTrustedUrl(details.requestingUrl, startUrl)) {
         callback(false);
         return;
@@ -219,14 +250,14 @@ if (!app.requestSingleInstanceLock()) {
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: "POS", submenu: [
         { label: "Home / Reconnect", accelerator: "CmdOrCtrl+R", click: () => { void loadPos(); } },
-        { label: "Select Backup Folder…", click: () => { void backupAction(selectBackupFolder); } },
-        { label: "Automatic Backup…", click: () => { void backupAction(configureAutomaticBackup); } },
+        { label: "Select Backup Folder...", click: () => { void backupAction(selectBackupFolder); } },
+        { label: "Automatic Backup...", click: () => { void backupAction(configureAutomaticBackup); } },
         { label: "Back Up Now", click: () => { void backupAction(async () => {
           const path = await localBackup.run();
           await dialog.showMessageBox(mainWindow, { title: "Backup saved", message: "Encrypted backup saved on this computer.", detail: path });
         }); } },
         { label: "Backup Status", click: () => { void backupAction(showBackupStatus); } },
-        { label: "Select Receipt Printer…", click: () => { void selectReceiptPrinter(); } },
+        { label: "Select Receipt Printer...", click: () => { void selectReceiptPrinter(); } },
         { type: "separator" }, { role: "quit" },
       ] },
       { label: "Edit", submenu: [{ role: "undo" }, { role: "redo" }, { type: "separator" },

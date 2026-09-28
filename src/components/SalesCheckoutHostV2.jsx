@@ -708,6 +708,18 @@ export default function SalesCheckoutHostV2() {
                 )}
                   </>
                 )}
+                {saleType !== "WHOLESALE" && (
+                  <label className="mt-4 block">
+                    <span className="label">Doctor name</span>
+                    <input
+                      className="field"
+                      name="doctorName"
+                      maxLength={120}
+                      placeholder="Enter prescribing doctor name"
+                      autoComplete="off"
+                    />
+                  </label>
+                )}
                 <div className="mt-4 grid gap-3">
                   <label><span className="label">Fulfilment</span><select className="field" value={fulfilment} onChange={e=>setFulfilment(e.target.value)}><option value="COUNTER">Counter sale</option><option value="DELIVERY">Delivery of goods</option></select></label>
                   {fulfilment==="DELIVERY"&&<><label><span className="label">Delivery address</span><textarea className="field" value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} required/></label><label><span className="label">Delivery state</span><select className="field" value={deliveryStateCode} onChange={e=>setDeliveryStateCode(e.target.value)} required><option value="">Select state</option>{GST_STATES.map(([code,name])=><option key={code} value={code}>{name}</option>)}</select></label></>}
@@ -837,18 +849,6 @@ export default function SalesCheckoutHostV2() {
                       </div>
                     )}
                   </div>
-                )}
-                {saleType !== "WHOLESALE" && (
-                  <label className="mt-4 block">
-                    <span className="label">Doctor name</span>
-                    <input
-                      className="field"
-                      name="doctorName"
-                      maxLength={120}
-                      placeholder="Enter prescribing doctor name"
-                      autoComplete="off"
-                    />
-                  </label>
                 )}
               </section>
               <section>

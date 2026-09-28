@@ -22,6 +22,8 @@
     },
     "files": [
       "main.mjs",
+      "chrome.html",
+      "chrome-preload.cjs",
       "local-backup.mjs",
       "preload.cjs",
       "receipt-print.mjs",
