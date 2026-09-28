@@ -373,6 +373,20 @@ const paymentSchema = new Schema(
 const saleSchema = new Schema(
   {
     invoiceNumber: { type: String, required: true, unique: true, index: true },
+    discountSummary: {
+      itemDiscount: Number,
+      cartDiscount: Number,
+      automaticDiscount: Number,
+      totalDiscount: Number,
+      discountType: String,
+      discountValue: Number,
+      reason: String,
+      approvalRequired: Boolean,
+      approved: Boolean,
+      approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      approvedByName: String,
+      approvedAt: Date,
+    },
     customerType: {
       type: String,
       enum: ["WALK_IN", "EXISTING", "NEW"],
@@ -719,6 +733,8 @@ Sale.schema
   .path("items")
   .schema.add({
     wholesaleUnit: String,
+    wholesaleDiscountPercent: Number,
+    wholesaleDiscountAmount: Number,
     orderedQuantity: { type: Number, default: 0 },
     unitsPerWholesalePack: { type: Number, default: 1 },
     paidQuantity: { type: Number, default: 0 },

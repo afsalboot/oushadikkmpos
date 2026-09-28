@@ -13,11 +13,11 @@ test("bulk price adjustment supports increases, reductions, and currency roundin
   assert.equal(adjustedProductPrice(0, 25), 0);
 });
 
-test("mass deletion preserves products with stock or transaction history", () => {
+test("mass deletion deletes selected products even when they have history", () => {
   const products = [{ _id: "unused" }, { _id: "sold" }, { _id: "stocked" }];
   const result = classifyBulkDeletion(products, ["sold", "stocked"]);
-  assert.deepEqual(result.deleteIds, ["unused"]);
-  assert.deepEqual(result.deactivateIds, ["sold", "stocked"]);
+  assert.deepEqual(result.deleteIds, ["unused", "sold", "stocked"]);
+  assert.deepEqual(result.deactivateIds, []);
 });
 
 test("enabling wholesale repairs missing legacy defaults before validation", () => {

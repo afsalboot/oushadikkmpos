@@ -119,13 +119,13 @@ test('purchase odd-paise tax and additional charge tax reconcile',()=>{
   assert.equal(sumMoney([result.cgst,result.sgst,result.igst]),result.totalGst);assert.equal(result.total,119.05);
   assert.throws(()=>calculatePurchaseTotals([{packageQuantity:1,unitCost:100,gstRate:18,taxType:'NONE'}]),/tax type/);
 });
-test('fiscal numbering uses IST financial year and never changes scope on registration',async()=>{
+test('invoice numbering uses IST datetime and continuous sequence across registration',async()=>{
   assert.equal(financialYear('2026-03-31T18:29:59Z'),'2025-26');assert.equal(financialYear('2026-03-31T18:30:00Z'),'2026-27');
   const counters=new Map();const Counter={findOneAndUpdate:async({key})=>{const sequence=(counters.get(key)||0)+1;counters.set(key,sequence);return{sequence};}};
   const a=await nextInvoiceNumber({Counter,value:'2026-09-10',registrationKey:'UNREGISTERED'}),b=await nextInvoiceNumber({Counter,value:'2026-09-10',registrationKey:'REGISTERED'});
-  assert.equal(a,'INV/26-27/000001');assert.equal(b,'INV/26-27/000002');assert.ok(a.length<=16);
+  assert.equal(a,'INV-20260910053000-001');assert.equal(b,'INV-20260910053000-002');
   await assert.rejects(()=>nextInvoiceNumber({Counter,prefix:'TOOLONG'}),/series/);
-  await assert.rejects(()=>nextInvoiceNumber({Counter:{findOneAndUpdate:async()=>({sequence:1000000})}}),/full/);
+  await assert.rejects(()=>nextInvoiceNumber({Counter:{findOneAndUpdate:async()=>({sequence:NaN})}}),/Invalid invoice sequence/);
 });
 test('restore rejects removed or altered issued documents',()=>{
   const original={_id:'1',invoiceNumber:'INV/26-27/000001',createdAt:new Date('2026-09-10'),total:100};

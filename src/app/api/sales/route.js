@@ -558,6 +558,8 @@ export async function POST(request) {
               total: line.total,
               packageType: product.packageType,
               wholesaleUnit: line.sellBy,
+              wholesaleDiscountPercent: product.wholesalePricingMethod === "DISCOUNT_FROM_RETAIL" && !line.tier && line.unitPrice === Math.round(Number(product.packageSellingPrice) * (1 - Number(product.wholesaleDiscountPercent || 0) / 100) * 100) / 100 ? Number(product.wholesaleDiscountPercent || 0) : 0,
+              wholesaleDiscountAmount: product.wholesalePricingMethod === "DISCOUNT_FROM_RETAIL" && !line.tier ? Math.max(0, Math.round((Number(product.packageSellingPrice) * line.paidPackageQuantity - line.total) * 100) / 100) : 0,
               orderedQuantity: line.orderedQuantity,
               unitsPerWholesalePack: line.unitsPerWholesalePack,
               paidQuantity: line.paidPackageQuantity,
@@ -815,13 +817,11 @@ export async function POST(request) {
             amount: amount(payment.amount),
             reference: String(payment.reference || "").trim(),
           }));
-      const prefix =
-        saleType === "WHOLESALE"
-          ? settings?.invoice?.wholesalePrefix || "WSI"
-          : settings?.invoice?.prefix || "INV";
+      const prefix = settings?.invoice?.prefix || "INV";
       const invoiceDate=new Date();
       const invoiceNumber = await nextInvoiceNumber({
         Counter: DocumentCounter,
+        isNumberUsed: (invoiceNumber) => Sale.exists({ invoiceNumber }).session(dbSession),
         prefix,
         value: invoiceDate,
         session: dbSession,

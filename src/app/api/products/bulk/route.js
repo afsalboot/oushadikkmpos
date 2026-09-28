@@ -5,16 +5,13 @@ import { ok, fail, apiError } from "@/lib/api";
 import {
   InventoryBatch,
   Product,
-  Purchase,
-  Sale,
-  StockTransaction,
   AuditLog,
 } from "@/models";
 import { WHOLESALE_UNITS, validateWholesaleProduct } from "@/lib/wholesale";
 import {
   MAX_BULK_PRODUCTS,
-  bulkProductSectionsTouched,
   classifyBulkDeletion,
+  bulkProductSectionsTouched,
   missingWholesaleDefaults,
 } from "@/lib/product-bulk";
 
@@ -212,7 +209,7 @@ export async function PATCH(request) {
 export async function DELETE(request) {
   let session;
   try {
-    await requireSession("ADMIN");
+    const actor = await requireSession("ADMIN");
     await connectDb();
     const body = await request.json();
     const ids = productIds(body.ids);
@@ -225,59 +222,19 @@ export async function DELETE(request) {
       .lean();
     if (!products.length) return fail("No selected products were found", 404);
 
-    const [saleIds, mixSaleIds, purchaseIds, transactionIds, stockedIds] =
-      await Promise.all([
-        Sale.distinct("items.productId", {
-          "items.productId": { $in: objectIds },
-        }),
-        Sale.distinct("items.ingredients.productId", {
-          "items.ingredients.productId": { $in: objectIds },
-        }),
-        Purchase.distinct("items.productId", {
-          "items.productId": { $in: objectIds },
-        }),
-        StockTransaction.distinct("productId", {
-          productId: { $in: objectIds },
-        }),
-        InventoryBatch.distinct("productId", {
-          productId: { $in: objectIds },
-          $or: [{ sealedPackages: { $gt: 0 } }, { openQuantity: { $gt: 0 } }],
-        }),
-      ]);
-    const preserve = new Set(
-      [
-        ...saleIds,
-        ...mixSaleIds,
-        ...purchaseIds,
-        ...transactionIds,
-        ...stockedIds,
-      ].map(String),
-    );
-    const { deactivateIds, deleteIds } = classifyBulkDeletion(
-      products,
-      preserve,
-    );
-
+    const { deleteIds } = classifyBulkDeletion(products);
     session = await mongoose.startSession();
     await session.withTransaction(async () => {
-      if (deactivateIds.length)
-        await Product.updateMany(
-          { _id: { $in: deactivateIds } },
-          { $set: { active: false, visibleInSales: false } },
-          { session },
-        );
-      if (deleteIds.length) {
-        await InventoryBatch.deleteMany(
-          { productId: { $in: deleteIds } },
-          { session },
-        );
-        await Product.deleteMany({ _id: { $in: deleteIds } }, { session });
-      }
+      const snapshots = await Product.find({ _id: { $in: deleteIds } }).session(session).lean();
+      const batches = await InventoryBatch.find({ productId: { $in: deleteIds } }).session(session).lean();
+      await AuditLog.create(snapshots.map((product) => ({ actorId: actor.sub, action: "PRODUCT_DELETED", module: "products", targetType: "Product", targetId: product._id, description: `Deleted ${product.name}`, metadata: { product, batches: batches.filter((batch) => String(batch.productId) === String(product._id)) } })), { session, ordered: true });
+      await InventoryBatch.deleteMany({ productId: { $in: deleteIds } }, { session });
+      await Product.deleteMany({ _id: { $in: deleteIds } }, { session });
     });
     return ok({
       selected: products.length,
       deleted: deleteIds.length,
-      deactivated: deactivateIds.length,
+      deactivated: 0,
       missing: ids.length - products.length,
     });
   } catch (error) {

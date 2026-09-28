@@ -5,6 +5,7 @@ import Link from "next/link";
 import OushadhiLogo from "@/components/branding/OushadhiLogo";
 import { ArrowLeft, LoaderCircle, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
+import { receiptDiscountLabel } from "@/lib/receipt-discount";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -181,7 +182,7 @@ export default function SaleSourceDetails({ id }) {
             </div>
             {Number(sale.discount || 0) > 0 && (
               <div className="flex justify-between py-1 text-[var(--green)]">
-                <span>Discount</span>
+                <span>{receiptDiscountLabel(sale)}</span>
                 <strong>-{money(sale.discount)}</strong>
               </div>
             )}

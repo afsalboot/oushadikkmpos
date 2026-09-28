@@ -1,5 +1,6 @@
 "use client";
 import BackupStorageSettings from "./BackupStorageSettings";
+import FutureInvoiceReset from "./FutureInvoiceReset";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState } from "react";
@@ -1163,7 +1164,7 @@ const configs = {
           {
             path: "invoice.format",
             label: "Number format",
-            note: "Supported: {PREFIX}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {NUMBER}",
+            note: "Invoices use PREFIX-YYYYMMDDHHmmss-001 (India time).",
           },
           {
             path: "invoice.nextNumber",
@@ -1721,6 +1722,8 @@ function Field({ field, data, change, error, disabled }) {
   if (field.when && !get(data, field.when)) return null;
   if (field.whenValue && get(data, field.whenValue[0]) !== field.whenValue[1])
     return null;
+  if (field.path === "invoice.format") return <div><span className="label">Number format</span><p className="text-sm">{data.invoice?.prefix || "INV"}-YYYYMMDDHHmmss-001</p><p className="mt-1 text-xs text-[var(--muted)]">Date and time use India time. The suffix increases for each sale.</p></div>;
+  if (field.path === "invoice.nextNumber") return <p className="text-sm text-[var(--muted)]">Use the reset button below to restart future sales at 001.</p>;
   const value = get(data, field.path),
     controlDisabled =
       disabled ||
@@ -2785,6 +2788,9 @@ export default function SettingsWorkspace() {
                 </Card>
               ))}
             </div>
+          )}
+          {section === "invoice" && data._capabilities?.role === "ADMIN" && (
+            <FutureInvoiceReset disabled={dirty || saving} onReset={load} />
           )}
         </main>
       </div>

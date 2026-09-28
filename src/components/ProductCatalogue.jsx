@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
+import CategoryScroller from "@/components/CategoryScroller";
 import {
   BASE_UNITS,
   LOOSE_CONVERSION_TYPES,
@@ -256,7 +257,7 @@ function FieldLabel({ children, help }) {
   );
 }
 
-function CategoryModal({ onClose, onCreated }) {
+function CategoryModal({ onClose, onCreated, category: existingCategory }) {
   const [saving, setSaving] = useState(false);
   async function submit(event) {
     event.preventDefault();
@@ -266,11 +267,11 @@ function CategoryModal({ onClose, onCreated }) {
     setSaving(true);
     try {
       const category = await api("/api/categories", {
-        method: "POST",
+        method: existingCategory ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, id: existingCategory?._id }),
       });
-      toast.success("Category created successfully.");
+      toast.success(existingCategory ? "Category updated successfully." : "Category created successfully.");
       onCreated(category);
     } catch (error) {
       toast.error(error.message);
@@ -286,7 +287,7 @@ function CategoryModal({ onClose, onCreated }) {
             <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--green)]">
               Product category
             </p>
-            <h2 className="mt-1 text-2xl font-extrabold">Add category</h2>
+            <h2 className="mt-1 text-2xl font-extrabold">{existingCategory ? "Edit category" : "Add category"}</h2>
           </div>
           <button type="button" onClick={onClose}>
             <X />
@@ -295,11 +296,11 @@ function CategoryModal({ onClose, onCreated }) {
         <div className="mt-6 grid gap-4">
           <label>
             <span className="label">Category name *</span>
-            <input autoFocus className="field" name="name" />
+            <input autoFocus className="field" name="name" defaultValue={existingCategory?.name || ""} />
           </label>
           <label>
             <span className="label">Description</span>
-            <textarea className="field min-h-24" name="description" />
+            <textarea className="field min-h-24" name="description" defaultValue={existingCategory?.description || ""} />
           </label>
         </div>
         <div className="mt-6 flex justify-end gap-2">
@@ -307,7 +308,7 @@ function CategoryModal({ onClose, onCreated }) {
             Cancel
           </button>
           <button className="btn btn-primary" disabled={saving}>
-            {saving ? "Adding…" : "Add category"}
+            {saving ? "Saving..." : existingCategory ? "Save category" : "Add category"}
           </button>
         </div>
       </form>
@@ -678,6 +679,7 @@ function ProductEditor({
                       <Plus size={16} />
                       Add Category
                     </button>
+                    <button type="button" className="btn whitespace-nowrap" disabled={!form.categoryId} onClick={() => setCategoryOpen(categories.find((item) => item._id === form.categoryId))}>Edit Category</button>
                     <FieldLabel help="Create a new category if the required category is not available." />
                   </div>
                 </label>
@@ -1468,6 +1470,7 @@ function ProductEditor({
       </Modal>
       {categoryOpen && (
         <CategoryModal
+          category={typeof categoryOpen === "object" ? categoryOpen : undefined}
           onClose={() => setCategoryOpen(false)}
           onCreated={(category) => {
             onCategory(category);
@@ -3342,7 +3345,7 @@ export default function ProductCatalogue() {
       !(await confirmAction({
         title: `Delete ${selected.size} selected products?`,
         description:
-          "Unused products will be permanently deleted. Products with stock or transaction history will be deactivated and hidden from POS to preserve records.",
+          "Products and their remaining inventory will be permanently deleted. Existing invoices and transaction history will be retained.",
         confirmText: "Delete selected",
         cancelText: "Cancel",
         variant: "danger",
@@ -3357,7 +3360,7 @@ export default function ProductCatalogue() {
         body: JSON.stringify({ ids: selectedIds }),
       });
       toast.success(
-        `${result.deleted} deleted; ${result.deactivated} deactivated to preserve stock and history.`,
+        `${result.deleted} products permanently deleted.`,
       );
       setSelected(new Set());
       await load();
@@ -3373,6 +3376,7 @@ export default function ProductCatalogue() {
     opened: products.filter((p) => p.stock.openQuantity > 0).length,
     expiring: products.filter((p) => p.expiringSoon).length,
     inactive: products.filter((p) => p.active === false).length,
+    sellingValue: products.reduce((sum, p) => sum + Number(p.valuation?.sellingValue || 0), 0),
   };
   const reset = () => {
     setPage(1);
@@ -3400,7 +3404,7 @@ export default function ProductCatalogue() {
     if (
       !(await confirmAction({
         title: `Delete ${product.name}?`,
-        description: "This action cannot be undone.",
+        description: "The product and remaining inventory will be permanently deleted. Existing invoices and transaction history will be retained.",
         confirmText: "Delete",
         cancelText: "Cancel",
         variant: "danger",
@@ -3412,22 +3416,7 @@ export default function ProductCatalogue() {
       toast.success("Product deleted successfully.");
       load();
     } catch (error) {
-      if (
-        error.status === 409 &&
-        (await confirmAction({
-          title: "Deactivate this product instead?",
-          description: error.message,
-          confirmText: "Deactivate",
-          cancelText: "Cancel",
-          variant: "warning",
-        }))
-      )
-        await patchProduct(
-          product,
-          { active: false, visibleInSales: false },
-          "Product deactivated.",
-        );
-      else toast.error(error.message);
+      toast.error(error.message);
     }
   }
   const actions = (product) => ({
@@ -3501,7 +3490,7 @@ export default function ProductCatalogue() {
           ["Low stock", metrics.low, AlertTriangle],
           ["Opened stock", metrics.opened, Boxes],
           ["Expiring soon", metrics.expiring, Clock3],
-          ["Inactive", metrics.inactive, Archive],
+          ["Inventory selling value", money(metrics.sellingValue), Archive],
         ].map(([label, value, Icon]) => (
           <div className="card p-4" key={label}>
             <div className="flex items-start justify-between">
@@ -3530,7 +3519,7 @@ export default function ProductCatalogue() {
             placeholder="Search products by name, SKU, barcode or brand…"
           />
         </div>
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+        <CategoryScroller>
           <button
             className={`whitespace-nowrap rounded-full border px-3 py-2 text-xs font-extrabold ${category === "ALL" ? "bg-[var(--green)] text-white" : ""}`}
             onClick={() => {
@@ -3554,7 +3543,7 @@ export default function ProductCatalogue() {
                 {item.name}
               </button>
             ))}
-        </div>
+        </CategoryScroller>
         <div className="mt-4 flex flex-wrap gap-2">
           <MultiSelectFilter
             triggerClassName="btn !min-h-10 min-w-40"
@@ -3818,11 +3807,10 @@ export default function ProductCatalogue() {
           suppliers={suppliers}
           settings={settings}
           onStockSaved={() => load()}
-          onCategory={(item) =>
-            setCategories((current) =>
-              [...current, item].sort((a, b) => a.name.localeCompare(b.name)),
-            )
-          }
+          onCategory={(item) => {
+            setCategories((current) => [...current.filter((entry) => entry._id !== item._id), item].sort((a, b) => a.name.localeCompare(b.name)));
+            load();
+          }}
           onClose={() => {
             setEditor(null);
             setEditorMode(null);

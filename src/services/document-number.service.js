@@ -1,4 +1,3 @@
-import {financialYear} from "../lib/gst-compliance.js";
 export function formatDocumentDateTime(value, timeZone = "Asia/Kolkata") {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit", hourCycle:"h23" }).formatToParts(new Date(value));
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
@@ -17,13 +16,17 @@ export async function nextDocumentNumber({ Counter, prefix, value = new Date(), 
   const counter = await Counter.findOneAndUpdate({ key }, { $inc:{ sequence:1 } }, { returnDocument:"after", session });
   return `${normalizedPrefix}-${dateTime}-${String(counter.sequence).padStart(3,"0")}`;
 }
-export async function nextInvoiceNumber({Counter,prefix="INV",value=new Date(),session,registrationKey="UNREGISTERED"}){
-  const series=String(prefix).trim().toUpperCase();
-  if(!/^[A-Z0-9]{1,3}$/.test(series))throw new Error("Invoice series must contain 1 to 3 letters or digits");
-  // The printed number is globally unique in Sale; changing registration must not reset it.
-  const year=financialYear(value),key=`INVOICE:${year}:${series}`;
-  if(!registrationKey)throw new Error("Registration scope is required");
-  const counter=await Counter.findOneAndUpdate({key},{$inc:{sequence:1}},{returnDocument:"after",upsert:true,setDefaultsOnInsert:true,session});
-  if(counter.sequence>999999)throw new Error("Invoice series is full; open a new series");
-  return `${series}/${year.slice(2)}/${String(counter.sequence).padStart(6,"0")}`;
+export async function nextInvoiceNumber({ Counter, prefix = "INV", value = new Date(), session, isNumberUsed = async () => false }) {
+  const series = String(prefix).trim().toUpperCase();
+  if (!/^[A-Z0-9]{1,3}$/.test(series)) throw new Error("Invoice series must contain 1 to 3 letters or digits");
+  const key = `INVOICE:TIMESTAMP:${series}`;
+  const dateTime = formatDocumentDateTime(value);
+  // Skip a used number if an owner resets twice in the same second.
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const counter = await Counter.findOneAndUpdate({ key }, { $inc: { sequence: 1 } }, { returnDocument: "after", upsert: true, setDefaultsOnInsert: true, session });
+    if (!Number.isSafeInteger(counter.sequence) || counter.sequence < 1) throw new Error("Invalid invoice sequence");
+    const number = `${series}-${dateTime}-${String(counter.sequence).padStart(3, "0")}`;
+    if (!await isNumberUsed(number)) return number;
+  }
+  throw new Error("Unable to allocate an unused invoice number. Try again.");
 }

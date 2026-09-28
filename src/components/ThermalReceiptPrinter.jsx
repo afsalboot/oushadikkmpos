@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Printer } from "lucide-react";
 import { gstStateName } from "@/lib/gst-states";
+import { receiptDiscountLabel } from "@/lib/receipt-discount";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -195,6 +196,9 @@ export function ThermalReceipt({ sale }) {
         {sale.items?.map((item, index) => (
           <div className="receipt-item" key={index}>
             <strong>{item.name}</strong>
+            {Number(item.wholesaleDiscountPercent) > 0 && (
+              <small>Wholesale discount ({item.wholesaleDiscountPercent}%): {money(item.wholesaleDiscountAmount)} (included in price)</small>
+            )}
             {registered && (
               <small>
                 HSN {item.hsnCode || "Not recorded"}
@@ -242,7 +246,7 @@ export function ThermalReceipt({ sale }) {
         </div>
         {Number(sale.discount || 0) > 0 && (
           <div>
-            <dt>Discount</dt>
+            <dt>{receiptDiscountLabel(sale)}</dt>
             <dd>-{money(sale.discount)}</dd>
           </div>
         )}

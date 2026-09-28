@@ -1,3 +1,4 @@
+import { inventoryValue } from "@/lib/inventory-value";
 import mongoose from "mongoose";
 import { Category, InventoryBatch, Product, Purchase, Sale, Settings, StockTransaction, AuditLog } from "@/models";
 import { calculatePhysicalStock, formatPhysicalStock, getLooseUnit, isCountBasedProduct, isLowStock } from "@/services/inventory.service";
@@ -118,6 +119,7 @@ export async function getProducts(filter = {}) {
     return {
       ...normalizedProduct,
       stock,
+      valuation: inventoryValue(productBatches, normalizedProduct),
       stockLabel: formatPhysicalStock(stock, normalizedProduct),
       lowStock: isLowStock(stock, normalizedProduct),
       activeBatchCount: activeBatches.length,

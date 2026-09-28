@@ -371,11 +371,12 @@ export default function DashboardWorkspace() {
       <div className="grid gap-5 lg:grid-cols-3">
         <Card title="Inventory overview">
           <div className="rounded-xl bg-[#f3f6f1] p-4">
-            <small className="text-[var(--muted)]">Inventory value</small>
+            <small className="text-[var(--muted)]">Inventory value (selling price)</small>
             <p className="text-2xl font-extrabold">
-              {money(data?.inventory.value)}
+              {money(data?.inventory.sellingValue)}
             </p>
           </div>
+          <p className="mt-2 text-xs text-[var(--muted)]">Known purchase cost: {money(data?.inventory.value)}{data?.inventory.missingCostBatches > 0 ? ` - ${data.inventory.missingCostBatches} batches have incomplete purchase costs` : ""}</p>
           <div className="mt-4 space-y-2">
             {data &&
               Object.entries(data.inventory.groups).map(([u, v]) => (
@@ -657,7 +658,7 @@ export default function DashboardWorkspace() {
           ["Active customers", data?.totals.customers, Users],
           ["Suppliers", data?.totals.suppliers, ClipboardList],
           ["Staff", data?.totals.staff, Users],
-          ["Inventory value", money(data?.totals.inventoryValue), Landmark],
+          ["Inventory selling value", money(data?.totals.inventoryValue), Landmark],
         ].map(([l, v, I]) => (
           <div className="card p-4" key={l}>
             <I size={18} className="text-[var(--green)]" />

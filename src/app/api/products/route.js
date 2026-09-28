@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 import { connectDb } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { ok, fail, apiError } from "@/lib/api";
-import { Product, InventoryBatch } from "@/models";
-import { createProduct, getProducts, productHasHistory, updateProduct } from "@/services/product.service";
+import { Product, InventoryBatch, AuditLog } from "@/models";
+import { createProduct, getProducts, updateProduct } from "@/services/product.service";
 
 export async function GET(request) {
   try {
@@ -71,15 +71,19 @@ export async function PATCH(request) {
 
 export async function DELETE(request) {
   try {
-    await requireSession("ADMIN");
+    const actor = await requireSession("ADMIN");
     await connectDb();
     const id = new URL(request.url).searchParams.get("id");
     if (!mongoose.isValidObjectId(id)) return fail("Invalid product");
     const productId = new mongoose.Types.ObjectId(id);
-    if (await productHasHistory(productId)) return fail("This product has transaction history and cannot be deleted. You can deactivate it instead.", 409);
     const product = await Product.findById(id);
     if (!product) return fail("Product not found", 404);
-    await Promise.all([InventoryBatch.deleteMany({ productId }), mongoose.connection.db.collection("stocktransactions").deleteMany({ productId }), Product.deleteOne({ _id: productId })]);
+    await mongoose.connection.transaction(async (session) => {
+      const batches = await InventoryBatch.find({ productId }).session(session).lean();
+      await AuditLog.create([{ actorId: actor.sub, action: "PRODUCT_DELETED", module: "products", targetType: "Product", targetId: productId, description: `Deleted ${product.name}`, metadata: { product: product.toObject(), batches } }], { session });
+      await InventoryBatch.deleteMany({ productId }, { session });
+      await Product.deleteOne({ _id: productId }, { session });
+    });
     return ok({ deleted: true });
   } catch (error) {
     return apiError(error);

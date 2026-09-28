@@ -92,14 +92,6 @@ export function missingWholesaleDefaults(product, allowedUnits) {
   return defaults;
 }
 
-export function classifyBulkDeletion(products, preservedProductIds) {
-  const preserve = new Set([...preservedProductIds].map(String));
-  return {
-    deactivateIds: products
-      .filter((product) => preserve.has(String(product._id)))
-      .map((product) => product._id),
-    deleteIds: products
-      .filter((product) => !preserve.has(String(product._id)))
-      .map((product) => product._id),
-  };
+export function classifyBulkDeletion(products) {
+  return { deactivateIds: [], deleteIds: products.map((product) => product._id) };
 }
