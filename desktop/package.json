@@ -1,0 +1,51 @@
+{
+  "name": "oushadhi-pos-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Oushadhi POS desktop client",
+  "author": "Oushadhi POS",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "node launch.mjs",
+    "dev": "node launch.mjs --local",
+    "smoke": "node launch.mjs --smoke",
+    "smoke:print": "node launch.mjs --print-smoke",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "test": "node --test *.test.mjs"
+  },
+  "build": {
+    "appId": "com.oushadhi.pos",
+    "productName": "Oushadhi POS",
+    "asar": true,
+    "directories": {
+      "output": "../dist-desktop"
+    },
+    "files": [
+      "main.mjs",
+      "local-backup.mjs",
+      "preload.cjs",
+      "receipt-print.mjs",
+      "printer-policy.mjs",
+      "policy.mjs",
+      "offline.html",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/icon.png",
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "Oushadhi-POS-Setup-${version}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3"
+  }
+}

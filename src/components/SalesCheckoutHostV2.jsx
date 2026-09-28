@@ -15,6 +15,7 @@ import { calculateSalePricing } from "@/services/pricing.service";
 import { GST_STATES } from "@/lib/gst-states";
 import { isWholesaleCustomer } from "@/lib/sale-customer";
 import {checkoutFetch} from "@/lib/checkout-request";
+import { resolveCheckoutCustomer } from "@/lib/checkout-customer";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -59,6 +60,8 @@ export default function SalesCheckoutHostV2() {
     [reference, setReference] = useState(""),
     [saving, setSaving] = useState(false),
     [settings, setSettings] = useState(null);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [saleType, setSaleType] = useState("SALE");
   const [wholesaleDiscountEnabled, setWholesaleDiscountEnabled] = useState(false);
   const [newGstin,setNewGstin]=useState("");
@@ -95,6 +98,8 @@ export default function SalesCheckoutHostV2() {
             : "WALK_IN",
       );
       setSelected(preselected);
+      setCustomerName(preselected?.name || "");
+      setCustomerPhone(preselected?.phone || "");
       setQuery("");
       setResults([]);
       setDiscountValue(wholesaleDiscount ? String(event.detail?.wholesaleDiscountPercent || "") : "");
@@ -125,6 +130,7 @@ export default function SalesCheckoutHostV2() {
     return () => window.removeEventListener("oushadi-open-checkout", handle);
   }, []);
   useEffect(() => {
+    if (saleType !== "WHOLESALE") return;
     if (customerType !== "EXISTING" || query.trim().length < 2) {
       queueMicrotask(() => {
         setResults([]);
@@ -158,6 +164,43 @@ export default function SalesCheckoutHostV2() {
       controller.abort();
     };
   }, [customerType, query, saleType]);
+  async function searchRetailCustomers(name, phone, signal) {
+    const terms = [...new Set([name.trim(), phone.trim()].filter((term) => term.length >= 2))];
+    const groups = await Promise.all(terms.map((term) => api(
+      `/api/customers/search?q=${encodeURIComponent(term)}&customerType=RETAIL&limit=50`,
+      { signal },
+    )));
+    return [...new Map(groups.flat().map((customer) => [customer._id, customer])).values()];
+  }
+  useEffect(() => {
+    if (!open || saleType === "WHOLESALE" || selected) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const found = await searchRetailCustomers(customerName, customerPhone, controller.signal);
+        if (controller.signal.aborted) return;
+        setResults(found);
+        setSearched(true);
+      } catch (error) {
+        if (!controller.signal.aborted) toast.error(error.message);
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [open, saleType, customerName, customerPhone, selected]);
+  function updateCustomerField(field, value) {
+    const name = field === "name" ? value : customerName;
+    const phone = field === "phone" ? value : customerPhone;
+    setCustomerName(name);
+    setCustomerPhone(phone);
+    setSelected(null);
+    setResults([]);
+    setSearched(false);
+    setSearching(false);
+    setCustomerType(name.trim() || phone.trim() ? "NEW" : "WALK_IN");
+  }
   const subtotal = useMemo(
     () => amount(cart.reduce((sum, item) => sum + lineTotal(item), 0)),
     [cart],
@@ -235,6 +278,7 @@ export default function SalesCheckoutHostV2() {
   }
   async function complete(event) {
     event.preventDefault();
+    if (saving) return;
     if (customerType === "EXISTING" && !selected)
       return toast.error("Select an existing customer");
     if (saleType !== "WHOLESALE" && isWholesaleCustomer(selected)) {
@@ -264,7 +308,7 @@ export default function SalesCheckoutHostV2() {
     const form = Object.fromEntries(new FormData(event.currentTarget));
     if(pricing.validationErrors.length)return toast.error(pricing.validationErrors[0]);
     if(fulfilment==="DELIVERY"&&(!deliveryAddress.trim()||!deliveryStateCode))return toast.error("Enter delivery address and state");
-    if (customerType === "NEW") {
+    if (saleType === "WHOLESALE" && customerType === "NEW") {
       const match = await findDuplicate(form);
       if (match) {
         setDuplicate(match);
@@ -347,15 +391,19 @@ export default function SalesCheckoutHostV2() {
         : undefined;
     setSaving(true);
     try {
+      const matches = saleType !== "WHOLESALE" && !selected
+        ? await searchRetailCustomers(customerName, customerPhone) : [];
+      if (saleType !== "WHOLESALE") setResults(matches);
+      const customerDetails = saleType === "WHOLESALE"
+        ? { customerType, customerId: selected?._id, customer: newCustomer }
+        : resolveCheckoutCustomer(customerName, customerPhone, matches, selected);
       const completed = await api("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items,
           saleType,
-          customerType,
-          customerId: selected?._id,
-          customer: newCustomer,
+          ...customerDetails,
           doctorName: form.doctorName,
           discountType,
           discountValue: 0,
@@ -398,6 +446,8 @@ export default function SalesCheckoutHostV2() {
         "Select a wholesale customer. This customer is configured as retail.",
       );
     setSelected(customer);
+    setCustomerName(customer.name || "");
+    setCustomerPhone(customer.phone || "");
     setCustomerType("EXISTING");
     setDuplicate(null);
   }
@@ -440,9 +490,54 @@ export default function SalesCheckoutHostV2() {
             </div>
             <div className="mt-6 grid gap-7 lg:grid-cols-[1.05fr_.95fr]">
               <section>
-                <p className="label">Customer</p>
-                <div
-                  className={`grid ${saleType === "WHOLESALE" ? "grid-cols-2" : "grid-cols-3"} rounded-xl bg-[#eef2ee] p-1`}
+                {saleType !== "WHOLESALE" ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label>
+                        <span className="label">Customer name</span>
+                        <input className="field" value={customerName} disabled={saving}
+                          onChange={(event) => updateCustomerField("name", event.target.value)}
+                          placeholder="Enter name" autoComplete="off" />
+                      </label>
+                      <label>
+                        <span className="label">Phone number</span>
+                        <input className="field" type="tel" value={customerPhone} disabled={saving}
+                          pattern="[0-9+ ()-]{7,18}" title="Enter a valid phone number"
+                          onChange={(event) => updateCustomerField("phone", event.target.value)}
+                          placeholder="Enter number" autoComplete="off" />
+                      </label>
+                    </div>
+                    <p className="text-xs text-[var(--muted)]" aria-live="polite">
+                      {selected ? `Existing customer: ${selected.name}`
+                        : !customerName.trim() && !customerPhone.trim() ? "Leave blank for a walk-in sale."
+                        : searching ? "Searching customers…"
+                        : "Matching customers are linked at payment. Unmatched details are saved as a new customer."}
+                    </p>
+                    {!selected && results.length > 0 && (
+                      <div className="max-h-48 space-y-2 overflow-y-auto">
+                        {results.map((customer) => (
+                          <button type="button" key={customer._id} disabled={saving}
+                            onClick={() => chooseExisting(customer)}
+                            className="flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--line)] p-3 text-left hover:border-[var(--green)]">
+                            <span><strong className="block text-sm">{customer.name}</strong>
+                              <span className="text-xs text-[var(--muted)]">{customer.phone || "No phone"}</span></span>
+                            <span className="text-xs font-bold text-[var(--green)]">Select</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                <label className="label" htmlFor="checkout-customer-type">
+                  Customer
+                </label>
+                <select
+                  id="checkout-customer-type"
+                  className="field"
+                  value={customerType}
+                  onChange={(event) => chooseType(event.target.value)}
+                  disabled={saving}
                 >
                   {(saleType === "WHOLESALE"
                     ? [
@@ -455,16 +550,11 @@ export default function SalesCheckoutHostV2() {
                         ["NEW", "New customer"],
                       ]
                   ).map(([value, label]) => (
-                    <button
-                      type="button"
-                      key={value}
-                      onClick={() => chooseType(value)}
-                      className={`rounded-lg px-2 py-2.5 text-xs font-extrabold transition ${customerType === value ? "bg-[var(--green)] text-white shadow-sm" : "text-[var(--muted)] hover:bg-white"}`}
-                    >
+                    <option key={value} value={value}>
                       {label}
-                    </button>
+                    </option>
                   ))}
-                </div>
+                </select>
                 {customerType === "WALK_IN" && (
                   <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
                     <span className="grid size-10 place-items-center rounded-xl bg-white text-[var(--green)]">
@@ -616,11 +706,13 @@ export default function SalesCheckoutHostV2() {
                     )}
                   </div>
                 )}
+                  </>
+                )}
                 <div className="mt-4 grid gap-3">
                   <label><span className="label">Fulfilment</span><select className="field" value={fulfilment} onChange={e=>setFulfilment(e.target.value)}><option value="COUNTER">Counter sale</option><option value="DELIVERY">Delivery of goods</option></select></label>
                   {fulfilment==="DELIVERY"&&<><label><span className="label">Delivery address</span><textarea className="field" value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} required/></label><label><span className="label">Delivery state</span><select className="field" value={deliveryStateCode} onChange={e=>setDeliveryStateCode(e.target.value)} required><option value="">Select state</option>{GST_STATES.map(([code,name])=><option key={code} value={code}>{name}</option>)}</select></label></>}
                 </div>
-                {customerType === "NEW" && (
+                {saleType === "WHOLESALE" && customerType === "NEW" && (
                   <div className="mt-4 space-y-3">
                     <label>
                       <span className="label">Customer name *</span>

@@ -12,6 +12,10 @@ npm run build
 npm start
 ```
 
+## Windows desktop app
+
+The Electron client opens the hosted POS in a Windows desktop window. Run `npm run desktop:install`, then `npm run desktop:start`. Build a Windows installer with `npm run desktop:dist`. See [desktop/README.md](desktop/README.md) for local development, verification, and release instructions. Internet access is required.
+
 ## Project structure
 
 ```text
