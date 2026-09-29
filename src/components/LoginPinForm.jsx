@@ -26,7 +26,7 @@ export default function LoginPinForm({ enabled }) {
   }
   return <section className="card mx-auto w-full max-w-lg p-6">
     <h1 className="text-2xl font-extrabold">Login PIN</h1>
-    <p className="mt-2 text-sm text-[var(--muted)]">{active ? "Your PIN is enabled. Change or remove it below." : "Set a four-digit PIN to sign in quickly with your email."} Your password remains available.</p>
+    <p className="mt-2 text-sm text-[var(--muted)]">{active ? "Your PIN is enabled. Change or remove it below." : "Set a four-digit PIN to sign in quickly with your username."} Your password remains available.</p>
     <form className="mt-6 space-y-4" onSubmit={submit}>
       <fieldset disabled={saving} className="space-y-4">
         <label><span className="label">Current password</span><PasswordInput className="field" name="currentPassword" autoComplete="current-password" required /></label>

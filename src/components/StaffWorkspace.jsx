@@ -91,6 +91,7 @@ const moduleLabel = (value) =>
 const emptyForm = () => ({
   name: "",
   email: "",
+  username: "",
   phone: "",
   roleId: "",
   active: true,
@@ -300,6 +301,7 @@ function StaffForm({ initial, roles, onClose, onSaved }) {
             ...emptyForm(),
             name: initial.name,
             email: initial.email,
+            username: initial.username || "",
             phone: initial.phone || "",
             roleId: initial.roleId?._id || "",
             active: initial.active,
@@ -374,6 +376,10 @@ function StaffForm({ initial, roles, onClose, onSaved }) {
                 />
               </label>
               <label>
+                <span className="label">Username *</span>
+                <input className="field" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}" minLength={3} maxLength={32} autoCapitalize="none" required />
+              </label>
+              <label>
                 <span className="label">Email *</span>
                 <input
                   className="field"
@@ -427,7 +433,7 @@ function StaffForm({ initial, roles, onClose, onSaved }) {
                       onChange={(event) =>
                         setForm({ ...form, password: event.target.value })
                       }
-                      minLength={8}
+                      minLength={15}
                       required
                     />
                     <button
@@ -453,7 +459,7 @@ function StaffForm({ initial, roles, onClose, onSaved }) {
                 </label>
               </div>
               <p className="mt-3 text-xs text-[var(--muted)]">
-                At least 8 characters with uppercase, lowercase, and a number.
+                At least 15 characters with uppercase, lowercase, and a number; maximum 72 UTF-8 bytes.
               </p>
             </section>
           )}
@@ -606,7 +612,7 @@ function ResetPassword({ staff, onClose }) {
             />
           </label>
           <p className="text-xs text-[var(--muted)]">
-            Use 8+ characters with uppercase, lowercase, and a number.
+            Use 15+ characters with uppercase, lowercase, and a number; maximum 72 UTF-8 bytes.
           </p>
         </div>
         <div className="mt-6 flex justify-end gap-2">

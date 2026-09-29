@@ -162,6 +162,9 @@ export default function AppShell({ user, children }) {
         <Link href="/login-pin" onClick={() => setOpen(false)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-bold text-emerald-50/70 hover:bg-white/10 hover:text-white">
           <KeyRound size={17} /> Login PIN
         </Link>
+        <Link href="/change-password" onClick={() => setOpen(false)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-bold text-emerald-50/70 hover:bg-white/10 hover:text-white">
+          <KeyRound size={17} /> Change password
+        </Link>
         <button
           onClick={logout}
           className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-bold text-emerald-50/70 hover:bg-white/10 hover:text-white"

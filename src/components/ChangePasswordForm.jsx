@@ -45,12 +45,12 @@ export default function ChangePasswordForm() {
         </span>
         <h1 className="mt-4 text-2xl font-extrabold">Change your password</h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Your password was reset by an administrator. Set a private password
-          before continuing.
+          Use at least 15 characters with uppercase, lowercase and a number.
+          The maximum length is 72 UTF-8 bytes.
         </p>
         <div className="mt-6 space-y-4">
           <label>
-            <span className="label">Current temporary password</span>
+            <span className="label">Current password</span>
             <PasswordInput
               className="field"
               visibilityLabel="current temporary password"
@@ -68,7 +68,7 @@ export default function ChangePasswordForm() {
               className="field"
               visibilityLabel="new password"
               autoComplete="new-password"
-              minLength={8}
+              minLength={15}
               value={form.password}
               onChange={(event) =>
                 setForm({ ...form, password: event.target.value })

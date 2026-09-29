@@ -14,6 +14,7 @@ const userSchema = new Schema(
     },
     phone: { type: String, trim: true, default: "" },
     passwordHash: { type: String, required: true },
+    username: { type: String, trim: true, lowercase: true, unique: true, sparse: true },
     pinHash: { type: String, select: false },
     pinAttempts: { type: Number, default: 0, select: false },
     role: { type: String, enum: ["ADMIN", "STAFF"], default: "STAFF" },
@@ -655,6 +656,11 @@ const documentCounterSchema = new Schema(
   { timestamps: true },
 );
 export const User = model("User", userSchema);
+export const AuthAttempt = model("AuthAttempt", new Schema({
+  _id: String,
+  count: Number,
+  expiresAt: { type: Date, expires: 0 },
+}, { versionKey: false }));
 if (!User.schema.path("readNotificationIds"))
   User.schema.add({ readNotificationIds: { type: [String], default: [] } });
 if (!User.schema.path("dismissedNotificationIds"))

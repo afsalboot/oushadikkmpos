@@ -4,12 +4,15 @@ import { connectDb } from "@/lib/db";
 import { apiError, fail, ok } from "@/lib/api";
 import { AuditLog, User } from "@/models";
 import { getSettings } from "@/services/settings.service";
+import { validPassword, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy";
+import { consumeAuthAttempt } from "@/lib/server/auth-attempts";
 
 export async function POST(request) {
   try {
     const session = await readSession();
     if (!session) return fail("Authentication required", 401);
     await connectDb();
+    if (!(await consumeAuthAttempt(`password-change:${session.sub}`)).allowed) return fail("Too many attempts. Try again in 15 minutes.", 429);
     const body = await request.json();
     const user = await User.findById(session.sub);
     if (!user) return fail("Authentication required", 401);
@@ -18,12 +21,12 @@ export async function POST(request) {
     const settings = await getSettings();
     const rules = settings.security || {};
     const password = String(body.password || "");
-    const invalid = password.length < Number(rules.minimumPasswordLength || 8)
+    const invalid = !validPassword(password) || password.length < Number(rules.minimumPasswordLength || 15)
       || (rules.requireUppercase !== false && !/[A-Z]/.test(password))
       || (rules.requireLowercase !== false && !/[a-z]/.test(password))
       || (rules.requireNumber !== false && !/\d/.test(password))
       || (rules.requireSpecialCharacter && !/[^A-Za-z0-9]/.test(password));
-    if (invalid) return fail("The new password does not meet the configured password rules", 400);
+    if (invalid) return fail(`${PASSWORD_POLICY_MESSAGE} Also follow any additional password rules in Settings.`, 400);
     if (password !== String(body.confirmPassword || "")) return fail("Passwords do not match", 400);
     if (await bcrypt.compare(password, user.passwordHash)) return fail("Choose a password different from your current password", 400);
 

@@ -5,12 +5,15 @@ import { LoaderCircle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import OushadhiLogo from "@/components/branding/OushadhiLogo";
 import PasswordInput from "@/components/PasswordInput";
+import { PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy";
 export default function LoginForm() {
   const router = useRouter();
   const [bootstrap, setBootstrap] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [setupUsername, setSetupUsername] = useState(false);
   const [pinLogin, setPinLogin] = useState(false);
+  const usePin = pinLogin && !bootstrap && !setupUsername;
   useEffect(() => {
     fetch("/api/auth/status")
       .then((r) => r.json())
@@ -20,11 +23,13 @@ export default function LoginForm() {
   }, []);
   async function submit(e) {
     e.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     try {
       const body = Object.fromEntries(new FormData(e.currentTarget));
+      if (!bootstrap && setupUsername) body.setupUsername = true;
       const response = await fetch(
-        bootstrap ? "/api/auth/bootstrap" : pinLogin ? "/api/auth/pin-login" : "/api/auth/login",
+        bootstrap ? "/api/auth/bootstrap" : usePin ? "/api/auth/pin-login" : "/api/auth/username-login",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -83,7 +88,7 @@ export default function LoginForm() {
                   {bootstrap ? "Secure setup" : "Secure sign in"}
                 </span>
                 <h2 className="text-3xl font-extrabold tracking-tight">
-                  {bootstrap ? "Create the first admin" : "Welcome back"}
+                  {bootstrap ? "Create the first admin" : setupUsername ? "Set up your username" : "Welcome back"}
                 </h2>
                 <p className="mt-2 text-[var(--muted)]">
                   {bootstrap
@@ -92,7 +97,7 @@ export default function LoginForm() {
                 </p>
               </div>
               <form onSubmit={submit} className="space-y-5">
-                {!bootstrap && <div className="flex gap-2" aria-label="Sign-in method">
+                {!bootstrap && !setupUsername && <div className="flex gap-2" aria-label="Sign-in method">
                   <button type="button" disabled={submitting} aria-pressed={!pinLogin} className={`btn flex-1 ${!pinLogin ? "btn-primary" : ""}`} onClick={() => setPinLogin(false)}>Password</button>
                   <button type="button" disabled={submitting} aria-pressed={pinLogin} className={`btn flex-1 ${pinLogin ? "btn-primary" : ""}`} onClick={() => setPinLogin(true)}>4-digit PIN</button>
                 </div>}
@@ -123,7 +128,8 @@ export default function LoginForm() {
                     />
                   </label>
                 )}
-                <label>
+                <label><span className="label">Username</span><input className="field" name="username" autoComplete="username" pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}" minLength={3} maxLength={32} autoCapitalize="none" spellCheck={false} required /></label>
+                {(bootstrap || setupUsername) && <label>
                   <span className="label">Email address</span>
                   <input
                     className="field"
@@ -132,25 +138,31 @@ export default function LoginForm() {
                     autoComplete="email"
                     required
                   />
-                </label>
+                </label>}
                 <label>
-                  <span className="label">{pinLogin && !bootstrap ? "4-digit PIN" : "Password"}</span>
+                  <span className="label">{usePin ? "4-digit PIN" : setupUsername && !bootstrap ? "Current password" : "Password"}</span>
                   <PasswordInput
-                    key={pinLogin && !bootstrap ? "pin" : "password"}
+                    key={`${setupUsername}:${usePin}`}
                     className="field"
-                    name={pinLogin && !bootstrap ? "pin" : "password"}
-                    visibilityLabel={pinLogin && !bootstrap ? "PIN" : "password"}
-                    minLength={pinLogin && !bootstrap ? 4 : 8}
-                    maxLength={pinLogin && !bootstrap ? 4 : undefined}
-                    inputMode={pinLogin && !bootstrap ? "numeric" : undefined}
-                    pattern={pinLogin && !bootstrap ? "[0-9]{4}" : undefined}
+                    name={usePin ? "pin" : "password"}
+                    visibilityLabel={usePin ? "PIN" : "password"}
+                    minLength={usePin ? 4 : bootstrap ? 15 : undefined}
+                    maxLength={usePin ? 4 : undefined}
+                    inputMode={usePin ? "numeric" : undefined}
+                    pattern={usePin ? "[0-9]{4}" : undefined}
                     autoComplete={
                       bootstrap ? "new-password" : "current-password"
                     }
                     required
                   />
                 </label>
-                {pinLogin && !bootstrap && <p className="text-sm text-[var(--muted)]">First sign in with your password, then open Login PIN in the sidebar to set your PIN. After five failed attempts, use your password to unlock it.</p>}
+                {usePin && <p className="text-sm text-[var(--muted)]">Set your PIN in Login PIN after signing in with your password. Five failed PIN attempts require password sign-in to unlock.</p>}
+                {setupUsername && !bootstrap && <>
+                  <p className="text-sm text-[var(--muted)]">For existing accounts without a username: verify your current email and password, then choose a username and new password. After setup, use your username to sign in.</p>
+                  <label><span className="label">New password</span><PasswordInput className="field" name="newPassword" minLength={15} autoComplete="new-password" required /></label>
+                  <label><span className="label">Confirm new password</span><PasswordInput className="field" name="confirmPassword" minLength={15} autoComplete="new-password" required /></label>
+                </>}
+                {(bootstrap || setupUsername) && <p className="text-sm text-[var(--muted)]">{PASSWORD_POLICY_MESSAGE}</p>}
                 <button
                   disabled={submitting}
                   className="btn btn-primary w-full min-h-12"
@@ -158,9 +170,10 @@ export default function LoginForm() {
                   {submitting && (
                     <LoaderCircle size={18} className="loading-shimmer-icon" />
                   )}
-                  {bootstrap ? "Create admin account" : "Sign in"}
+                  {bootstrap ? "Create admin account" : setupUsername ? "Save username and sign in" : "Sign in"}
                 </button>
               </form>
+              {!bootstrap && <button type="button" disabled={submitting} className="mt-4 text-sm font-bold text-[var(--green)] underline" onClick={() => setSetupUsername((value) => !value)}>{setupUsername ? "Back to username sign-in" : "Existing account? Set up your username"}</button>}
             </>
           )}
         </div>
