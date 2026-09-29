@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
   LoaderCircle,
@@ -64,6 +64,8 @@ export default function SalesCheckoutHostV2() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [saleType, setSaleType] = useState("SALE");
   const [wholesaleDiscountEnabled, setWholesaleDiscountEnabled] = useState(false);
+  const [cartCustomer, setCartCustomer] = useState(null);
+  const directoryType = saleType === "WHOLESALE" || wholesaleDiscountEnabled ? "WHOLESALE" : "RETAIL";
   const [newGstin,setNewGstin]=useState("");
   const [fulfilment,setFulfilment]=useState("COUNTER"),[deliveryAddress,setDeliveryAddress]=useState(""),[deliveryStateCode,setDeliveryStateCode]=useState(""),[recipientStateCode,setRecipientStateCode]=useState(""),[discountReason,setDiscountReason]=useState("");
   const placeOfSupply=fulfilment==="DELIVERY"?(deliveryStateCode||settings?.store?.stateCode):customerType==="NEW"&&!newGstin?(recipientStateCode||settings?.store?.stateCode):selected&&!selected.gstin?(selected.stateCode||settings?.store?.stateCode):settings?.store?.stateCode||"";
@@ -111,6 +113,19 @@ export default function SalesCheckoutHostV2() {
       setNewCreditLimit("0");
       setReference("");
       setDuplicate(null);
+      const draft = event.detail?.cartCustomer || null;
+      setCartCustomer(draft);
+      if (draft) {
+        const matching = draft.selected && (draft.selected.customerType === "WHOLESALE") === wholesaleDiscount
+          ? draft.selected : null;
+        setCustomerName(draft.name || "");
+        setCustomerPhone(draft.phone || "");
+        setSelected(matching);
+        setCustomerType(matching ? "EXISTING" : draft.name?.trim() || draft.phone?.trim() ? "NEW" : "WALK_IN");
+        setFulfilment(draft.fulfilment || "COUNTER");
+        setDeliveryAddress(draft.deliveryAddress || "");
+        setDeliveryStateCode(draft.deliveryStateCode || "");
+      }
       setOpen(true);
       api("/api/settings")
         .then((value) => {
@@ -164,16 +179,16 @@ export default function SalesCheckoutHostV2() {
       controller.abort();
     };
   }, [customerType, query, saleType]);
-  async function searchRetailCustomers(name, phone, signal) {
+  const searchRetailCustomers = useCallback(async (name, phone, signal) => {
     const terms = [...new Set([name.trim(), phone.trim()].filter((term) => term.length >= 2))];
     const groups = await Promise.all(terms.map((term) => api(
-      `/api/customers/search?q=${encodeURIComponent(term)}&customerType=RETAIL&limit=50`,
+      `/api/customers/search?q=${encodeURIComponent(term)}&customerType=${directoryType}&limit=50`,
       { signal },
     )));
     return [...new Map(groups.flat().map((customer) => [customer._id, customer])).values()];
-  }
+  }, [directoryType]);
   useEffect(() => {
-    if (!open || saleType === "WHOLESALE" || selected) return;
+    if (!open || cartCustomer || saleType === "WHOLESALE" || selected) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setSearching(true);
@@ -189,7 +204,7 @@ export default function SalesCheckoutHostV2() {
       }
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [open, saleType, customerName, customerPhone, selected]);
+  }, [open, cartCustomer, saleType, customerName, customerPhone, selected, searchRetailCustomers]);
   function updateCustomerField(field, value) {
     const name = field === "name" ? value : customerName;
     const phone = field === "phone" ? value : customerPhone;
@@ -210,6 +225,8 @@ export default function SalesCheckoutHostV2() {
     discountLimit = 100,
     discountValid = !wholesaleDiscountEnabled || (Number.isFinite(enteredDiscount) && enteredDiscount >= 0 && enteredDiscount <= 100);
   const pricing=calculateSalePricing({
+    consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
+    consultationFee: cartCustomer?.consultationFee,
     wholesaleDiscount: wholesaleDiscountEnabled ? enteredDiscount : undefined,
     items:cart.map(item=>({...item,amount:lineTotal(item),gstRate:item.kind==="MIX"?settings?.gst?.defaultRate:item.gstRate,useDefaultGstRate:item.kind==="MIX"?true:item.useDefaultGstRate})),
     discount:{type:"PERCENTAGE",value:0,reason:discountReason},
@@ -281,7 +298,7 @@ export default function SalesCheckoutHostV2() {
     if (saving) return;
     if (customerType === "EXISTING" && !selected)
       return toast.error("Select an existing customer");
-    if (saleType !== "WHOLESALE" && isWholesaleCustomer(selected)) {
+    if (directoryType === "RETAIL" && isWholesaleCustomer(selected)) {
       setSelected(null);
       return toast.error("Select a retail customer for this sale.");
     }
@@ -396,7 +413,7 @@ export default function SalesCheckoutHostV2() {
       if (saleType !== "WHOLESALE") setResults(matches);
       const customerDetails = saleType === "WHOLESALE"
         ? { customerType, customerId: selected?._id, customer: newCustomer }
-        : resolveCheckoutCustomer(customerName, customerPhone, matches, selected);
+        : resolveCheckoutCustomer(customerName, customerPhone, matches, selected, directoryType);
       const completed = await api("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -404,10 +421,12 @@ export default function SalesCheckoutHostV2() {
           items,
           saleType,
           ...customerDetails,
-          doctorName: form.doctorName,
+          doctorName: cartCustomer ? cartCustomer.doctorName : form.doctorName,
           discountType,
           discountValue: 0,
           wholesaleDiscountEnabled,
+          consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
+          consultationFee: cartCustomer?.consultationFee,
           wholesaleDiscountPercent: wholesaleDiscountEnabled ? enteredDiscount : 0,
           supplyContext:{fulfilment,deliveryAddress,deliveryStateCode},
           discountReason,
@@ -439,9 +458,9 @@ export default function SalesCheckoutHostV2() {
     setResults([]);
   }
   function chooseExisting(customer) {
-    if (saleType !== "WHOLESALE" && isWholesaleCustomer(customer))
+    if (directoryType === "RETAIL" && isWholesaleCustomer(customer))
       return toast.error("Select a retail customer for this sale.");
-    if (saleType === "WHOLESALE" && !isWholesaleCustomer(customer))
+    if (directoryType === "WHOLESALE" && !isWholesaleCustomer(customer))
       return toast.error(
         "Select a wholesale customer. This customer is configured as retail.",
       );
@@ -462,7 +481,7 @@ export default function SalesCheckoutHostV2() {
         >
           <form
             onSubmit={complete}
-            className="card max-h-[94vh] w-full max-w-4xl overflow-y-auto p-6"
+            className={`card max-h-[94vh] w-full ${cartCustomer ? "max-w-lg" : "max-w-4xl"} overflow-y-auto p-6`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="checkout-title"
@@ -476,7 +495,7 @@ export default function SalesCheckoutHostV2() {
                   id="checkout-title"
                   className="mt-1 text-2xl font-extrabold"
                 >
-                  Customer & payment
+                  {cartCustomer ? "Payment" : "Customer & payment"}
                 </h2>
               </div>
               <button
@@ -488,8 +507,8 @@ export default function SalesCheckoutHostV2() {
                 <X />
               </button>
             </div>
-            <div className="mt-6 grid gap-7 lg:grid-cols-[1.05fr_.95fr]">
-              <section>
+            <div className={`mt-6 grid gap-7 ${cartCustomer ? "" : "lg:grid-cols-[1.05fr_.95fr]"}`}>
+              {!cartCustomer && <section>
                 {saleType !== "WHOLESALE" ? (
                   <div className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -850,7 +869,7 @@ export default function SalesCheckoutHostV2() {
                     )}
                   </div>
                 )}
-              </section>
+              </section>}
               <section>
                 <div className="rounded-2xl bg-[#f4f7f3] p-5">
                   <p className="label">Order summary</p>
@@ -863,12 +882,15 @@ export default function SalesCheckoutHostV2() {
                       <span>Subtotal</span>
                       <strong>{money(subtotal)}</strong>
                     </div>
-                    <label className="mt-3 flex items-center gap-2 text-sm font-bold">
+                    {pricing.consultationFee > 0 && <div className="flex justify-between"><span>Consultation fee</span><strong>{money(pricing.consultationFee)}</strong></div>}
+                    {!cartCustomer && <label className="mt-3 flex items-center gap-2 text-sm font-bold">
                       <input type="checkbox" checked={wholesaleDiscountEnabled}
                         onChange={(event) => { setWholesaleDiscountEnabled(event.target.checked); setDiscountType("PERCENTAGE"); setDiscountValue(""); }} />
                       Wholesale
-                    </label>
-                    {discountEnabled && (
+                    </label>}
+                    {cartCustomer && wholesaleDiscountEnabled && <p className="text-sm text-[var(--green)]">Wholesale · {enteredDiscount}% discount</p>}
+                    {cartCustomer && discount > 0 && <div className="flex justify-between text-[var(--green)]"><span>Wholesale discount</span><strong>-{money(discount)}</strong></div>}
+                    {discountEnabled && !cartCustomer && (
                       <>
                         <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
                           {!wholesaleDiscountEnabled && settings?.discount?.allowFixed !== false &&

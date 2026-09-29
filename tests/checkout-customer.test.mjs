@@ -31,3 +31,24 @@ test("ambiguous names require selection and explicit selection resolves ambiguit
   assert.throws(() => resolve("Anu", "", matches), /Multiple customers/);
   assert.equal(resolve("Anu", "", matches, matches[3]).customerId, "second");
 });
+
+test("checked wholesale customer entry matches only the wholesale directory", () => {
+  assert.equal(resolve("", "+91 98765 43212", customers, null, "WHOLESALE").customerId, "wholesale");
+  assert.deepEqual(resolve("New trader", "9876543222", customers, null, "WHOLESALE"), {
+    customerType: "NEW", customer: { name: "New trader", phone: "9876543222", customerType: "WHOLESALE" },
+  });
+});
+
+test("switching wholesale clears incompatible selected customer identity", () => {
+  const wholesale = resolve("Anu", "9876543210", customers, customers[0], "WHOLESALE");
+  assert.equal(wholesale.customerType, "NEW");
+  assert.equal(wholesale.customer.customerType, "WHOLESALE");
+  const retail = resolve("Wholesale", "9876543212", customers, customers[2], "RETAIL");
+  assert.equal(retail.customerType, "NEW");
+  assert.equal(retail.customer.customerType, "RETAIL");
+});
+
+test("wholesale discount without customer details stays walk-in", () => {
+  assert.deepEqual(resolve("", "", [], null, "WHOLESALE"), { customerType: "WALK_IN" });
+  assert.equal(resolve("Trader", "", [], null, "WHOLESALE").customer.customerType, "WHOLESALE");
+});

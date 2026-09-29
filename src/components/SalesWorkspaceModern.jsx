@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import ExpiredStockWarning from "@/components/ExpiredStockWarning";
+import CartCustomerFields from "@/components/CartCustomerFields";
 import { setCartItemWholesale } from "@/lib/wholesale";
 import { calculateSalePricing } from "@/services/pricing.service";
 const money = (v) =>
@@ -547,6 +548,7 @@ export default function SalesWorkspaceModern() {
     [wholesaleDiscountEnabled, setWholesaleDiscountEnabled] = useState(false),
     [wholesaleDiscountPercent, setWholesaleDiscountPercent] = useState(""),
     [saleCustomer, setSaleCustomer] = useState(null),
+    [cartCustomer, setCartCustomer] = useState({}),
     [heldSales, setHeldSales] = useState([]),
     [heldOpen, setHeldOpen] = useState(false),
     [quick, setQuick] = useState(null),
@@ -563,7 +565,7 @@ export default function SalesWorkspaceModern() {
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem("oushadi-preselected-customer");
-      if (saved) setSaleCustomer(JSON.parse(saved));
+      if (saved) { const customer = JSON.parse(saved); setSaleCustomer(customer); setCartCustomer({ name: customer.name || "", phone: customer.phone || "", selected: customer }); setWholesaleDiscountEnabled(customer.customerType === "WHOLESALE"); }
     } catch {}
   }, []);
   useEffect(() => {
@@ -672,9 +674,11 @@ export default function SalesWorkspaceModern() {
     const openCheckout = (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();
+      const fields = document.querySelectorAll("#cart-customer-fields input, #cart-customer-fields select, #cart-customer-fields textarea, [data-consultation-fee]");
+      for (const field of fields) if (!field.reportValidity()) return;
       window.dispatchEvent(
         new CustomEvent("oushadi-open-checkout", {
-          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, wholesaleDiscountPercent },
+          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, wholesaleDiscountPercent, cartCustomer },
         }),
       );
     };
@@ -685,9 +689,10 @@ export default function SalesWorkspaceModern() {
       layout?.classList.remove("sales-cart-grid");
       workspace?.classList.remove("sales-cart-workspace");
     };
-  }, [cart, mode, wholesaleDiscountEnabled, wholesaleDiscountPercent]);
+  }, [cart, mode, wholesaleDiscountEnabled, wholesaleDiscountPercent, cartCustomer]);
   useEffect(() => {
     const completed = () => {
+      setCartCustomer({});
       setCart([]);
       setWholesaleDiscountEnabled(false);
       setWholesaleDiscountPercent("");
@@ -806,6 +811,8 @@ export default function SalesWorkspaceModern() {
     });
   const subtotal = cart.reduce((s, i) => s + total(i), 0),
     cartPricing = calculateSalePricing({
+      consultationFeeEnabled: cartCustomer.consultationFeeEnabled === true,
+      consultationFee: cartCustomer.consultationFee,
       wholesaleDiscount: wholesaleDiscountEnabled ? wholesaleDiscountPercent || 0 : undefined,
       items: cart.map((i) => ({ ...i, discount: undefined, amount: total(i),
         gstRate: i.kind === "MIX" ? settings?.gst?.defaultRate : i.gstRate,
@@ -813,7 +820,11 @@ export default function SalesWorkspaceModern() {
       })),
       settings,
       currentUser: { role: settings?._capabilities?.role || "STAFF" },
-      placeOfSupply: settings?.store?.stateCode,
+      placeOfSupply: cartCustomer.fulfilment === "DELIVERY"
+        ? cartCustomer.deliveryStateCode || settings?.store?.stateCode
+        : cartCustomer.selected && !cartCustomer.selected.gstin && (cartCustomer.selected.customerType === "WHOLESALE") === wholesaleDiscountEnabled
+          ? cartCustomer.selected.stateCode || settings?.store?.stateCode
+          : settings?.store?.stateCode,
     }),
     cartGst = cartPricing.gst,
     step = settings?.roundOff?.enabled,
@@ -832,7 +843,7 @@ export default function SalesWorkspaceModern() {
     );
     if (roundRow) {
       const value = roundRow.lastElementChild;
-      if (value) value.textContent = money(grand - cartGst.total);
+      if (value) value.textContent = money(cartPricing.roundOff);
     }
     if (
       !settings?.gst?.enabled ||
@@ -881,6 +892,7 @@ export default function SalesWorkspaceModern() {
     cartGst.taxableSubtotal,
     cartGst.total,
     grand,
+    cartPricing.roundOff,
     settings,
   ]);
   function startNewSale() {
@@ -894,6 +906,7 @@ export default function SalesWorkspaceModern() {
           wholesaleDiscountEnabled,
           wholesaleDiscountPercent,
           customer: saleCustomer,
+          cartCustomer,
           heldAt: new Date().toISOString(),
         },
       ]);
@@ -901,6 +914,7 @@ export default function SalesWorkspaceModern() {
     setWholesaleDiscountEnabled(false);
     setWholesaleDiscountPercent("");
     setSaleCustomer(null);
+    setCartCustomer({});
     sessionStorage.removeItem("oushadi-preselected-customer");
     setQuick(null);
     setMode("PRODUCT");
@@ -921,6 +935,7 @@ export default function SalesWorkspaceModern() {
               wholesaleDiscountEnabled,
               wholesaleDiscountPercent,
               customer: saleCustomer,
+              cartCustomer,
               heldAt: new Date().toISOString(),
             },
           ]
@@ -930,6 +945,7 @@ export default function SalesWorkspaceModern() {
     setWholesaleDiscountEnabled(Boolean(sale.wholesaleDiscountEnabled));
     setWholesaleDiscountPercent(sale.wholesaleDiscountPercent || "");
     setSaleCustomer(sale.customer || null);
+    setCartCustomer(sale.cartCustomer || { name: sale.customer?.name || "", phone: sale.customer?.phone || "", selected: sale.customer || null });
     if (sale.customer)
       sessionStorage.setItem(
         "oushadi-preselected-customer",
@@ -1305,34 +1321,16 @@ export default function SalesWorkspaceModern() {
                         confirmText: "Clear all",
                         cancelText: "Cancel",
                         variant: "warning",
-                      })) && (setCart([]), setWholesaleDiscountEnabled(false), setWholesaleDiscountPercent(""))
+                      })) && (setCart([]), setCartCustomer({}), setWholesaleDiscountEnabled(false), setWholesaleDiscountPercent(""))
                     }
                   >
                     Clear all
                   </button>
                 )}
               </div>
-              <button
-                type="button"
-                className="sales-cart-customer"
-                disabled
-                title={
-                  cart.length
-                    ? "Change customer during checkout"
-                    : "Add a product before selecting a customer"
-                }
-              >
-                <span className="min-w-0 text-left">
-                  <small className="block uppercase tracking-wide text-[var(--muted)]">
-                    Customer
-                  </small>
-                  <b className="mt-0.5 block truncate">
-                    {saleCustomer?.name || "Walk-in customer"}
-                  </b>
-                </span>
-              </button>
             </div>
             <div className="sales-cart-list">
+              <CartCustomerFields value={cartCustomer} onChange={setCartCustomer} wholesale={wholesaleDiscountEnabled} />
               {cart.length ? (
                 [...cart].reverse().map((i) => {
                   const saleLabel =
@@ -1439,6 +1437,11 @@ export default function SalesWorkspaceModern() {
               )}
             </div>
             <div className="sales-cart-summary border-t">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" className="size-4 accent-[var(--green)]" checked={Boolean(cartCustomer.consultationFeeEnabled)} onChange={(event) => setCartCustomer((current) => ({ ...current, consultationFeeEnabled: event.target.checked, consultationFee: "" }))} />Consultation Fee</label>
+                {cartCustomer.consultationFeeEnabled && <input data-consultation-fee type="number" className="field !min-h-9 !w-28" aria-label="Consultation fee amount" placeholder="Enter amount" min="0.01" max="99999999" step="0.01" required value={cartCustomer.consultationFee || ""} onChange={(event) => setCartCustomer((current) => ({ ...current, consultationFee: event.target.value }))} />}
+              </div>
+              {cartPricing.consultationFee > 0 && <div className="mb-2 flex justify-between text-sm"><span>Consultation fee</span><b>{money(cartPricing.consultationFee)}</b></div>}
               <label className="mb-3 flex items-center gap-2 text-sm font-bold">
                 <input type="checkbox" className="size-4 accent-[var(--green)]"
                   checked={wholesaleDiscountEnabled}

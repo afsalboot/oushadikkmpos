@@ -276,6 +276,7 @@ export async function POST(request) {
     const previous=await Sale.findOne({requestKey}).lean();
     if(previous)return ok(assertRetryMatches(previous,hash,session.sub));
     const saleType = body.saleType === "WHOLESALE" ? "WHOLESALE" : "SALE";
+    const directoryType = saleType === "WHOLESALE" || body.wholesaleDiscountEnabled === true ? "WHOLESALE" : "RETAIL";
     if (!Array.isArray(body.items) || !body.items.length)
       return fail("Add at least one item to the cart");
     if (String(body.doctorName || "").trim().length > 120)
@@ -304,7 +305,9 @@ export async function POST(request) {
         }).session(dbSession);
         if (!customer) throw new Error("Customer not found");
       } else if (customerType === "NEW")
-        customer = await createCustomer(body.customer, dbSession);
+        customer = await createCustomer({ ...body.customer, customerType: directoryType }, dbSession);
+      if (customer && (isWholesaleCustomer(customer) !== (directoryType === "WHOLESALE")))
+        throw Object.assign(new Error(`Select a ${directoryType === "WHOLESALE" ? "wholesale" : "retail"} customer for this sale. Change the customer type in Customers if needed.`), { status: 422 });
       if (saleType === "WHOLESALE" && !customer)
         throw Object.assign(
           new Error("Select a wholesale customer before checkout"),
@@ -698,6 +701,8 @@ export async function POST(request) {
           ? Number(customer?.defaultDiscount || 0)
           : null;
       const pricing = calculateSalePricing({
+        consultationFeeEnabled: body.consultationFeeEnabled === true,
+        consultationFee: body.consultationFee,
         wholesaleDiscount: body.wholesaleDiscountEnabled === true ? body.wholesaleDiscountPercent ?? 0 : undefined,
         items: saleItems.map((item, index) => ({
           amount: item.total,
@@ -897,6 +902,7 @@ export async function POST(request) {
             placeOfSupply: gstInvoice.placeOfSupply,
             roundOff,
             roundingSummary: pricing.roundingSummary,
+            consultationFee: pricing.consultationFee,
             total,
             payments,
             paymentStatus: credit?.paymentStatus || "PAID",

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { dashboardToday } from "@/lib/dashboard-dates";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -39,8 +40,8 @@ const num = (v) =>
   );
 const fmt = (v, o = { dateStyle: "medium" }) =>
   new Intl.DateTimeFormat("en-IN", o).format(new Date(v));
-async function api(url) {
-  const r = await fetch(url),
+async function api(url, signal) {
+  const r = await fetch(url, { cache: "no-store", signal }),
     j = await r.json();
   if (!r.ok) throw new Error(j.error);
   return j.data;
@@ -91,16 +92,38 @@ export default function DashboardWorkspace() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [invoice, setInvoice] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [fromDate, setFromDate] = useState(() => dashboardToday());
+  const [toDate, setToDate] = useState(() => dashboardToday());
+  const [customDates, setCustomDates] = useState(() => ({ from: dashboardToday(), to: dashboardToday() }));
+  const customValid = Boolean(fromDate && toDate && fromDate <= toDate);
   useEffect(() => {
     let active = true;
-    api(`/api/dashboard?range=${range}`)
-      .then((v) => active && setData(v))
-      .catch((e) => active && setError(e.message))
-      .finally(() => active && setLoading(false));
+    let controller;
+    const refresh = () => {
+      if (document.hidden) return;
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      const params = new URLSearchParams({ range });
+      if (range === "custom") { params.set("from", customDates.from); params.set("to", customDates.to); }
+      api(`/api/dashboard?${params}`, request.signal)
+        .then((v) => { if (active && !request.signal.aborted) { setData(v); setError(""); } })
+        .catch((e) => { if (active && !request.signal.aborted) setError(e.message); })
+        .finally(() => { if (active && !request.signal.aborted) setLoading(false); });
+    };
+    refresh();
+    const timer = setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       active = false;
+      controller?.abort();
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
-  }, [range]);
+  }, [range, refreshKey, customDates]);
   if (error && !data)
     return (
       <Empty
@@ -132,7 +155,7 @@ export default function DashboardWorkspace() {
           t: "bg-blue-50 text-blue-700",
         },
         {
-          l: "Gross profit",
+          l: "Estimated gross profit",
           v: money(data.kpis.profit),
           c: data.kpis.comparisons.profit,
           i: TrendingUp,
@@ -184,9 +207,9 @@ export default function DashboardWorkspace() {
           </div>
           <div className="rounded-xl border border-[var(--line)] bg-white px-4 py-2">
             <small className="font-bold text-[var(--muted)]">
-              CURRENT BRANCH
+              STORE
             </small>
-            <p className="font-extrabold">Main Branch</p>
+            <p className="font-extrabold">{data?.storeName || "—"}</p>
           </div>
         </div>
       </div>
@@ -197,16 +220,33 @@ export default function DashboardWorkspace() {
           ["7d", "Last 7 Days"],
           ["week", "This Week"],
           ["month", "This Month"],
+          ["custom", "Custom Date"],
         ].map(([v, l]) => (
           <button
             key={v}
-            onClick={() => setRange(v)}
+            onClick={() => { if (range !== v) { setRange(v); setLoading(true); setData(null); setError(""); } }}
             className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-extrabold ${range === v ? "bg-[var(--green)] text-white" : "border border-[var(--line)] bg-white"}`}
           >
             {l}
           </button>
         ))}
+        <button type="button" className="btn ml-auto" disabled={loading} onClick={() => { setLoading(true); setRefreshKey((value) => value + 1); }}><RefreshCw size={15} /> Refresh</button>
       </div>
+      {range === "custom" && (
+        <form className="flex flex-wrap items-end gap-3 rounded-xl border bg-white p-3" onSubmit={(event) => {
+          event.preventDefault();
+          if (!customValid) return;
+          setLoading(true); setData(null); setError("");
+          setCustomDates({ from: fromDate, to: toDate });
+        }}>
+          <label className="min-w-0 flex-1 sm:flex-none"><span className="label">From</span><input type="date" className="field" value={fromDate} max={toDate || undefined} required onChange={(event) => setFromDate(event.target.value)} /></label>
+          <label className="min-w-0 flex-1 sm:flex-none"><span className="label">To</span><input type="date" className="field" value={toDate} min={fromDate || undefined} required onChange={(event) => setToDate(event.target.value)} /></label>
+          <button type="submit" className="btn btn-primary" disabled={!customValid || loading}>Apply dates</button>
+          {!customValid && <p className="w-full text-xs text-red-700" role="status">Select both dates, with From on or before To.</p>}
+          <p className="w-full text-xs text-[var(--muted)]">Showing {customDates.from} to {customDates.to}, inclusive (IST). Inventory cards show current stock.</p>
+        </form>
+      )}
+      {error && data && <p role="status" className="text-sm text-red-700">Could not refresh: {error}. Showing the last successful update.</p>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {loading && !data
           ? Array.from({ length: 5 }, (_, i) => <Skel key={i} />)
@@ -376,7 +416,6 @@ export default function DashboardWorkspace() {
               {money(data?.inventory.sellingValue)}
             </p>
           </div>
-          <p className="mt-2 text-xs text-[var(--muted)]">Known purchase cost: {money(data?.inventory.value)}{data?.inventory.missingCostBatches > 0 ? ` - ${data.inventory.missingCostBatches} batches have incomplete purchase costs` : ""}</p>
           <div className="mt-4 space-y-2">
             {data &&
               Object.entries(data.inventory.groups).map(([u, v]) => (
@@ -413,7 +452,7 @@ export default function DashboardWorkspace() {
           ) : (
             <Empty
               title="No near-expiry batches"
-              body="The next 60 days are clear."
+              body={`No stocked batches expire in the next ${data?.expiryWarningDays || 90} days.`}
             />
           )}
         </Card>
@@ -448,7 +487,11 @@ export default function DashboardWorkspace() {
         </Card>
       </div>
       <div className="grid gap-5 lg:grid-cols-3">
-        <Card title="Opened loose stock">
+        <Card title="Expired stock" action={<Link href="/products" className="text-xs font-bold text-[var(--green)]">View products</Link>}>
+          <p className="mb-3 text-sm text-[var(--muted)]">{data?.expiredCount || 0} stocked batches · Sales {data?.blockExpiredSales ? "blocked" : "allowed with warnings"}</p>
+          {data?.expired?.length ? data.expired.map((batch) => <div key={batch.id} className="mb-2 rounded-xl border border-red-200 bg-red-50 p-3 text-red-800"><strong className="text-sm">{batch.product}</strong><p className="text-xs">Batch {batch.batch} · Expired {fmt(batch.expiryDate)}</p></div>) : <Empty title="No expired stock" body="Active products have no expired stocked batches." />}
+        </Card>
+        {data?.features?.loose && <Card title="Opened loose stock">
           {data?.opened.length ? (
             <div className="space-y-3">
               {data.opened.map((x) => (
@@ -470,8 +513,8 @@ export default function DashboardWorkspace() {
               body="Opened package quantities appear here."
             />
           )}
-        </Card>
-        <Card title="Loose sales">
+        </Card>}
+        {data?.features?.loose && <Card title="Loose sales">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-blue-50 p-4">
               <small>Loose lines</small>
@@ -499,8 +542,8 @@ export default function DashboardWorkspace() {
                   </div>
                 ))}
           </div>
-        </Card>
-        <Card title="Mixture sales">
+        </Card>}
+        {data?.features?.mix && <Card title="Custom Mix sales">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-violet-50 p-4">
               <small>Mixtures</small>
@@ -521,7 +564,7 @@ export default function DashboardWorkspace() {
               <strong>{x.sales} sales</strong>
             </div>
           ))}
-        </Card>
+        </Card>}
       </div>
       <div className="grid gap-5 lg:grid-cols-3">
         <Card title="Payment breakdown">
@@ -573,7 +616,7 @@ export default function DashboardWorkspace() {
           {[
             ["Gross sales", data?.financial.sales],
             ["Expenses", data?.financial.expenses],
-            ["Gross profit", data?.financial.profit],
+            ["Estimated gross profit", data?.financial.profit],
             ["Net cash movement", data?.financial.netMovement],
           ].map(([l, v], i) => (
             <div
@@ -674,7 +717,7 @@ export default function DashboardWorkspace() {
             href="/reports"
             className="text-xs font-bold text-[var(--green)]"
           >
-            View wholesale report
+            View reports
           </Link>
         }
       >
@@ -692,52 +735,25 @@ export default function DashboardWorkspace() {
             </p>
           </div>
           <div className="rounded-xl bg-slate-50 p-4">
-            <small>Paid quantity</small>
+            <small>Customers</small>
             <p className="text-xl font-extrabold">
-              {num(data?.wholesale?.paidQuantity)}
+              {num(data?.wholesale?.customers)}
             </p>
           </div>
           <div className="rounded-xl bg-violet-50 p-4">
-            <small>Free quantity</small>
+            <small>Discount given</small>
             <p className="text-xl font-extrabold">
-              {num(data?.wholesale?.freeQuantity)}
+              {money(data?.wholesale?.discount)}
             </p>
           </div>
           <div className="rounded-xl bg-orange-50 p-4">
-            <small>Total stock out</small>
+            <small>Average invoice</small>
             <p className="text-xl font-extrabold">
-              {num(data?.wholesale?.totalOutgoing)}
+              {money(data?.wholesale?.averageInvoice)}
             </p>
           </div>
         </div>
-        {data?.wholesale?.products?.length ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {data.wholesale.products.map((product) => (
-              <div
-                className="flex items-center justify-between rounded-xl border p-3"
-                key={product.id}
-              >
-                <span className="min-w-0">
-                  <strong className="block truncate text-sm">
-                    {product.name}
-                  </strong>
-                  <small className="text-[var(--muted)]">
-                    {num(product.paidQuantity)} paid +{" "}
-                    {num(product.freeQuantity)} free
-                  </small>
-                </span>
-                <strong className="ml-3 shrink-0">
-                  {money(product.revenue)}
-                </strong>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Empty
-            title="No wholesale sales"
-            body="Wholesale invoices and stock-out quantities appear here."
-          />
-        )}
+        <p className="mt-3 text-xs text-[var(--muted)]">Includes sales marked Wholesale in the cart and earlier wholesale invoices for the selected period.</p>
       </Card>
       {invoice && (
         <div className="fixed inset-0 z-[70] grid place-items-center bg-black/45 p-4">

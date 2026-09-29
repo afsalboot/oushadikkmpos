@@ -211,6 +211,7 @@ export default function SaleSourceDetails({ id }) {
                 )}
               </>
             )}
+            {Number(sale.consultationFee || 0) > 0 && <div className="flex justify-between"><span className="text-[var(--muted)]">Consultation fee</span><strong>{money(sale.consultationFee)}</strong></div>}
             {Math.abs(Number(sale.roundOff || 0)) > 0.001 && (
               <div className="flex justify-between py-1">
                 <span className="text-[var(--muted)]">Round off</span>

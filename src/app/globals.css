@@ -1052,6 +1052,23 @@ main.min-h-screen form > button:last-child {
     background: white;
 }
 
+.cart-customer-compact {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.cart-customer-compact .field {
+    min-height: 34px;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+}
+
+.cart-customer-compact .label {
+    margin-bottom: 0.2rem;
+    font-size: 0.6875rem;
+}
+
 .sales-cart-item {
     display: flex;
     gap: 0.75rem;
