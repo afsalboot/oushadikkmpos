@@ -5,5 +5,6 @@ import ChangePasswordForm from "@/components/ChangePasswordForm";
 export default async function ChangePasswordPage() {
   const session = await readSession();
   if (!session) redirect("/login");
+  if (!session.mustChangePassword) redirect("/settings/change-password");
   return <ChangePasswordForm />;
 }

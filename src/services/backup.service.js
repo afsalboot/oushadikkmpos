@@ -6,7 +6,7 @@ import {mkdir,readdir,readFile,rename,stat,writeFile} from "node:fs/promises";
 import path from "node:path";
 import mongoose from "mongoose";
 import {connectDb} from "../lib/db.js";
-import {AuditLog,Category,Customer,DocumentCounter,Expense,ExpenseCategory,InventoryBatch,Product,Purchase,Sale,Settings,StaffRole,StockTransaction,Supplier,User,FiscalGuard} from "../models/index.js";
+import {Consultation,Doctor,AuditLog,Category,Customer,DocumentCounter,Expense,ExpenseCategory,InventoryBatch,Product,Purchase,Sale,Settings,StaffRole,StockTransaction,Supplier,User,FiscalGuard} from "../models/index.js";
 import {getSettings,invalidateSettingsCache} from "./settings.service.js";
 
 import {assertRestorePreservesDocuments} from "../lib/fiscal-integrity.js";
@@ -14,7 +14,7 @@ import {assertRestorePreservesDocuments} from "../lib/fiscal-integrity.js";
 const FORMAT="oushadi-pos-backup";
 const VERSION=1;
 const FILE_PATTERN=/^oushadi-(manual|auto)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.obak$/;
-const models={users:User,staffRoles:StaffRole,categories:Category,products:Product,inventoryBatches:InventoryBatch,stockTransactions:StockTransaction,settings:Settings,customers:Customer,sales:Sale,suppliers:Supplier,purchases:Purchase,expenses:Expense,expenseCategories:ExpenseCategory,documentCounters:DocumentCounter,auditLogs:AuditLog};
+const models={consultations:Consultation,doctors:Doctor,users:User,staffRoles:StaffRole,categories:Category,products:Product,inventoryBatches:InventoryBatch,stockTransactions:StockTransaction,settings:Settings,customers:Customer,sales:Sale,suppliers:Supplier,purchases:Purchase,expenses:Expense,expenseCategories:ExpenseCategory,documentCounters:DocumentCounter,auditLogs:AuditLog};
 function nextAutomaticDate(value,frequency){const next=new Date(value);if(frequency==="MONTHLY")next.setUTCMonth(next.getUTCMonth()+1);else next.setUTCDate(next.getUTCDate()+(frequency==="WEEKLY"?7:1));return next;}
 
 async function backupBucket(){await connectDb();return new mongoose.mongo.GridFSBucket(mongoose.connection.db,{bucketName:BACKUP_BUCKET});}

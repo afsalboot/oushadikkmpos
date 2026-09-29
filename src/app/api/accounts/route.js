@@ -1,7 +1,7 @@
 import { connectDb } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { ok, apiError } from "@/lib/api";
-import {Expense,Purchase,Sale,Settings} from "@/models";
+import {Consultation,Expense,Purchase,Sale,Settings} from "@/models";
 import { buildAccountLedger } from "@/services/accounting.service";
 import {queryValues} from "@/lib/filter-utils";
 
@@ -20,6 +20,7 @@ export async function GET(request){
     const multiValueNames=new Set(["transactionType","paymentMethod","source"]);
     const options=Object.fromEntries(optionNames.map((name)=>[name,multiValueNames.has(name)?queryValues(parameters,name):parameters.get(name)||""]));
     options.purchases=purchases;
+    options.consultations=await Consultation.find().lean();
     options.enabledMethods=settings?.payments?.enabledMethods?.length?settings.payments.enabledMethods:["CASH","UPI","BANK"];
     return ok(buildAccountLedger(sales,expenses,options));
   }catch(error){return apiError(error);}

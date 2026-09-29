@@ -1,6 +1,8 @@
 "use client";
 import BackupStorageSettings from "./BackupStorageSettings";
 import FutureInvoiceReset from "./FutureInvoiceReset";
+import DoctorSettings from "./DoctorSettings";
+import { useRouter } from "next/navigation";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState } from "react";
@@ -41,6 +43,8 @@ const sectionGroups = [
   {
     label: "General",
     items: [
+      { id: "features", label: "Features", icon: Settings2, keywords: "enable consultation optional reception" },
+      { id: "consultation", label: "Consultation", icon: Users, keywords: "doctor qualification fee reception" },
       {
         id: "store",
         label: "Store & Business",
@@ -227,6 +231,7 @@ async function api(url, options) {
 }
 
 const configs = {
+  features: { title: "Features", description: "Enable optional modules without deleting historical data.", groups: [{ title: "Optional modules", fields: [{ path: "features.consultation", label: "Enable Consultation", type: "toggle" }] }] },
   store: {
     title: "Store & Business",
     description:
@@ -2501,6 +2506,7 @@ function Backup({ data, change, disabled }) {
 }
 
 export default function SettingsWorkspace() {
+  const router = useRouter();
   const [data, setData] = useState(null),
     [original, setOriginal] = useState(null),
     [section, setSection] = useState("store"),
@@ -2557,6 +2563,7 @@ export default function SettingsWorkspace() {
       setOriginal(result);
       setErrors({});
       toast.success("Settings saved successfully.");
+      router.refresh();
     } catch (failure) {
       setErrors(failure.details || {});
       toast.error(failure.message);
@@ -2712,7 +2719,7 @@ export default function SettingsWorkspace() {
               </p>
             )}
           </div>
-          {section === "payments" ? (
+          {section === "consultation" ? <DoctorSettings /> : section === "payments" ? (
             <div className="space-y-5">
               <Payments
                 data={data}

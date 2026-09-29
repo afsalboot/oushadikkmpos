@@ -273,6 +273,8 @@ const settingsSchema = new Schema(
     store: { type: Schema.Types.Mixed, default: {} },
     invoice: { type: Schema.Types.Mixed, default: {} },
     receipt: { type: Schema.Types.Mixed, default: {} },
+    features: { type: Schema.Types.Mixed, default: {} },
+    consultationWriteVersion: { type: Number, default: 0 },
     checkout: { type: Schema.Types.Mixed, default: {} },
     discount: { type: Schema.Types.Mixed, default: {} },
     roundOff: { type: Schema.Types.Mixed, default: {} },
@@ -656,6 +658,40 @@ const documentCounterSchema = new Schema(
   { timestamps: true },
 );
 export const User = model("User", userSchema);
+export const Doctor = model("Doctor", new Schema({
+  name: { type: String, required: true, trim: true, maxlength: 120 },
+  qualification: { type: String, default: "", maxlength: 120 },
+  consultationFee: { type: Number, required: true, min: 0 },
+  active: { type: Boolean, default: true },
+  revision: { type: Number, default: 0 },
+}, { timestamps: true }));
+const consultationSchema = new Schema({
+  branchId: { type: String, default: "MAIN", required: true },
+  opNumber: { type: String, required: true, unique: true },
+  tokenNumber: { type: Number, required: true },
+  dayKey: { type: String, required: true },
+  requestId: { type: String, required: true, unique: true },
+  customerId: { type: Schema.Types.ObjectId, ref: "Customer", default: null },
+  patient: { name: String, phone: String, age: Number, gender: String },
+  doctorId: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
+  doctorSnapshot: { name: String, qualification: String },
+  storeSnapshot: Schema.Types.Mixed,
+  receiptSnapshot: Schema.Types.Mixed,
+  consultationFee: { type: Number, required: true, min: 0 },
+  paymentMethod: { type: String, enum: ["CASH", "UPI", "BANK"], required: true },
+  paymentReference: { type: String, default: "" },
+  status: { type: String, enum: ["COMPLETED", "CANCELLED"], default: "COMPLETED" },
+  createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  creatorSnapshot: { name: String },
+  cancelledBy: { type: Schema.Types.ObjectId, ref: "User" },
+  cancelledAt: Date,
+  cancellationReason: String,
+  refundedAmount: { type: Number, default: 0 },
+  refundReference: String,
+}, { timestamps: true });
+consultationSchema.index({ branchId: 1, dayKey: 1, tokenNumber: 1 }, { unique: true });
+consultationSchema.index({ createdAt: -1, status: 1 });
+export const Consultation = model("Consultation", consultationSchema);
 export const AuthAttempt = model("AuthAttempt", new Schema({
   _id: String,
   count: Number,

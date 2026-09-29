@@ -14,8 +14,8 @@ import {
   ChartNoAxesCombined,
   UserCog,
   Settings,
+  Stethoscope,
   LogOut,
-  KeyRound,
   Menu,
   X,
   ChevronRight,
@@ -25,6 +25,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import OushadhiLogo from "@/components/branding/OushadhiLogo";
 
 const nav = [
+  { href: "/consultations", label: "Consultation", icon: Stethoscope, permission: "consultation.view" },
   {
     href: "/dashboard",
     label: "Dashboard",
@@ -126,7 +127,7 @@ export default function AppShell({ user, children }) {
       </div>
       <nav className="flex-1 overflow-y-auto p-3">
         {nav
-          .filter((item) => allowed(item.permission))
+          .filter((item) => (item.href !== "/consultations" || user.consultationEnabled) && (item.href === "/settings" || allowed(item.permission)))
           .map(({ href, label, icon: Icon }) => {
             const active = path === href || path.startsWith(href + "/");
             return (
@@ -159,12 +160,6 @@ export default function AppShell({ user, children }) {
             </p>
           </div>
         </div>
-        <Link href="/login-pin" onClick={() => setOpen(false)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-bold text-emerald-50/70 hover:bg-white/10 hover:text-white">
-          <KeyRound size={17} /> Login PIN
-        </Link>
-        <Link href="/change-password" onClick={() => setOpen(false)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-bold text-emerald-50/70 hover:bg-white/10 hover:text-white">
-          <KeyRound size={17} /> Change password
-        </Link>
         <button
           onClick={logout}
           className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-bold text-emerald-50/70 hover:bg-white/10 hover:text-white"

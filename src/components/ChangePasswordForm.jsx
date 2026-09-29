@@ -6,7 +6,7 @@ import { KeyRound, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import PasswordInput from "@/components/PasswordInput";
 
-export default function ChangePasswordForm() {
+export default function ChangePasswordForm({ embedded = false }) {
   const router = useRouter();
   const [form, setForm] = useState({
     currentPassword: "",
@@ -28,7 +28,7 @@ export default function ChangePasswordForm() {
       if (!response.ok)
         throw new Error(result.error || "Unable to change password");
       toast.success("Password changed successfully.");
-      router.replace("/dashboard");
+      router.replace(embedded ? "/settings" : "/dashboard");
       router.refresh();
     } catch (error) {
       toast.error(error.message);
@@ -38,7 +38,7 @@ export default function ChangePasswordForm() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f3f6f1] p-4">
+    <main className={embedded ? "grid place-items-center" : "grid min-h-screen place-items-center bg-[#f3f6f1] p-4"}>
       <form className="card w-full max-w-md p-6" onSubmit={submit}>
         <span className="grid size-11 place-items-center rounded-xl bg-[var(--green-soft)] text-[var(--green)]">
           <KeyRound size={20} />

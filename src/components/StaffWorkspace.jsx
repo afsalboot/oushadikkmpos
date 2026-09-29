@@ -48,6 +48,8 @@ const initials = (name) =>
     .join("")
     .toUpperCase();
 const modules = {
+  consultation: ["view", "create", "cancel", "print", "overrideFee"],
+  doctor: ["view", "manage"],
   dashboard: ["view"],
   sales: ["view", "create", "edit", "cancel", "refund", "print"],
   products: [

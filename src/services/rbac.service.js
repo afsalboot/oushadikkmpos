@@ -1,6 +1,7 @@
 import {StaffRole} from "../models/index.js";
 
 export const PERMISSION_CATALOG={
+  consultation:["view","create","cancel","print","overrideFee"],doctor:["view","manage"],
   dashboard:["view"],sales:["view","create","edit","cancel","refund","print"],products:["view","create","edit","deactivate","stockAdjust","manageBatches","import"],customers:["view","create","edit","deactivate","export"],purchases:["view","create","edit","cancel","print"],expenses:["view","create","edit","void","manageCategories","export"],accounts:["view","export","adjustment","viewBalances"],reports:["view","sales","inventory","purchases","expenses","customers","accounts","profitability","staff","export"],staff:["view","create","edit","deactivate","managePermissions","manageRoles","resetPassword"],settings:["view","edit"],
 };
 

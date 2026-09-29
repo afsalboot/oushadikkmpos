@@ -1,5 +1,5 @@
 export const ACCOUNT_DIRECTIONS={IN:"IN",OUT:"OUT"};
-export const ACCOUNT_TRANSACTION_TYPES={SALE:"SALE",PURCHASE:"PURCHASE",EXPENSE:"EXPENSE"};
+export const ACCOUNT_TRANSACTION_TYPES={SALE:"SALE",PURCHASE:"PURCHASE",EXPENSE:"EXPENSE",CONSULTATION:"CONSULTATION",CONSULTATION_REFUND:"CONSULTATION_REFUND"};
 
 const money=(value)=>Math.round((Number(value||0)+Number.EPSILON)*100)/100;
 const text=(value)=>String(value??"").trim();
@@ -33,6 +33,14 @@ function normalizeExpense(expense,purchases){
   const reference=expense.expenseNumber||(isPurchase?(purchase?.purchaseNumber||expense.description?.match(/PUR-[A-Z0-9-]+/)?.[0]||"Purchase"):expense.category);
   const party=isPurchase?(purchase?.supplierSnapshot?.name||"Supplier"):(expense.staffId?.name||expense.staffSnapshot?.name||expense.paidTo||expense.title||expense.category);
   return{id:`expense-${expense._id}`,sourceId:String(expense._id),date:expense.expenseDate||expense.createdAt,direction:ACCOUNT_DIRECTIONS.OUT,type:isPurchase?ACCOUNT_TRANSACTION_TYPES.PURCHASE:ACCOUNT_TRANSACTION_TYPES.EXPENSE,source:isPurchase?"PURCHASES":"EXPENSES",reference,party,description:expense.title||expense.description||expense.category,category:expense.category,method:text(expense.paymentMethod||"CASH").toUpperCase(),paymentReference:text(expense.paymentReference||purchase?.paymentReference),paymentBreakdown:[{method:text(expense.paymentMethod||"CASH").toUpperCase(),amount,reference:text(expense.paymentReference||purchase?.paymentReference),paidAt:expense.expenseDate||expense.createdAt}],amount,createdBy:expense.actorId?.name||expense.creatorSnapshot?.name||"System",status:"POSTED",sourcePath:isPurchase?`/purchases?search=${encodeURIComponent(purchase?.purchaseNumber||reference)}`:`/expenses?search=${encodeURIComponent(expense.expenseNumber||reference)}`,sourceDetails:isPurchase?{purchaseNumber:purchase?.purchaseNumber||reference,supplier:purchase?.supplierSnapshot?.name||"Supplier",supplierInvoiceNumber:purchase?.supplierInvoiceNumber||"",purchaseTotal:money(purchase?.total),amountPaid:money(purchase?.amountPaid),balanceDue:money(purchase?.balanceDue)}:{expenseNumber:expense.expenseNumber||reference,title:expense.title||expense.description,category:expense.category,recordedBy:expense.actorId?.name||expense.creatorSnapshot?.name||"System"}};
+}
+
+export function normalizeConsultation(row) {
+  const base = { sourceId: String(row._id), source: "CONSULTATIONS", reference: row.opNumber, party: row.patient?.name || "Patient", category: "Consultation", method: row.paymentMethod, createdBy: row.creatorSnapshot?.name || "Staff", status: "POSTED", sourcePath: "/consultations", sourceDetails: { opNumber: row.opNumber, doctor: row.doctorSnapshot?.name, consultationStatus: row.status } };
+  const movements = [];
+  if (Number(row.consultationFee) > 0) movements.push({ ...base, id: `consultation-${row._id}`, date: row.createdAt, direction: "IN", type: "CONSULTATION", description: "Consultation fee received", amount: money(row.consultationFee), paymentReference: row.paymentReference || "", paymentBreakdown: [{ method: row.paymentMethod, amount: money(row.consultationFee), reference: row.paymentReference || "", paidAt: row.createdAt }] });
+  if (row.status === "CANCELLED" && Number(row.refundedAmount) > 0) movements.push({ ...base, id: `consultation-refund-${row._id}`, date: row.cancelledAt, direction: "OUT", type: "CONSULTATION_REFUND", description: row.cancellationReason || "Consultation refund", amount: money(row.refundedAmount), paymentReference: row.refundReference || "", paymentBreakdown: [{ method: row.paymentMethod, amount: money(row.refundedAmount), reference: row.refundReference || "", paidAt: row.cancelledAt }] });
+  return movements;
 }
 
 export function calculateRunningBalances(movements){
@@ -84,12 +92,12 @@ function cashFlow(movements){
 
 export function buildAccountLedger(sales=[],expenses=[],options={}){
   const purchases=new Map((options.purchases||[]).map((purchase)=>[String(purchase._id),purchase]));
-  const raw=[...sales.map(normalizeSale),...expenses.map((expense)=>normalizeExpense(expense,purchases))].filter(Boolean);
+  const raw=[...sales.map(normalizeSale),...expenses.map((expense)=>normalizeExpense(expense,purchases)),...(options.consultations||[]).flatMap(normalizeConsultation)].filter(Boolean);
   const chronological=calculateRunningBalances(raw),filtered=chronological.filter((movement)=>matchesFilters(movement,options));
   const enabledMethods=(options.enabledMethods?.length?options.enabledMethods:[...new Set(chronological.flatMap((movement)=>movement.paymentBreakdown.map((payment)=>payment.method)))]).filter(Boolean);
   const order=options.order==="asc"?1:-1,sort=options.sort||"date";
   const sorted=[...filtered].sort((left,right)=>{const comparison=sort==="amount"?left.amount-right.amount:sort==="type"?left.type.localeCompare(right.type):new Date(left.date)-new Date(right.date);return comparison*order||(left.id.localeCompare(right.id)*order);});
   const page=Math.max(1,Number(options.page)||1),limit=Math.min(1000,Math.max(1,Number(options.limit)||25)),total=sorted.length;
   const allSummary=summarize(chronological),periodSummary=summarize(filtered),balances=paymentSummary(chronological,enabledMethods);
-  return{movements:sorted.slice((page-1)*limit,page*limit),pagination:{page,limit,total,pages:Math.max(1,Math.ceil(total/limit))},summary:{...periodSummary,balance:allSummary.netCashFlow,cashBalance:balances.find((entry)=>entry.method==="CASH")?.net||0,digitalBalance:money(balances.filter((entry)=>entry.method!=="CASH").reduce((sum,entry)=>sum+entry.net,0))},paymentMethods:paymentSummary(filtered,enabledMethods),enabledMethods,cashFlow:cashFlow(filtered),supportedTypes:Object.values(ACCOUNT_TRANSACTION_TYPES),supportedSources:["SALES","PURCHASES","EXPENSES"]};
+  return{movements:sorted.slice((page-1)*limit,page*limit),pagination:{page,limit,total,pages:Math.max(1,Math.ceil(total/limit))},summary:{...periodSummary,balance:allSummary.netCashFlow,cashBalance:balances.find((entry)=>entry.method==="CASH")?.net||0,digitalBalance:money(balances.filter((entry)=>entry.method!=="CASH").reduce((sum,entry)=>sum+entry.net,0))},paymentMethods:paymentSummary(filtered,enabledMethods),enabledMethods,cashFlow:cashFlow(filtered),supportedTypes:Object.values(ACCOUNT_TRANSACTION_TYPES),supportedSources:["SALES","PURCHASES","EXPENSES","CONSULTATIONS"]};
 }

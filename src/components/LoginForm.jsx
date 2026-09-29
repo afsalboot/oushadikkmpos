@@ -156,7 +156,7 @@ export default function LoginForm() {
                     required
                   />
                 </label>
-                {usePin && <p className="text-sm text-[var(--muted)]">Set your PIN in Login PIN after signing in with your password. Five failed PIN attempts require password sign-in to unlock.</p>}
+                {usePin && <p className="text-sm text-[var(--muted)]">Set your PIN in Settings → Login PIN after signing in with your password. Five failed PIN attempts require password sign-in to unlock.</p>}
                 {setupUsername && !bootstrap && <>
                   <p className="text-sm text-[var(--muted)]">For existing accounts without a username: verify your current email and password, then choose a username and new password. After setup, use your username to sign in.</p>
                   <label><span className="label">New password</span><PasswordInput className="field" name="newPassword" minLength={8} autoComplete="new-password" required /></label>
