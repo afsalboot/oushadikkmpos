@@ -192,7 +192,7 @@ export default function DashboardWorkspace() {
             {data?.currentUser?.name
               ? `, ${String(data.currentUser.name).trim().split(/\s+/)[0]}`
               : ""}{" "}
-            👋
+            👋🏻
           </h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Here&apos;s what&apos;s happening in your store today.
