@@ -163,11 +163,11 @@ export default function DashboardWorkspace() {
           t: "bg-violet-50 text-violet-700",
         },
         {
-          l: "Transactions",
-          v: data.kpis.transactions,
-          c: data.kpis.comparisons.transactions,
+          l: "Average order value",
+          v: money(data.kpis.averageOrderValue),
+          c: data.kpis.comparisons.averageOrderValue,
           i: ReceiptText,
-          h: "/accounts",
+          h: "/sales",
           t: "bg-orange-50 text-orange-700",
         },
         {

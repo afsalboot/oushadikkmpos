@@ -683,8 +683,23 @@ export default function SalesWorkspaceModern() {
       );
     };
     button.addEventListener("click", openCheckout, { capture: true });
+    const handlePaymentShortcut = (event) => {
+      if (
+        event.key !== "Enter" || event.defaultPrevented || event.repeat ||
+        event.isComposing || event.ctrlKey || event.altKey || event.metaKey ||
+        event.shiftKey || button.disabled ||
+        document.querySelector('[role="dialog"], [aria-modal="true"]') ||
+        event.target?.closest?.(
+          'input, textarea, select, button, a, [contenteditable]:not([contenteditable="false"]), [role="button"], [role="combobox"], [role="listbox"], [role="menu"]',
+        )
+      ) return;
+      event.preventDefault();
+      button.click();
+    };
+    window.addEventListener("keydown", handlePaymentShortcut);
     return () => {
       button.removeEventListener("click", openCheckout, { capture: true });
+      window.removeEventListener("keydown", handlePaymentShortcut);
       panel?.classList.remove("sales-cart-panel", "sales-cart-empty");
       layout?.classList.remove("sales-cart-grid");
       workspace?.classList.remove("sales-cart-workspace");
@@ -1474,6 +1489,8 @@ export default function SalesWorkspaceModern() {
               </div>
               <button
                 data-cart-payment
+                aria-keyshortcuts="Enter"
+                title="Press Enter outside input fields to proceed to payment"
                 disabled={!cart.length}
                 className="btn btn-primary mt-4 w-full"
                 onClick={() =>
