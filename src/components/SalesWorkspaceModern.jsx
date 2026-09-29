@@ -1257,7 +1257,7 @@ export default function SalesWorkspaceModern() {
         <main className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {shown.map((p) => (
             <article
-              className={`card flex min-h-60 cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md ${p.expired ? "sales-product-expired" : ""}`}
+              className={`sales-product-card card flex cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md ${p.expired ? "sales-product-expired" : ""}`}
               key={p._id}
               onClick={() => (mode === "PRODUCT" ? selectProduct(p) : ingredient(p))}
             >
@@ -1281,7 +1281,7 @@ export default function SalesWorkspaceModern() {
                 {countBased(p) && <Badge t="orange">Count based</Badge>}
                 {p.allowMixture && <Badge t="green">Mix enabled</Badge>}
               </div>
-              <div className="mt-auto pt-4">
+              <div className="pt-2">
                 <b className="text-sm text-[var(--green)]">{p.stockLabel}</b>
                 {mode === "PRODUCT" && p.allowPackageSale && (
                   <p className="mt-2 text-xl font-extrabold">

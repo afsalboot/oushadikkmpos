@@ -328,6 +328,27 @@ body:has(.report-controls input[placeholder="Search settings..."]) .fixed.inset-
   }
 }
 
+.sales-product-card {
+    min-width: 0;
+    padding: 0.875rem;
+}
+
+.sales-product-card > h2 {
+    margin-top: 0.5rem;
+    font-size: 0.9375rem;
+    line-height: 1.25;
+}
+
+.sales-product-card > small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sales-product-card .sales-product-badges:empty {
+    display: none;
+}
+
 @media (min-width: 1280px) {
   .space-y-5:has(> .gst-settings-card) {
     display: grid;
@@ -1250,7 +1271,7 @@ main.min-h-screen form > button:last-child {
 
     :is(.sales-cart-grid, .sales-mix-grid) > main > article {
         min-width: 0;
-        aspect-ratio: 1 / 1;
+        aspect-ratio: auto;
         min-height: 0;
         overflow: hidden;
         padding: 0.875rem;
@@ -1269,7 +1290,7 @@ main.min-h-screen form > button:last-child {
     :is(.sales-cart-grid, .sales-mix-grid) > main > article > h2 {
         display: -webkit-box;
         margin-top: 0.5rem;
-        min-height: 2.15em;
+        min-height: 0;
         overflow: hidden;
         font-size: 0.875rem;
         line-height: 1.075;
@@ -1418,7 +1439,7 @@ input.min-w-0.flex-1.px-2.outline-none[type="number"] {
 
 :is(.sales-cart-grid, .sales-mix-grid) > main > article.sales-product-expired {
     aspect-ratio: auto;
-    min-height: 270px;
+    min-height: 0;
     border-color: #fca5a5;
 }
 
