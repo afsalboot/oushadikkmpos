@@ -15,6 +15,7 @@ import {
   UserCog,
   Settings,
   LogOut,
+  KeyRound,
   Menu,
   X,
   ChevronRight,
@@ -158,6 +159,9 @@ export default function AppShell({ user, children }) {
             </p>
           </div>
         </div>
+        <Link href="/login-pin" onClick={() => setOpen(false)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-bold text-emerald-50/70 hover:bg-white/10 hover:text-white">
+          <KeyRound size={17} /> Login PIN
+        </Link>
         <button
           onClick={logout}
           className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-bold text-emerald-50/70 hover:bg-white/10 hover:text-white"

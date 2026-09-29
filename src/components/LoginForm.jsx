@@ -10,6 +10,7 @@ export default function LoginForm() {
   const [bootstrap, setBootstrap] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [pinLogin, setPinLogin] = useState(false);
   useEffect(() => {
     fetch("/api/auth/status")
       .then((r) => r.json())
@@ -23,7 +24,7 @@ export default function LoginForm() {
     try {
       const body = Object.fromEntries(new FormData(e.currentTarget));
       const response = await fetch(
-        bootstrap ? "/api/auth/bootstrap" : "/api/auth/login",
+        bootstrap ? "/api/auth/bootstrap" : pinLogin ? "/api/auth/pin-login" : "/api/auth/login",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -33,7 +34,7 @@ export default function LoginForm() {
       const result = await response.json();
       if (!response.ok) return toast.error(result.error);
       toast.success(bootstrap ? "Admin account created" : "Welcome back");
-      router.replace("/dashboard");
+      router.replace(result.data?.user?.mustChangePassword ? "/change-password" : "/dashboard");
       router.refresh();
     } catch {
       toast.error("Could not sign in. Check your connection and try again.");
@@ -91,6 +92,10 @@ export default function LoginForm() {
                 </p>
               </div>
               <form onSubmit={submit} className="space-y-5">
+                {!bootstrap && <div className="flex gap-2" aria-label="Sign-in method">
+                  <button type="button" disabled={submitting} aria-pressed={!pinLogin} className={`btn flex-1 ${!pinLogin ? "btn-primary" : ""}`} onClick={() => setPinLogin(false)}>Password</button>
+                  <button type="button" disabled={submitting} aria-pressed={pinLogin} className={`btn flex-1 ${pinLogin ? "btn-primary" : ""}`} onClick={() => setPinLogin(true)}>4-digit PIN</button>
+                </div>}
                 {bootstrap && (
                   <label>
                     <span className="label">Setup token</span>
@@ -129,17 +134,23 @@ export default function LoginForm() {
                   />
                 </label>
                 <label>
-                  <span className="label">Password</span>
+                  <span className="label">{pinLogin && !bootstrap ? "4-digit PIN" : "Password"}</span>
                   <PasswordInput
+                    key={pinLogin && !bootstrap ? "pin" : "password"}
                     className="field"
-                    name="password"
-                    minLength={8}
+                    name={pinLogin && !bootstrap ? "pin" : "password"}
+                    visibilityLabel={pinLogin && !bootstrap ? "PIN" : "password"}
+                    minLength={pinLogin && !bootstrap ? 4 : 8}
+                    maxLength={pinLogin && !bootstrap ? 4 : undefined}
+                    inputMode={pinLogin && !bootstrap ? "numeric" : undefined}
+                    pattern={pinLogin && !bootstrap ? "[0-9]{4}" : undefined}
                     autoComplete={
                       bootstrap ? "new-password" : "current-password"
                     }
                     required
                   />
                 </label>
+                {pinLogin && !bootstrap && <p className="text-sm text-[var(--muted)]">First sign in with your password, then open Login PIN in the sidebar to set your PIN. After five failed attempts, use your password to unlock it.</p>}
                 <button
                   disabled={submitting}
                   className="btn btn-primary w-full min-h-12"

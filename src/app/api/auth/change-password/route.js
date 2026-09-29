@@ -28,6 +28,9 @@ export async function POST(request) {
     if (await bcrypt.compare(password, user.passwordHash)) return fail("Choose a password different from your current password", 400);
 
     user.passwordHash = await bcrypt.hash(password, 12);
+    user.pinHash = undefined;
+    user.markModified("pinHash");
+    user.pinAttempts = 0;
     user.mustChangePassword = false;
     user.authVersion = Number(user.authVersion || 0) + 1;
     user.lastActiveAt = new Date();

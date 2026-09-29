@@ -14,6 +14,8 @@ const userSchema = new Schema(
     },
     phone: { type: String, trim: true, default: "" },
     passwordHash: { type: String, required: true },
+    pinHash: { type: String, select: false },
+    pinAttempts: { type: Number, default: 0, select: false },
     role: { type: String, enum: ["ADMIN", "STAFF"], default: "STAFF" },
     bootstrapKey: { type: String, unique: true, sparse: true, immutable: true },
     roleId: { type: Schema.Types.ObjectId, ref: "StaffRole", index: true },
