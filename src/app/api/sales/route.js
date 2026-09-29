@@ -35,6 +35,7 @@ import { buildWholesaleLine, wholesaleLooseRate } from "@/lib/wholesale";
 import {assertRegistration,resolveSupply,validateFiscalLines,registrationStatus,financialYear,GST_RULE_VERSION} from "@/lib/gst-compliance";
 import {requestHash,assertRetryMatches} from "@/lib/fiscal-integrity";
 import {money,multiplyMoney} from "@/lib/money";
+import { directCheckoutPayments } from "@/lib/direct-checkout";
 
 const amount = money;
 const escapeRegex = (value) =>
@@ -758,7 +759,7 @@ export async function POST(request) {
       const roundOff = pricing.roundOff,
         total = pricing.total;
       const documentType=validateFiscalLines(saleItems,settings,supplyContext,total);
-      const requestedPayments = Array.isArray(body.payments)
+      const requestedPayments = directCheckoutPayments(settings, total, body) || (Array.isArray(body.payments)
           ? body.payments
           : [
               {
@@ -766,7 +767,7 @@ export async function POST(request) {
                 amount: total,
                 reference: body.paymentReference,
               },
-            ],
+            ]),
         enabledMethods = settings?.payments?.enabledMethods || ["CASH", "UPI"];
       const credit = prepareWholesaleCredit({
         saleType,

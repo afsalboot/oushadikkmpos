@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   Check,
   LoaderCircle,
@@ -65,6 +65,19 @@ export default function SalesCheckoutHostV2() {
   const [saleType, setSaleType] = useState("SALE");
   const [wholesaleDiscountEnabled, setWholesaleDiscountEnabled] = useState(false);
   const [cartCustomer, setCartCustomer] = useState(null);
+  const openingRef = useRef(false);
+  const [preparing, setPreparing] = useState(false);
+  const [directPending, setDirectPending] = useState(false);
+  const submitDirect = useEffectEvent(async () => {
+    setDirectPending(false);
+    try { await complete(null, true); }
+    finally { openingRef.current = false; setPreparing(false); }
+  });
+  useEffect(() => {
+    let active = true;
+    if (directPending) queueMicrotask(() => { if (active) void submitDirect(); });
+    return () => { active = false; };
+  }, [directPending]);
   const directoryType = saleType === "WHOLESALE" || wholesaleDiscountEnabled ? "WHOLESALE" : "RETAIL";
   const [newGstin,setNewGstin]=useState("");
   const [fulfilment,setFulfilment]=useState("COUNTER"),[deliveryAddress,setDeliveryAddress]=useState(""),[deliveryStateCode,setDeliveryStateCode]=useState(""),[recipientStateCode,setRecipientStateCode]=useState(""),[discountReason,setDiscountReason]=useState("");
@@ -74,6 +87,9 @@ export default function SalesCheckoutHostV2() {
       const checkoutCart = event.detail?.cart || [];
       if (event.detail?.source !== "PROCEED_PAYMENT" || !checkoutCart.length)
         return;
+      if (openingRef.current) return;
+      openingRef.current = true;
+      setPreparing(true);
       let preselected = null;
       try {
         const saved = sessionStorage.getItem("oushadi-preselected-customer");
@@ -126,7 +142,6 @@ export default function SalesCheckoutHostV2() {
         setDeliveryAddress(draft.deliveryAddress || "");
         setDeliveryStateCode(draft.deliveryStateCode || "");
       }
-      setOpen(true);
       api("/api/settings")
         .then((value) => {
           setSettings(value);
@@ -138,8 +153,17 @@ export default function SalesCheckoutHostV2() {
                 ? "PERCENTAGE"
                 : "FIXED",
           );
+          if (value?.checkout?.enabled === false && draft) {
+            if (!(value?.payments?.enabledMethods || ["CASH", "UPI"]).includes("CASH")) throw new Error("Enable Cash in Settings to use direct checkout.");
+            setOpen(false);
+            setDirectPending(true);
+          } else {
+            openingRef.current = false;
+            setPreparing(false);
+            setOpen(true);
+          }
         })
-        .catch(() => {});
+        .catch((error) => { openingRef.current = false; setPreparing(false); toast.error(error.message || "Could not load checkout settings"); });
     };
     window.addEventListener("oushadi-open-checkout", handle);
     return () => window.removeEventListener("oushadi-open-checkout", handle);
@@ -293,8 +317,8 @@ export default function SalesCheckoutHostV2() {
     }
     return null;
   }
-  async function complete(event) {
-    event.preventDefault();
+  async function complete(event, direct = false) {
+    event?.preventDefault();
     if (saving) return;
     if (customerType === "EXISTING" && !selected)
       return toast.error("Select an existing customer");
@@ -302,7 +326,7 @@ export default function SalesCheckoutHostV2() {
       setSelected(null);
       return toast.error("Select a retail customer for this sale.");
     }
-    if (!paymentValid)
+    if (!paymentValid && !direct)
       return toast.error(
         payment === "CASH"
           ? "Cash received cannot be less than the total"
@@ -322,7 +346,7 @@ export default function SalesCheckoutHostV2() {
         "Select a wholesale customer. This customer is configured as retail.",
       );
     }
-    const form = Object.fromEntries(new FormData(event.currentTarget));
+    const form = event ? Object.fromEntries(new FormData(event.currentTarget)) : {};
     if(pricing.validationErrors.length)return toast.error(pricing.validationErrors[0]);
     if(fulfilment==="DELIVERY"&&(!deliveryAddress.trim()||!deliveryStateCode))return toast.error("Enter delivery address and state");
     if (saleType === "WHOLESALE" && customerType === "NEW") {
@@ -420,6 +444,7 @@ export default function SalesCheckoutHostV2() {
         body: JSON.stringify({
           items,
           saleType,
+          skipCheckout: direct,
           ...customerDetails,
           doctorName: cartCustomer ? cartCustomer.doctorName : form.doctorName,
           discountType,
@@ -472,6 +497,7 @@ export default function SalesCheckoutHostV2() {
   }
   return (
     <>
+      {preparing && <div className="fixed inset-0 z-[110] grid place-items-center bg-black/20" role="status" aria-live="polite"><div className="card flex items-center gap-3 p-5"><LoaderCircle className="animate-spin" size={20} />Processing payment…</div></div>}
       {open && (
         <div
           className="fixed inset-0 z-[100] grid place-items-center bg-black/50 p-4"

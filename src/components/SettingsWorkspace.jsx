@@ -258,6 +258,15 @@ const configs = {
     description: "Customer defaults and cashier cart behavior.",
     groups: [
       {
+        title: "Payment window",
+        fields: [{
+          path: "checkout.enabled",
+          label: "Show checkout before payment",
+          type: "toggle",
+          note: "Turn off to save the sale as fully paid in Cash and print its receipt directly when Proceed to Payment is clicked.",
+        }],
+      },
+      {
         title: "Customer at checkout",
         fields: [
           {
