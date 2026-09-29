@@ -45,6 +45,7 @@ import {
   LOOSE_UNITS,
   PACKAGE_TYPES,
   calculateLooseUnitPrice,
+  capitalizeProductWords,
   parseBoolean,
 } from "@/lib/product-validation";
 import { calculateLineGST } from "@/services/gst.service";
@@ -407,7 +408,10 @@ function ProductEditor({
     wholesale: "Edit Wholesale",
   }[mode];
   const set = (name, value) =>
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => ({
+      ...current,
+      [name]: ["name", "manufacturer"].includes(name) ? capitalizeProductWords(value) : value,
+    }));
   const rate = calculateLooseUnitPrice(
     form.packageSellingPrice,
     form.packageSize,

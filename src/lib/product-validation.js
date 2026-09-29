@@ -5,6 +5,10 @@ export const LOOSE_CONVERSION_TYPES = Object.freeze({ FIXED: "fixed", COUNT_ON_O
 export const LOOSE_UNITS = ["tablet", "capsule", "piece", "sachet", "other"];
 import { BARCODE_TYPES, detectBarcodeType, normalizeBarcode, validateBarcode } from "./barcode.js";
 
+export function capitalizeProductWords(value = "") {
+  return String(value ?? "").replace(/(^|\s)(\p{L})/gu, (_, space, letter) => space + letter.toUpperCase());
+}
+
 export function parseBoolean(value, fallback = false) {
   if (typeof value === "boolean") return value;
   if (value === undefined || value === null || value === "") return fallback;
@@ -48,12 +52,12 @@ export function normalizeProductInput(input = {}) {
   const openingStockPacks = Number(input.openingStockPacks ?? input.opening_stock_packs ?? 0);
   const openingIndividualPackages = Number(input.openingIndividualPackages ?? input.opening_individual_packages ?? input.openingPackages ?? input.opening_packages ?? 0);
   return {
-    name: String(input.name || "").trim(),
+    name: capitalizeProductWords(input.name || "").trim(),
     sku: String(input.sku || "").trim().toUpperCase(),
     barcode: normalizeBarcode(input.barcode),
     barcodeType: BARCODE_TYPES.includes(String(input.barcodeType || "").toUpperCase()) ? String(input.barcodeType).toUpperCase() : detectBarcodeType(input.barcode),
     categoryId: input.categoryId,
-    manufacturer: String(input.manufacturer ?? input.brand ?? "").trim(),
+    manufacturer: capitalizeProductWords(input.manufacturer ?? input.brand ?? "").trim(),
     hsnCode: String(input.hsnCode ?? input.hsn_code ?? input.hsn ?? "").trim(),
     taxable,
     useDefaultGstRate: parseBoolean(input.useDefaultGstRate ?? input.use_default_gst_rate, (input.gstRate ?? input.gst_rate)===""||(input.gstRate ?? input.gst_rate)===undefined||(input.gstRate ?? input.gst_rate)===null),
