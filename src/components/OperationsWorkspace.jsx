@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
+import PasswordInput from "@/components/PasswordInput";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -1471,10 +1472,9 @@ export function StaffWorkspace() {
               <span className="label">
                 {editing ? "New password (optional)" : "Password"}
               </span>
-              <input
+              <PasswordInput
                 className="field"
                 name="password"
-                type="password"
                 minLength="8"
                 required={!editing}
               />

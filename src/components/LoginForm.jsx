@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { LoaderCircle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import OushadhiLogo from "@/components/branding/OushadhiLogo";
+import PasswordInput from "@/components/PasswordInput";
 export default function LoginForm() {
   const router = useRouter();
   const [bootstrap, setBootstrap] = useState(false);
@@ -93,10 +94,10 @@ export default function LoginForm() {
                 {bootstrap && (
                   <label>
                     <span className="label">Setup token</span>
-                    <input
+                    <PasswordInput
                       className="field"
                       name="setupToken"
-                      type="password"
+                      visibilityLabel="setup token"
                       autoComplete="off"
                       maxLength={512}
                     />
@@ -129,10 +130,9 @@ export default function LoginForm() {
                 </label>
                 <label>
                   <span className="label">Password</span>
-                  <input
+                  <PasswordInput
                     className="field"
                     name="password"
-                    type="password"
                     minLength={8}
                     autoComplete={
                       bootstrap ? "new-password" : "current-password"

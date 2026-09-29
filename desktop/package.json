@@ -1,6 +1,6 @@
 {
   "name": "oushadhi-pos-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Oushadhi POS desktop client",
   "author": "Oushadhi POS",
@@ -40,7 +40,8 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
+      "include": "installer.nsh",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "artifactName": "Oushadhi-POS-Setup-${version}.${ext}"

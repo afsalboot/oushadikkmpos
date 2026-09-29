@@ -20,7 +20,9 @@ npm run desktop:smoke
 npm run desktop:dist
 ```
 
-The Windows x64 installer is written to `dist-desktop/Oushadhi-POS-Setup-0.1.0.exe`. Building requires internet on the first run to download Electron and the Windows installer tools. The desktop package has its own lockfile and no server dependencies. It bundles only its main process, receipt-print adapter, logo, URL policy, fallback page, and package metadata. Never copy `.env.local`, backups, or server credentials into it.
+The Windows x64 installer is written to `dist-desktop/Oushadhi-POS-Setup-<version>.exe`. Building requires internet on the first run to download Electron and the Windows installer tools. The desktop package has its own lockfile and no server dependencies. It bundles only its main process, receipt-print adapter, logo, URL policy, fallback page, and package metadata. Never copy `.env.local`, backups, or server credentials into it.
+
+To update an installed copy, close Oushadhi POS and run the newer installer. Setup reuses the registered installation folder and, when exactly one installation scope exists, keeps that scope (including requesting administrator access for an existing all-users installation). Fresh installs still offer a user/all-users choice. If both scopes already contain an installation, setup retains its scope selector; it does not automatically delete either copy. Keep `build.appId` and the package name stable, and increment the desktop package version and lockfile for each distributed release. Do not uninstall first. User profile data is retained by the normal upgrade. Validate upgrades from 0.1.0 for both installation scopes on a Windows test machine before release.
 
 For local development, run `npm run dev` in one terminal and `npm run desktop:dev` in another. The local client connects to `http://localhost:3000`. Installed builds always use the production URL in `desktop/policy.mjs`; changing that URL requires a new installer.
 

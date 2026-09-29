@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ChangePasswordForm() {
   const router = useRouter();
@@ -50,9 +51,9 @@ export default function ChangePasswordForm() {
         <div className="mt-6 space-y-4">
           <label>
             <span className="label">Current temporary password</span>
-            <input
+            <PasswordInput
               className="field"
-              type="password"
+              visibilityLabel="current temporary password"
               autoComplete="current-password"
               value={form.currentPassword}
               onChange={(event) =>
@@ -63,9 +64,9 @@ export default function ChangePasswordForm() {
           </label>
           <label>
             <span className="label">New password</span>
-            <input
+            <PasswordInput
               className="field"
-              type="password"
+              visibilityLabel="new password"
               autoComplete="new-password"
               minLength={8}
               value={form.password}
@@ -77,9 +78,9 @@ export default function ChangePasswordForm() {
           </label>
           <label>
             <span className="label">Confirm new password</span>
-            <input
+            <PasswordInput
               className="field"
-              type="password"
+              visibilityLabel="confirm new password"
               autoComplete="new-password"
               value={form.confirmPassword}
               onChange={(event) =>
