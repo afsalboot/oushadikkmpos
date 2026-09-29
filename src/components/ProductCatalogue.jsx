@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import CategoryScroller from "@/components/CategoryScroller";
+import ExpiredStockWarning from "@/components/ExpiredStockWarning";
 import {
   BASE_UNITS,
   LOOSE_CONVERSION_TYPES,
@@ -2984,6 +2985,7 @@ function ProductRow({
         </div>
         <div className="mt-4">
           <strong>{hasStock ? product.stockLabel : "Out of stock"}</strong>
+          <ExpiredStockWarning product={product} />
           {!countBased && (
             <p className="text-xs text-[var(--muted)]">
               {number(product.stock.totalBaseQuantity)} {product.baseUnit} total
@@ -3040,6 +3042,7 @@ function ProductRow({
       <td>{product.categoryId?.name || "Uncategorized"}</td>
       <td>
         <strong>{hasStock ? product.stockLabel : "Out of stock"}</strong>
+        <ExpiredStockWarning product={product} />
         {!countBased && (
           <p className="text-xs text-[var(--muted)]">
             {number(product.stock.totalBaseQuantity)} {product.baseUnit} total

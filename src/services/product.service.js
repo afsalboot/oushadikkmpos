@@ -1,4 +1,5 @@
 import { inventoryValue } from "@/lib/inventory-value";
+import { getBatchExpirySummary } from "@/lib/batch-expiry";
 import mongoose from "mongoose";
 import { Category, InventoryBatch, Product, Purchase, Sale, Settings, StockTransaction, AuditLog } from "@/models";
 import { calculatePhysicalStock, formatPhysicalStock, getLooseUnit, isCountBasedProduct, isLowStock } from "@/services/inventory.service";
@@ -115,7 +116,7 @@ export async function getProducts(filter = {}) {
     const stock = calculatePhysicalStock(productBatches,normalizedProduct);
     const activeBatches = productBatches.filter((batch) => Number(batch.sealedPackages || 0)>0 || Number(batch.openQuantity || 0)>0);
     const expiringBatches = activeBatches.filter((batch) => { const days = daysFromNow(batch.expiryDate); return days !== null && days >= 0 && days <= 90; });
-    const expiredBatches = activeBatches.filter((batch) => { const days = daysFromNow(batch.expiryDate); return days !== null && days < 0; });
+    const expirySummary = getBatchExpirySummary(activeBatches);
     return {
       ...normalizedProduct,
       stock,
@@ -125,7 +126,7 @@ export async function getProducts(filter = {}) {
       activeBatchCount: activeBatches.length,
       nearestExpiry: activeBatches.find((batch) => batch.expiryDate)?.expiryDate || null,
       expiringSoon: expiringBatches.length > 0,
-      expired: expiredBatches.length > 0,
+      ...expirySummary,
       batches: productBatches.map((batch)=>({ _id:batch._id, batchNumber:batch.batchNumber, sealedPackages:batch.sealedPackages, openQuantity:batch.openQuantity, expiryDate:batch.expiryDate })),
     };
   });

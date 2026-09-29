@@ -1385,6 +1385,26 @@ input.min-w-0.flex-1.px-2.outline-none[type="number"] {
     min-height: 3rem;
 }
 
+.expired-stock-warning {
+    display: block;
+    flex-shrink: 0;
+    margin-top: 0.4rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #fca5a5;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    color: #991b1b;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    white-space: normal;
+}
+
+:is(.sales-cart-grid, .sales-mix-grid) > main > article.sales-product-expired {
+    aspect-ratio: auto;
+    min-height: 270px;
+    border-color: #fca5a5;
+}
+
 @media print {
     body.printing-purchase > * { visibility: hidden; }
     body.printing-purchase .purchase-print,

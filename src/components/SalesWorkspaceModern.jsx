@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
+import ExpiredStockWarning from "@/components/ExpiredStockWarning";
 import { setCartItemWholesale } from "@/lib/wholesale";
 import { calculateSalePricing } from "@/services/pricing.service";
 const money = (v) =>
@@ -291,6 +292,7 @@ function QuickSell({ p, close, add }) {
             <p className="mt-1 text-sm font-bold text-[var(--green)]">
               {p.stockLabel}
             </p>
+            <ExpiredStockWarning product={p} />
           </div>
           <button onClick={close}>
             <X />
@@ -1239,7 +1241,7 @@ export default function SalesWorkspaceModern() {
         <main className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {shown.map((p) => (
             <article
-              className="card flex min-h-60 cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+              className={`card flex min-h-60 cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md ${p.expired ? "sales-product-expired" : ""}`}
               key={p._id}
               onClick={() => (mode === "PRODUCT" ? selectProduct(p) : ingredient(p))}
             >
@@ -1250,6 +1252,7 @@ export default function SalesWorkspaceModern() {
                 </span>
               </div>
               <h2 className="mt-4 text-lg font-extrabold">{p.name}</h2>
+              <ExpiredStockWarning product={p} />
               <small className="text-[var(--muted)]">SKU {p.sku}</small>
               <div className="sales-product-badges mt-3 flex flex-wrap gap-1">
                 {opened(p) > 0 && (
@@ -1372,6 +1375,7 @@ export default function SalesWorkspaceModern() {
                             <Trash2 size={16} />
                           </button>
                         </div>
+                        <ExpiredStockWarning product={i} />
                         <div className="sales-cart-meta">
                           <Badge
                             t={
