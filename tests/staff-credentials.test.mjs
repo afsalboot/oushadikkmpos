@@ -27,7 +27,7 @@ test("staff creation persists normalized username and hashed strong password", a
 });
 test("staff creation rejects missing usernames and weak passwords", async () => {
   await assert.rejects(harness().createStaff({ ...body, username: "" }, actor), /Username/);
-  await assert.rejects(harness().createStaff({ ...body, password: "ShortPass1" }, actor), /Strong password/);
+  await assert.rejects(harness().createStaff({ ...body, password: "ShortP1" }, actor), /Strong password/);
 });
 test("staff username changes invalidate existing sessions", async () => {
   const h = harness();
@@ -37,7 +37,7 @@ test("staff username changes invalidate existing sessions", async () => {
 });
 test("staff password reset applies strong policy and invalidates existing credentials", async () => {
   const h = harness();
-  await assert.rejects(h.resetStaffPassword("id", { password: "ShortPass1" }, actor), /Strong password/);
+  await assert.rejects(h.resetStaffPassword("id", { password: "ShortP1" }, actor), /Strong password/);
   await h.resetStaffPassword("id", body, actor);
   assert.equal(h.user.passwordHash, "hashed-password");
   assert.equal(h.user.authVersion, 3);

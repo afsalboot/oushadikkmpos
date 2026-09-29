@@ -146,7 +146,7 @@ export default function LoginForm() {
                     className="field"
                     name={usePin ? "pin" : "password"}
                     visibilityLabel={usePin ? "PIN" : "password"}
-                    minLength={usePin ? 4 : bootstrap ? 15 : undefined}
+                    minLength={usePin ? 4 : bootstrap ? 8 : undefined}
                     maxLength={usePin ? 4 : undefined}
                     inputMode={usePin ? "numeric" : undefined}
                     pattern={usePin ? "[0-9]{4}" : undefined}
@@ -159,8 +159,8 @@ export default function LoginForm() {
                 {usePin && <p className="text-sm text-[var(--muted)]">Set your PIN in Login PIN after signing in with your password. Five failed PIN attempts require password sign-in to unlock.</p>}
                 {setupUsername && !bootstrap && <>
                   <p className="text-sm text-[var(--muted)]">For existing accounts without a username: verify your current email and password, then choose a username and new password. After setup, use your username to sign in.</p>
-                  <label><span className="label">New password</span><PasswordInput className="field" name="newPassword" minLength={15} autoComplete="new-password" required /></label>
-                  <label><span className="label">Confirm new password</span><PasswordInput className="field" name="confirmPassword" minLength={15} autoComplete="new-password" required /></label>
+                  <label><span className="label">New password</span><PasswordInput className="field" name="newPassword" minLength={8} autoComplete="new-password" required /></label>
+                  <label><span className="label">Confirm new password</span><PasswordInput className="field" name="confirmPassword" minLength={8} autoComplete="new-password" required /></label>
                 </>}
                 {(bootstrap || setupUsername) && <p className="text-sm text-[var(--muted)]">{PASSWORD_POLICY_MESSAGE}</p>}
                 <button

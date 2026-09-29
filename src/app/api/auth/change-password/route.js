@@ -21,7 +21,7 @@ export async function POST(request) {
     const settings = await getSettings();
     const rules = settings.security || {};
     const password = String(body.password || "");
-    const invalid = !validPassword(password) || password.length < Number(rules.minimumPasswordLength || 15)
+    const invalid = !validPassword(password) || password.length < Number(rules.minimumPasswordLength || 8)
       || (rules.requireUppercase !== false && !/[A-Z]/.test(password))
       || (rules.requireLowercase !== false && !/[a-z]/.test(password))
       || (rules.requireNumber !== false && !/\d/.test(password))

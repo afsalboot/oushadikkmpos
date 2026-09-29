@@ -24,7 +24,7 @@ test("username format rejects email, object injection and invalid names", () => 
 });
 test("password policy enforces length, character rules and bcrypt byte limit", () => {
   assert.equal(validPassword("PrivatePassphrase123"), true);
-  for (const value of ["ShortPass1", "a".repeat(20), "A".repeat(20), "PrivatePassphrase", "A1" + "é".repeat(36)]) assert.equal(validPassword(value), false);
+  for (const value of ["ShortP1", "a".repeat(20), "A".repeat(20), "PrivatePassphrase", "A1" + "é".repeat(36)]) assert.equal(validPassword(value), false);
 });
 test("username login reserves persistent IP and account attempts then updates conditionally", async () => {
   const h = harness();

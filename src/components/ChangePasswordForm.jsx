@@ -45,7 +45,7 @@ export default function ChangePasswordForm() {
         </span>
         <h1 className="mt-4 text-2xl font-extrabold">Change your password</h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Use at least 15 characters with uppercase, lowercase and a number.
+          Use at least 8 characters with uppercase, lowercase and a number.
           The maximum length is 72 UTF-8 bytes.
         </p>
         <div className="mt-6 space-y-4">
@@ -68,7 +68,7 @@ export default function ChangePasswordForm() {
               className="field"
               visibilityLabel="new password"
               autoComplete="new-password"
-              minLength={15}
+              minLength={8}
               value={form.password}
               onChange={(event) =>
                 setForm({ ...form, password: event.target.value })

@@ -433,7 +433,7 @@ function StaffForm({ initial, roles, onClose, onSaved }) {
                       onChange={(event) =>
                         setForm({ ...form, password: event.target.value })
                       }
-                      minLength={15}
+                      minLength={8}
                       required
                     />
                     <button
@@ -459,7 +459,7 @@ function StaffForm({ initial, roles, onClose, onSaved }) {
                 </label>
               </div>
               <p className="mt-3 text-xs text-[var(--muted)]">
-                At least 15 characters with uppercase, lowercase, and a number; maximum 72 UTF-8 bytes.
+                At least 8 characters with uppercase, lowercase, and a number; maximum 72 UTF-8 bytes.
               </p>
             </section>
           )}
@@ -612,7 +612,7 @@ function ResetPassword({ staff, onClose }) {
             />
           </label>
           <p className="text-xs text-[var(--muted)]">
-            Use 15+ characters with uppercase, lowercase, and a number; maximum 72 UTF-8 bytes.
+            Use 8+ characters with uppercase, lowercase, and a number; maximum 72 UTF-8 bytes.
           </p>
         </div>
         <div className="mt-6 flex justify-end gap-2">
