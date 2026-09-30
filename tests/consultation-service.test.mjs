@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { normalizeSettings } from "../src/services/settings.service.js";
 import { dashboardToday, dashboardRange } from "../src/lib/dashboard-dates.js";
-import { CONSULTATION_BRANCH, consultationInput, consultationPatient, consultationMoney } from "../src/lib/consultation.js";
+import { CONSULTATION_BRANCH, consultationInput, consultationPatient, consultationMoney, consultationTokenNumber } from "../src/lib/consultation.js";
 
 const source = (await readFile(new URL("../src/services/consultation.service.js", import.meta.url), "utf8"))
   .replace(/^import .*;\r?\n/gm, "").replace(/export /g, "");
@@ -11,6 +11,7 @@ const actor = { sub: "aaaaaaaaaaaaaaaaaaaaaaaa", role: "ADMIN", permissions: [],
 const body = { doctorId: "bbbbbbbbbbbbbbbbbbbbbbbb", requestId: "12345678-1234-1234-1234-123456789abc", patient: { name: "Patient" }, paymentMethod: "CASH" };
 function harness({ enabled = true, lockEnabled = true, existing = null, inactive = false, cancelled = false } = {}) {
   const writes = [], session = {}, settings = normalizeSettings({ features: { consultation: enabled } });
+  const counters = new Map();
   const lean = value => ({ lean: async () => value });
   const row = { _id: "cccccccccccccccccccccccc", opNumber: "OP000001", status: cancelled ? "CANCELLED" : "COMPLETED", consultationFee: 200, paymentMethod: "CASH", toObject() { return { ...this }; }, async save(options) { writes.push({ type: "save", options }); } };
   const deps = {
@@ -19,12 +20,20 @@ function harness({ enabled = true, lockEnabled = true, existing = null, inactive
     Settings: { findOne: () => lean(settings), findOneAndUpdate: () => { const value = lockEnabled ? settings : null; return { ...lean(value), then: resolve => resolve(value) }; } },
     Doctor: { init: async () => {}, findOneAndUpdate: () => lean(inactive ? null : { _id: body.doctorId, name: "Doctor", qualification: "BAMS", consultationFee: 200 }) },
     Customer: {},
-    DocumentCounter: { init: async () => {}, updateOne: async () => {}, findOneAndUpdate: async (filter, update, options) => { writes.push({ type: "counter", filter, options }); return { sequence: 1 }; } },
+    DocumentCounter: { init: async () => {}, updateOne: async (filter, update, options) => {
+      const counter = counters.get(filter.key) || { _id: "eeeeeeeeeeeeeeeeeeeeeeee", sequence: 0 };
+      if (update.$set) { Object.assign(counter, update.$set); writes.push({ type: "counterUpdate", filter, options }); }
+      counters.set(filter.key, counter);
+    }, findOneAndUpdate: async (filter, update, options) => {
+      const counter = counters.get(filter.key) || { _id: "eeeeeeeeeeeeeeeeeeeeeeee", sequence: 0 };
+      counter.sequence += update.$inc?.sequence || 0;
+      counters.set(filter.key, counter); writes.push({ type: "counter", filter, options }); return { ...counter };
+    } },
     Consultation: { init: async () => {}, findOne: () => lean(existing), findById: () => ({ session: async () => row }), create: async (rows, options) => { writes.push({ type: "create", rows, options }); return [{ ...rows[0], _id: row._id, toObject() { return { ...this }; } }]; } },
-    AuditLog: { create: async (rows, options) => { writes.push({ type: "audit", rows, options }); } },
+    AuditLog: { findOne: filter => ({ session: () => lean(writes.flatMap(write => write.rows || []).find(row => row.action === filter.action && row.metadata?.requestId === filter["metadata.requestId"])) }), create: async (rows, options) => { writes.push({ type: "audit", rows, options }); } },
   };
-  const service = new Function(...Object.keys(deps), `${source}; return {createConsultation,cancelConsultation,updateConsultation,deleteConsultation};`)(...Object.values(deps));
-  return { service, writes, session, row };
+  const service = new Function(...Object.keys(deps), `${source}; return {createConsultation,cancelConsultation,updateConsultation,deleteConsultation,resetConsultationTokens};`)(...Object.values(deps));
+  return { service, writes, session, row, counters };
 }
 test("disabled feature rejects creation before writes, including a concurrent settings toggle", async () => {
   for (const options of [{ enabled: false }, { lockEnabled: false }]) {
@@ -121,4 +130,51 @@ test("update and delete require explicit permissions and the enabled feature", a
       assert.equal(disabled.writes.length, 0);
     }
   }
+});
+
+const resetRequest = () => ({ confirmed: true, dayKey: dashboardToday(), requestId: "22345678-1234-1234-1234-123456789abc" });
+test("reset restarts today's displayed tokens while preserving OP and internal uniqueness", async () => {
+  const h = harness();
+  const first = await h.service.createConsultation(body, actor);
+  const second = await h.service.createConsultation({ ...body, requestId: "32345678-1234-1234-1234-123456789abc" }, actor);
+  assert.equal(consultationTokenNumber(second), 2);
+  const beforeReset = h.writes.length;
+  await h.service.resetConsultationTokens(resetRequest(), actor);
+  assert.deepEqual(h.writes.slice(beforeReset).map(write => write.type), ["counter", "counterUpdate", "audit"]);
+  assert.ok(h.writes.slice(beforeReset).every(write => write.options.session === h.session));
+  const next = await h.service.createConsultation({ ...body, requestId: "42345678-1234-1234-1234-123456789abc" }, actor);
+  assert.equal(consultationTokenNumber(next), 1);
+  assert.equal(next.tokenNumber, 3); assert.equal(next.opNumber, "OP000003");
+  assert.equal(consultationTokenNumber(first), 1); assert.equal(consultationTokenNumber(second), 2);
+  assert.equal(consultationTokenNumber({ tokenNumber: 9 }), 9);
+});
+test("retried reset does not reset tokens issued after the first request", async () => {
+  const h = harness(), request = resetRequest();
+  await h.service.resetConsultationTokens(request, actor);
+  await h.service.createConsultation(body, actor);
+  const beforeRetry = h.writes.length;
+  assert.equal((await h.service.resetConsultationTokens(request, actor)).alreadyReset, true);
+  assert.equal(h.writes.length, beforeRetry);
+  const next = await h.service.createConsultation(body, actor);
+  assert.equal(consultationTokenNumber(next), 2);
+});
+test("reset rejects staff, missing confirmation, stale dates and disabled module", async () => {
+  const h = harness();
+  await assert.rejects(h.service.resetConsultationTokens(resetRequest(), { ...actor, role: "CASHIER" }), error => error.status === 403);
+  await assert.rejects(h.service.resetConsultationTokens({ ...resetRequest(), confirmed: false }, actor), /Confirm/);
+  await assert.rejects(h.service.resetConsultationTokens({ ...resetRequest(), dayKey: "2000-01-01" }, actor), /date changed/);
+  assert.equal(h.writes.length, 0);
+  for (const options of [{ enabled: false }, { lockEnabled: false }]) {
+    const disabled = harness(options);
+    await assert.rejects(disabled.service.resetConsultationTokens(resetRequest(), actor), error => error.status === 403);
+    assert.equal(disabled.writes.length, 0);
+  }
+});
+test("reset affects only today's token counter", async () => {
+  const h = harness();
+  h.counters.set("consultation-token:MAIN:2000-01-01", { sequence: 8, tokenResetOffset: 3 });
+  h.counters.set("consultation-op", { sequence: 100 });
+  await h.service.resetConsultationTokens(resetRequest(), actor);
+  assert.deepEqual(h.counters.get("consultation-token:MAIN:2000-01-01"), { sequence: 8, tokenResetOffset: 3 });
+  assert.equal(h.counters.get("consultation-op").sequence, 100);
 });

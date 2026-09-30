@@ -1,4 +1,5 @@
 export const CONSULTATION_BRANCH = "MAIN";
+export const consultationTokenNumber = record => record.displayTokenNumber ?? record.tokenNumber;
 export const consultationMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const text = (value, max) => typeof value === "string" ? value.trim().slice(0, max) : "";
 export function consultationPatient(body) {

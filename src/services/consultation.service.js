@@ -68,7 +68,7 @@ export async function createConsultation(body, actor) {
       }
       const op = await DocumentCounter.findOneAndUpdate({ key: "consultation-op" }, { $inc: { sequence: 1 } }, { session, returnDocument: "after" });
       const token = await DocumentCounter.findOneAndUpdate({ key: tokenKey }, { $inc: { sequence: 1 } }, { session, returnDocument: "after" });
-      const [row] = await Consultation.create([{ ...values, createdAt: issuedAt, branchId: CONSULTATION_BRANCH, dayKey, requestId: body.requestId, opNumber: `OP${String(op.sequence).padStart(6, "0")}`, tokenNumber: token.sequence, customerId, doctorId: doctor._id, doctorSnapshot: { name: doctor.name, qualification: doctor.qualification }, storeSnapshot: settings.store, receiptSnapshot: settings.receipt, createdBy: actor.sub, creatorSnapshot: { name: actor.name } }], { session });
+      const [row] = await Consultation.create([{ ...values, createdAt: issuedAt, branchId: CONSULTATION_BRANCH, dayKey, requestId: body.requestId, opNumber: `OP${String(op.sequence).padStart(6, "0")}`, tokenNumber: token.sequence, displayTokenNumber: token.sequence - Number(token.tokenResetOffset || 0), customerId, doctorId: doctor._id, doctorSnapshot: { name: doctor.name, qualification: doctor.qualification }, storeSnapshot: settings.store, receiptSnapshot: settings.receipt, createdBy: actor.sub, creatorSnapshot: { name: actor.name } }], { session });
       await AuditLog.create([{ actorId: actor.sub, action: "CONSULTATION_CREATED", module: "consultation", targetType: "Consultation", targetId: row._id, description: `Created ${row.opNumber}` }], { session });
       return row.toObject();
     });
@@ -76,6 +76,28 @@ export async function createConsultation(body, actor) {
     if (error.code === 11000) { const previous = await Consultation.findOne({ requestId: body.requestId, createdBy: actor.sub }).lean(); if (previous) return previous; }
     throw error;
   }
+}
+export async function resetConsultationTokens(body, actor) {
+  if (actor.role !== "ADMIN") reject("Only an owner can reset OP tokens", 403);
+  await requireConsultation();
+  const dayKey = dashboardToday();
+  if (body.confirmed !== true) reject("Confirm the token reset");
+  if (body.dayKey !== dayKey) reject("The date changed. Reopen Reset OP Tokens and try again");
+  if (typeof body.requestId !== "string" || !/^[a-f0-9-]{36}$/i.test(body.requestId)) reject("Invalid reset request ID");
+  await DocumentCounter.init();
+  return mongoose.connection.transaction(async session => {
+    const settings = await Settings.findOneAndUpdate({ key: "global", "features.consultation": true }, { $inc: { consultationWriteVersion: 1 } }, { session, returnDocument: "after" });
+    if (!settings) reject("Consultation is disabled", 403);
+    const previous = await AuditLog.findOne({ action: "CONSULTATION_TOKENS_RESET", actorId: actor.sub, "metadata.requestId": body.requestId }).session(session).lean();
+    if (previous) return { dayKey: previous.metadata.dayKey, nextToken: 1, alreadyReset: true };
+    const key = `consultation-token:${CONSULTATION_BRANCH}:${dayKey}`;
+    const counter = await DocumentCounter.findOneAndUpdate({ key }, { $inc: { sequence: 0 } }, { upsert: true, session, returnDocument: "after" });
+    // Keep the internal sequence unique; only future displayed tokens restart.
+    // Existing tickets retain their original displayed number on reprint.
+    await DocumentCounter.updateOne({ key }, { $set: { tokenResetOffset: counter.sequence } }, { session });
+    await AuditLog.create([{ actorId: actor.sub, action: "CONSULTATION_TOKENS_RESET", module: "consultation", targetType: "DocumentCounter", targetId: counter._id, description: `Restarted OP tokens from 1 for ${dayKey}`, metadata: { requestId: body.requestId, dayKey, previousSequence: counter.sequence, previousOffset: counter.tokenResetOffset || 0, nextToken: 1 } }], { session });
+    return { dayKey, nextToken: 1 };
+  });
 }
 export async function updateConsultation(id, body, actor) {
   if (!consultationAllowed(actor, "edit")) reject("You cannot update consultations", 403);

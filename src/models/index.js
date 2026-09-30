@@ -654,6 +654,7 @@ const documentCounterSchema = new Schema(
   {
     key: { type: String, required: true, unique: true, index: true },
     sequence: { type: Number, default: 0, min: 0 },
+      tokenResetOffset: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true },
 );
@@ -669,6 +670,7 @@ const consultationSchema = new Schema({
   branchId: { type: String, default: "MAIN", required: true },
   opNumber: { type: String, required: true, unique: true },
   tokenNumber: { type: Number, required: true },
+  displayTokenNumber: { type: Number, min: 1 },
   dayKey: { type: String, required: true },
   requestId: { type: String, required: true, unique: true },
   customerId: { type: Schema.Types.ObjectId, ref: "Customer", default: null },
