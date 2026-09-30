@@ -8,7 +8,7 @@ import { normalizeProductInput, validateProductInput } from "../src/lib/product-
 
 test("simple sample imports required details and full opening stock", () => {
   assert.deepEqual(PRODUCT_SAMPLE_FIELDS, [...REQUIRED_PRODUCT_IMPORT_FIELDS,
-    "full_stock"]);
+    "full_stock", "brand_name"]);
   const parsed = Papa.parse(Papa.unparse(productImportSampleRows("Existing category"), { columns: PRODUCT_SAMPLE_FIELDS }), { header: true });
   assert.deepEqual(parsed.errors, []);
   assert.deepEqual(parsed.meta.fields, PRODUCT_SAMPLE_FIELDS);
@@ -21,6 +21,7 @@ test("simple sample imports required details and full opening stock", () => {
     assert.equal(product.openingPackages, [27, 15, 30][index]);
     assert.equal(product.openingQuantity, 0);
     assert.equal(product.wholesaleEnabled, false);
+    assert.equal(product.manufacturer, "Sample Ayurveda");
   });
 });
 

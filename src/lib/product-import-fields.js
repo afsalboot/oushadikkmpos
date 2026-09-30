@@ -19,3 +19,4 @@ export const productImportAliases = Object.fromEntries(PRODUCT_IMPORT_FIELDS.fla
 ]));
 Object.assign(productImportAliases, { packagesellingprice: "package_price", "package selling price": "package_price", loosepriceperunit: "loose_price", allowmixture: "allow_mix", visibleinsales: "pos_visible" });
 Object.assign(productImportAliases, { full_stock: "opening_packages", "full stock": "opening_packages" });
+Object.assign(productImportAliases, { brand: "manufacturer", brand_name: "manufacturer", "brand name": "manufacturer" });

@@ -1,4 +1,4 @@
-name,category,base_unit,package_type,package_size,package_price,full_stock
-Sample Herbal Oil,REPLACE_WITH_EXISTING_CATEGORY,ml,Bottle,200,180,27
-Sample Herbal Powder,REPLACE_WITH_EXISTING_CATEGORY,g,Packet,100,85,15
-Sample Herbal Syrup,REPLACE_WITH_EXISTING_CATEGORY,ml,Bottle,100,120,30
+name,category,base_unit,package_type,package_size,package_price,full_stock,brand_name
+Sample Herbal Oil,REPLACE_WITH_EXISTING_CATEGORY,ml,Bottle,200,180,27,Sample Ayurveda
+Sample Herbal Powder,REPLACE_WITH_EXISTING_CATEGORY,g,Packet,100,85,15,Sample Ayurveda
+Sample Herbal Syrup,REPLACE_WITH_EXISTING_CATEGORY,ml,Bottle,100,120,30,Sample Ayurveda
