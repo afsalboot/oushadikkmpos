@@ -10,10 +10,11 @@ export const PRODUCT_IMPORT_FIELDS = [
   "reorder_level", "opening_stock_packs", "opening_individual_packages", "opening_packages", "opening_quantity",
   "batch_tracking", "expiry_tracking", "batch_number", "manufacturing_date", "expiry_date", "purchase_price", "supplier", "pos_visible", "status",
 ];
-export const REQUIRED_PRODUCT_IMPORT_FIELDS = ["name", "sku", "category", "base_unit", "package_type", "package_size", "package_price"];
+export const REQUIRED_PRODUCT_IMPORT_FIELDS = ["name", "category", "base_unit", "package_type", "package_size", "package_price"];
 export const PRODUCT_TEMPLATE_FIELDS = PRODUCT_IMPORT_FIELDS.filter(field => field !== "opening_packages");
 export const cleanProductImportRow = row => Object.fromEntries(Object.entries(row || {}).filter(([, value]) => value !== undefined && value !== null && !(typeof value === "string" && !value.trim())));
 export const productImportAliases = Object.fromEntries(PRODUCT_IMPORT_FIELDS.flatMap(field => [
   [field, field], [field.replaceAll("_", " "), field], [field.replaceAll("_", ""), field],
 ]));
 Object.assign(productImportAliases, { packagesellingprice: "package_price", "package selling price": "package_price", loosepriceperunit: "loose_price", allowmixture: "allow_mix", visibleinsales: "pos_visible" });
+Object.assign(productImportAliases, { full_stock: "opening_packages", "full stock": "opening_packages" });

@@ -55,6 +55,7 @@ export async function POST(request) {
 
       const normalized = normalizeProductInput({
         ...row,
+        sku: row.sku || `PRD-${new mongoose.Types.ObjectId().toHexString().toUpperCase()}`,
         categoryId: category?._id,
         supplierId: supplier?._id,
         packageSellingPrice: row.packageSellingPrice ?? row.packagePrice,

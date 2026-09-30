@@ -55,8 +55,8 @@ import { calculateLineGST } from "@/services/gst.service";
 import BarcodeInput from "@/components/barcode/BarcodeInput";
 import { detectBarcodeType } from "@/lib/barcode";
 import { BULK_PRODUCT_FIELDS, parseBulkProductChanges } from "@/lib/product-bulk-fields";
-import { PRODUCT_IMPORT_FIELDS, PRODUCT_TEMPLATE_FIELDS, REQUIRED_PRODUCT_IMPORT_FIELDS, productImportAliases, cleanProductImportRow } from "@/lib/product-import-fields";
-import { productImportSampleRows } from "@/lib/product-import-sample";
+import { PRODUCT_IMPORT_FIELDS, REQUIRED_PRODUCT_IMPORT_FIELDS, productImportAliases, cleanProductImportRow } from "@/lib/product-import-fields";
+import { PRODUCT_SAMPLE_FIELDS, productImportSampleRows } from "@/lib/product-import-sample";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -1982,7 +1982,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
         const errors = [];
         const clean = cleanProductImportRow(row);
         const category = categories.find(item => item.name.toLowerCase() === String(row.category || "").trim().toLowerCase());
-        errors.push(...validateProductInput(normalizeProductInput({ ...clean, categoryId: category?._id })));
+        errors.push(...validateProductInput(normalizeProductInput({ ...clean, sku: clean.sku || "AUTO-GENERATED", categoryId: category?._id })));
         for (const field of REQUIRED_IMPORT)
           if (!String(row[field] ?? "").trim())
             errors.push(`${field} is required`);
@@ -2013,7 +2013,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
     const csv = Papa.unparse(
       productImportSampleRows(categories.find(category => category.active !== false)?.name),
       {
-        columns: PRODUCT_TEMPLATE_FIELDS,
+        columns: PRODUCT_SAMPLE_FIELDS,
         newline: "\r\n",
       },
     );
