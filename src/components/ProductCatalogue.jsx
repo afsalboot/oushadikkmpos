@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Papa from "papaparse";
+import { importProductsWithProgress } from "@/lib/product-import-progress";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   AlertTriangle,
@@ -1933,6 +1934,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
   const [mapping, setMapping] = useState({});
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ completed: 0, total: 0, percent: 0 });
   const [result, setResult] = useState(null);
   const [errorsOnly, setErrorsOnly] = useState(true);
   function load(file) {
@@ -2054,17 +2056,18 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
     if (importing) return;
     setImporting(true);
     try {
-      const response = await api("/api/products/import", {
+      const response = await importProductsWithProgress(mappedRows.map(cleanProductImportRow), rows => api("/api/products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          rows: mappedRows.map(cleanProductImportRow),
+          rows,
           createMissingCategories: false,
           duplicateMode: "SKIP",
         }),
-      });
+      }), setImportProgress);
       setResult(response);
       setStep(4);
+      if (response.interrupted) toast.error(`Import interrupted: ${response.error}`);
       if (response.imported) {
         toast.success(`${response.imported} products imported successfully.`);
         onImported();
@@ -2185,21 +2188,12 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
         <div className="my-10 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 sm:p-10" aria-busy="true">
           <div role="status" aria-live="polite">
             <h3 className="text-xl font-extrabold text-[var(--green)]">Adding your products</h3>
-            <p className="mt-2 text-sm text-[var(--muted)]">Processing {mappedRows.length} rows and saving opening stock. Keep this window open until the import finishes.</p>
+            <p className="mt-2 text-sm text-[var(--muted)]">{importProgress.completed} of {importProgress.total} rows processed. Keep this window open until the import finishes.</p>
           </div>
-          <div role="progressbar" aria-label="Product import in progress" className="mt-6 h-3 overflow-hidden rounded-full bg-emerald-100">
-            <div className="product-import-progress h-full w-1/3 rounded-full bg-[var(--green)]" />
+          <p className="mt-4 text-right text-xl font-extrabold tabular-nums text-[var(--green)]">{importProgress.percent}%</p>
+          <div role="progressbar" aria-label="Product import progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={importProgress.percent} className="mt-2 h-3 overflow-hidden rounded-full bg-emerald-100">
+            <div className="h-full rounded-full bg-[var(--green)] transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${importProgress.percent}%` }} />
           </div>
-          <style jsx>{`
-            .product-import-progress { animation: product-import-slide 1.5s ease-in-out infinite; }
-            @keyframes product-import-slide {
-              from { transform: translateX(-100%); }
-              to { transform: translateX(300%); }
-            }
-            @media (prefers-reduced-motion: reduce) {
-              .product-import-progress { animation: none; width: 100%; opacity: 0.6; }
-            }
-          `}</style>
         </div>
       )}
       {step === 3 && !importing && (
@@ -2285,7 +2279,8 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
           <span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-100 text-[var(--green)]">
             <CheckCircle2 size={38} />
           </span>
-          <h3 className="mt-4 text-2xl font-extrabold">Import completed</h3>
+          <h3 className="mt-4 text-2xl font-extrabold">{result?.interrupted ? "Import interrupted" : "Import completed — 100%"}</h3>
+          {result?.interrupted && <p className="mt-2 text-sm text-red-700">Some rows were not confirmed or attempted. Download the report and check saved products before retrying.</p>}
           <div className="mx-auto mt-5 grid max-w-2xl grid-cols-3 gap-3">
             <div className="card p-4">
               <strong className="text-2xl text-[var(--green)]">
@@ -2307,7 +2302,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
             </div>
           </div>
           <div className="mt-6 flex justify-center gap-2">
-            {(result?.failed || result?.skipped) > 0 && (
+            {(result?.interrupted || (result?.failed || result?.skipped) > 0) && (
               <button className="btn" onClick={errorReport}>
                 <Download size={16} />
                 Download import report

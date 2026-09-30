@@ -6,6 +6,7 @@ import { Category, Product, Supplier } from "@/models";
 import { normalizeProductInput, validateProductInput } from "@/lib/product-validation";
 import { createProduct } from "@/services/product.service";
 import { cleanProductImportRow, productCategoryKey } from "@/lib/product-import-fields";
+import { createProductImportDuplicateIndex } from "@/lib/product-import-duplicates";
 
 const slugify = (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -21,9 +22,8 @@ export async function POST(request) {
     const categoryMap = new Map(categories.map((category) => [productCategoryKey(category.name), category]));
     const suppliers = await Supplier.find({ active: { $ne: false } }).select("name").lean();
     const supplierMap = new Map(suppliers.map((supplier) => [supplier.name.trim().toLowerCase(), supplier]));
-    const existingProducts = await Product.find({}, { sku: 1, barcode: 1 }).lean();
-    const existingSkus = new Set(existingProducts.map((product) => product.sku?.toUpperCase()).filter(Boolean));
-    const existingBarcodes = new Set(existingProducts.map((product) => product.barcode).filter(Boolean));
+    const existingProducts = await Product.find({}, { sku: 1, barcode: 1, name: 1, manufacturer: 1, categoryId: 1, baseUnit: 1, packageUnit: 1, packageType: 1, packageSize: 1 }).lean();
+    const identityIndex = createProductImportDuplicateIndex(existingProducts);
     const usedSkus = new Set(existingProducts.map((product) => product.sku?.toUpperCase()).filter(Boolean));
     const usedBarcodes = new Set(existingProducts.map((product) => product.barcode).filter(Boolean));
     const results = [];
@@ -67,11 +67,13 @@ export async function POST(request) {
         else normalized.freeSchemeFreeProduct = freeProduct._id;
       }
       rowErrors.push(...validateProductInput(normalized));
-      const existingDuplicate = existingSkus.has(normalized.sku) || (normalized.barcode && existingBarcodes.has(normalized.barcode));
+      const identityMatch = identityIndex.find(normalized);
+      const existingDuplicate = usedSkus.has(normalized.sku) || (normalized.barcode && usedBarcodes.has(normalized.barcode)) || identityMatch;
       if (existingDuplicate && duplicateMode === "SKIP") {
-        results.push({ row: rowNumber, name: normalized.name || "Unnamed product", status: "SKIPPED", errors: ["Existing SKU or barcode skipped"] });
+        results.push({ row: rowNumber, name: normalized.name || "Unnamed product", status: "SKIPPED", errors: [identityMatch ? `Matching product already exists (${identityMatch.sku}): same name, category, package size and unit${normalized.manufacturer ? ", and brand" : ""}. Stock was not added.` : "Existing SKU or barcode skipped. Stock was not added."] });
         continue;
       }
+      if (identityMatch) rowErrors.push(`Matching product already exists (${identityMatch.sku})`);
       if (normalized.sku && usedSkus.has(normalized.sku)) rowErrors.push("SKU already exists or is duplicated in this file");
       if (normalized.barcode && usedBarcodes.has(normalized.barcode)) rowErrors.push("Barcode already exists or is duplicated in this file");
 
@@ -88,6 +90,7 @@ export async function POST(request) {
           product = await createProduct({ ...row, ...normalized, categoryId: category._id }, new mongoose.Types.ObjectId(auth.sub), dbSession);
         });
         usedSkus.add(product.sku);
+        identityIndex.add(product);
         if (product.barcode) usedBarcodes.add(product.barcode);
         existingProducts.push({ _id: product._id, sku: product.sku, barcode: product.barcode });
         results.push({ row: rowNumber, name: product.name, status: "IMPORTED" });
