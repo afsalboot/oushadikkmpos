@@ -36,6 +36,7 @@ import {assertRegistration,resolveSupply,validateFiscalLines,registrationStatus,
 import {requestHash,assertRetryMatches} from "@/lib/fiscal-integrity";
 import {money,multiplyMoney} from "@/lib/money";
 import { directCheckoutPayments } from "@/lib/direct-checkout";
+import { saleFreeQuantity } from "@/lib/sale-free-quantity";
 
 const amount = money;
 const escapeRegex = (value) =>
@@ -628,7 +629,12 @@ export async function POST(request) {
           await consumeStock(
             product,
             saleMode,
-            quantity,
+            quantity + saleFreeQuantity(item.freeQuantity, {
+              wholesale: body.wholesaleDiscountEnabled === true,
+              role: session.role,
+              saleMode,
+              countBased: isCountBasedProduct(product),
+            }),
             dbSession,
             stockRows,
             undefined,
@@ -646,6 +652,9 @@ export async function POST(request) {
             name: product.name,
             saleMode,
             quantity,
+            paidQuantity: quantity,
+            freeQuantity: Number(item.freeQuantity || 0),
+            totalOutgoingQuantity: quantity + Number(item.freeQuantity || 0),
             baseQuantity:
               saleMode === "LOOSE"
                 ? quantity

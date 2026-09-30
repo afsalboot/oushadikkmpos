@@ -26,6 +26,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import ExpiredStockWarning from "@/components/ExpiredStockWarning";
 import CartCustomerFields from "@/components/CartCustomerFields";
 import { setCartItemWholesale } from "@/lib/wholesale";
+import { saleFreeQuantity } from "@/lib/sale-free-quantity";
 import { calculateSalePricing } from "@/services/pricing.service";
 const money = (v) =>
     new Intl.NumberFormat("en-IN", {
@@ -992,8 +993,18 @@ export default function SalesWorkspaceModern() {
   }
   function updateCartItem(item, enabled, quantity = item.quantity) {
     try {
+      if (!enabled && quantity + Number(item.freeQuantity || 0) > sealed(item))
+        throw new Error(`Insufficient sealed stock for ${item.name} including free quantity`);
       const updated = setCartItemWholesale(item, enabled, quantity);
       setCart((current) => current.map((x) => x._id === item._id ? updated : x));
+    } catch (error) { toast.error(error.message); }
+  }
+  function updateFreeQuantity(item, value) {
+    try {
+      const free = saleFreeQuantity(value, { wholesale: wholesaleDiscountEnabled, saleMode: item.saleMode, countBased: countBased(item), role: settings?._capabilities?.role });
+      if (item.saleMode === "PACKAGE" && Number(item.quantity) + free > sealed(item))
+        throw new Error(`Insufficient sealed stock for ${item.name} including free quantity`);
+      setCart(current => current.map(row => row._id === item._id ? { ...row, freeQuantity: value === "" ? "" : free } : row));
     } catch (error) { toast.error(error.message); }
   }
   function add(i) {
@@ -1007,7 +1018,7 @@ export default function SalesWorkspaceModern() {
       i.saleMode === "PACKAGE" && c.some((x) => x._id === i._id)
         ? c.map((x) =>
             x._id === i._id
-              ? { ...x, quantity: Math.min(sealed(x), x.quantity + i.quantity) }
+              ? { ...x, quantity: Math.min(sealed(x) - Number(x.freeQuantity || 0), x.quantity + i.quantity) }
               : x,
           )
         : [
@@ -1095,6 +1106,7 @@ export default function SalesWorkspaceModern() {
               saleMode: i.saleMode,
               quantity: i.quantity,
               baseQuantity: i.looseQuantity,
+              freeQuantity: wholesaleDiscountEnabled ? i.freeQuantity || 0 : 0,
             },
       );
     setSaving(true);
@@ -1104,6 +1116,8 @@ export default function SalesWorkspaceModern() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items,
+          wholesaleDiscountEnabled,
+          wholesaleDiscountPercent,
           customerId: customerMode === "EXISTING" ? customerId : undefined,
           customer:
             customerMode === "NEW"
@@ -1389,6 +1403,15 @@ export default function SalesWorkspaceModern() {
                           </button>
                         </div>
                         <ExpiredStockWarning product={i} />
+                        {wholesaleDiscountEnabled && i.kind === "PRODUCT" && ["PACKAGE", "LOOSE"].includes(i.saleMode) && (
+                          <label className="my-2 flex items-center justify-between gap-2 text-xs">
+                            <span>Free quantity ({i.saleMode === "LOOSE" ? i.looseUnit || i.baseUnit : i.packageType})</span>
+                            <input type="number" className="field !min-h-8 !w-20" min="0" step={i.saleMode === "PACKAGE" || countBased(i) ? "1" : "0.001"}
+                              aria-label={`Free quantity for ${i.name}`} placeholder="0" value={i.freeQuantity ?? ""}
+                              disabled={settings?._capabilities?.role !== "ADMIN"} title={settings?._capabilities?.role !== "ADMIN" ? "Only an administrator can change wholesale free quantity" : undefined}
+                              onChange={event => updateFreeQuantity(i, event.target.value)} />
+                          </label>
+                        )}
                         <div className="sales-cart-meta">
                           <Badge
                             t={
@@ -1407,7 +1430,7 @@ export default function SalesWorkspaceModern() {
                           {i.kind !== "MIX" && ["PACKAGE", "WHOLESALE"].includes(i.saleMode) ? (
                             <Step
                               value={i.quantity}
-                              max={sealed(i)}
+                              max={sealed(i) - (i.saleMode === "PACKAGE" ? Number(i.freeQuantity || 0) : 0)}
                               onChange={(quantity) => updateCartItem(i, i.saleMode === "WHOLESALE", quantity)}
                             />
                           ) : i.kind !== "MIX" && i.saleMode === "LOOSE" ? (
@@ -1460,7 +1483,7 @@ export default function SalesWorkspaceModern() {
               <label className="mb-3 flex items-center gap-2 text-sm font-bold">
                 <input type="checkbox" className="size-4 accent-[var(--green)]"
                   checked={wholesaleDiscountEnabled}
-                  onChange={(e) => { setWholesaleDiscountEnabled(e.target.checked); if (!e.target.checked) setWholesaleDiscountPercent(""); }} />
+                  onChange={(e) => { setWholesaleDiscountEnabled(e.target.checked); if (!e.target.checked) { setWholesaleDiscountPercent(""); setCart(current => current.map(item => item.saleMode === "WHOLESALE" ? item : { ...item, freeQuantity: 0 })); } }} />
                 Wholesale
               </label>
               {wholesaleDiscountEnabled && <label className="mb-3 flex items-center justify-between gap-3 text-sm">

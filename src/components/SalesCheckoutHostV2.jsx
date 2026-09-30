@@ -385,6 +385,7 @@ export default function SalesCheckoutHostV2() {
               saleMode: item.saleMode,
               quantity: item.quantity,
               baseQuantity: item.looseQuantity,
+              freeQuantity: wholesaleDiscountEnabled ? item.freeQuantity || 0 : 0,
               openPackageCounts: item.openPackageCounts,
             },
     );
@@ -904,6 +905,9 @@ export default function SalesCheckoutHostV2() {
                       <span>Items</span>
                       <strong>{cart.length}</strong>
                     </div>
+                    {wholesaleDiscountEnabled && cart.filter(item => item.saleMode !== "WHOLESALE" && Number(item.freeQuantity) > 0).map(item => (
+                      <div key={item._id} className="flex justify-between gap-2 text-[var(--green)]"><span>{item.name} · Free</span><strong>{item.freeQuantity} {item.saleMode === "LOOSE" ? item.looseUnit || item.baseUnit : item.packageType}</strong></div>
+                    ))}
                     <div className="flex justify-between">
                       <span>Subtotal</span>
                       <strong>{money(subtotal)}</strong>

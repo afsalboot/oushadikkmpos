@@ -125,6 +125,7 @@ export default function SaleSourceDetails({ id }) {
                   <td>{item.saleMode}</td>
                   <td>
                     {item.quantity} {item.baseUnit || ""}
+                    {Number(item.freeQuantity) > 0 && <small className="block text-[var(--green)]">+ {item.freeQuantity} {item.saleMode === "LOOSE" ? item.baseUnit : item.packageType} free</small>}
                   </td>
                   {sale.gstEnabled && (
                     <td>

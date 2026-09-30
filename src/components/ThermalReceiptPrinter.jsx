@@ -197,6 +197,7 @@ export function ThermalReceipt({ sale }) {
         {sale.items?.map((item, index) => (
           <div className="receipt-item" key={index}>
             <strong>{item.name}</strong>
+            {item.saleMode !== "WHOLESALE" && Number(item.freeQuantity) > 0 && <small>Free: {item.freeQuantity} {item.saleMode === "LOOSE" ? item.baseUnit : item.packageType} (no charge)</small>}
             {Number(item.wholesaleDiscountPercent) > 0 && (
               <small>Wholesale discount ({item.wholesaleDiscountPercent}%): {money(item.wholesaleDiscountAmount)} (included in price)</small>
             )}
