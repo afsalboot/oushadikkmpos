@@ -1926,7 +1926,6 @@ const aliases = {
 function ImportWizard({ categories, onClose, onImported, manualEntry = false }) {
   const [manual, setManual] = useState(manualEntry);
   const [manualRows, setManualRows] = useState([]);
-  const [defaultBrand, setDefaultBrand] = useState("");
   const inputRef = useRef(null);
   const [step, setStep] = useState(1);
   const [headers, setHeaders] = useState([]);
@@ -1973,7 +1972,6 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
       ),
     [rawRows, headers, mapping],
   );
-  const importRows = useMemo(() => mappedRows.map(row => ({ ...row, manufacturer: String(row.manufacturer || "").trim() || defaultBrand.trim() })), [mappedRows, defaultBrand]);
   const categoryNames = useMemo(
     () => new Set(categories.map((item) => productCategoryKey(item.name))),
     [categories],
@@ -2055,7 +2053,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          rows: importRows.map(cleanProductImportRow),
+          rows: mappedRows.map(cleanProductImportRow),
           createMissingCategories: false,
           duplicateMode: "SKIP",
         }),
@@ -2134,13 +2132,6 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
           </button>
         </div>
       )}
-      {(step === 2 || step === 3) && !importing && (
-        <label className="mt-5 block">
-          <span className="label">Brand name (optional)</span>
-          <input className="field" value={defaultBrand} onChange={event => setDefaultBrand(event.target.value)} placeholder="Enter brand for products without a brand in the sheet" />
-          <span className="mt-1 block text-sm text-[var(--muted)]">Applies only where the product has no brand. Brands supplied in the sheet are kept.</span>
-        </label>
-      )}
       {step === 2 && (
         <div className="mt-6">
           <div className="mb-4">
@@ -2168,7 +2159,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
                   }
                 >
                   {IMPORT_FIELDS.map((field) => (
-                    <option key={field} value={field}>{field === "manufacturer" ? "Brand / Manufacturer" : field}</option>
+                    <option key={field} value={field}>{field === "manufacturer" ? "Brand name" : field}</option>
                   ))}
                 </select>
               </div>
