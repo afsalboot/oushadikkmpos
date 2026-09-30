@@ -36,6 +36,7 @@ import {assertRegistration,resolveSupply,validateFiscalLines,registrationStatus,
 import {requestHash,assertRetryMatches} from "@/lib/fiscal-integrity";
 import {money,multiplyMoney} from "@/lib/money";
 import { directCheckoutPayments } from "@/lib/direct-checkout";
+import { createSaleStockBuffer } from "@/lib/sale-stock-buffer";
 import { saleFreeQuantity } from "@/lib/sale-free-quantity";
 
 const amount = money;
@@ -51,6 +52,7 @@ async function consumeStock(
   transactionType = saleMode === "PACKAGE" ? "PACKAGE_SALE" : "LOOSE_SALE",
   settings,
   openPackageCounts = [],
+  stockBuffer,
 ) {
   let remaining = Number(requestedQuantity);
   if (!(remaining > 0))
@@ -69,7 +71,7 @@ async function consumeStock(
         ],
       },
     ];
-  const batches = await InventoryBatch.find(batchFilter)
+  const batches = stockBuffer ? stockBuffer.get(product._id) : await InventoryBatch.find(batchFilter)
     .sort({ expiryDate: 1, createdAt: 1 })
     .session(dbSession);
   let openCountCursor = 0;
@@ -80,7 +82,8 @@ async function consumeStock(
       if (!used) continue;
       const next = deductPackageStock(batch, used);
       batch.set(next);
-      await batch.save({ session: dbSession });
+      if (stockBuffer) stockBuffer.mark(batch);
+      else await batch.save({ session: dbSession });
       stockRows.push({
         productId: product._id,
         batchId: batch._id,
@@ -115,7 +118,8 @@ async function consumeStock(
         sealedPackages: result.sealedPackages,
         openQuantity: result.openQuantity,
       });
-      await batch.save({ session: dbSession });
+      if (stockBuffer) stockBuffer.mark(batch);
+      else await batch.save({ session: dbSession });
       for (const count of result.openings) {
         stockRows.push({
           productId: product._id,
@@ -152,7 +156,8 @@ async function consumeStock(
       const beforePackages = Number(batch.sealedPackages);
       const next = deductLooseStock(batch, used);
       batch.set(next);
-      await batch.save({ session: dbSession });
+      if (stockBuffer) stockBuffer.mark(batch);
+      else await batch.save({ session: dbSession });
       stockRows.push({
         productId: product._id,
         batchId: batch._id,
@@ -267,16 +272,22 @@ export async function GET(request) {
 
 export async function POST(request) {
   let dbSession;
+  const startedAt = performance.now();
+  const durations = [];
+  let checkpoint = startedAt;
+  const mark = name => { const now = performance.now(); durations.push(`${name};dur=${(now - checkpoint).toFixed(1)}`); checkpoint = now; };
+  const timed = response => { response.headers.set("Server-Timing", [...durations, `total;dur=${(performance.now() - startedAt).toFixed(1)}`].join(", ")); return response; };
   try {
     const session = await requireSession("sales.create");
     await connectDb();
+    mark("auth_db");
     const body = await request.json();
     await Promise.all([Sale.init(),FiscalGuard.init()]);
     const requestKey=String(request.headers.get('Idempotency-Key')||'');
     if(!/^[a-zA-Z0-9-]{16,80}$/.test(requestKey))return fail('A checkout retry key is required. Refresh checkout and try again.',422);
     const hash=requestHash(body);
     const previous=await Sale.findOne({requestKey}).lean();
-    if(previous)return ok(assertRetryMatches(previous,hash,session.sub));
+    if(previous)return timed(ok(assertRetryMatches(previous,hash,session.sub)));
     const saleType = body.saleType === "WHOLESALE" ? "WHOLESALE" : "SALE";
     const directoryType = saleType === "WHOLESALE" || body.wholesaleDiscountEnabled === true ? "WHOLESALE" : "RETAIL";
     if (!Array.isArray(body.items) || !body.items.length)
@@ -293,6 +304,8 @@ export async function POST(request) {
         : "NEW";
     dbSession = await mongoose.startSession();
     let completedSale;
+    let receiptSnapshot;
+    mark("prepare");
     await dbSession.withTransaction(async () => {
       await FiscalGuard.findOneAndUpdate({key:'issuance'},{$inc:{revision:1}},{upsert:true,session:dbSession});
       const retried=await Sale.findOne({requestKey}).session(dbSession).lean();
@@ -345,10 +358,14 @@ export async function POST(request) {
       const settings = await Settings.findOne({ key: "global" }).session(
         dbSession,
       );
+      receiptSnapshot = settings?.receipt?.toObject?.() || settings?.receipt;
       assertRegistration(settings);
       const supplyContext=resolveSupply(settings,customer,body.supplyContext||{});
       const saleItems = [];
       const stockRows = [];
+      const stockBuffer = await createSaleStockBuffer({ InventoryBatch, session: dbSession, settings,
+        productIds: [...productIds, ...products.filter(product => product.freeSchemeEnabled && product.freeSchemeType === "DIFFERENT_PRODUCT" && mongoose.isValidObjectId(product.freeSchemeFreeProduct)).map(product => product.freeSchemeFreeProduct)],
+      });
       for (const item of body.items) {
         if (item.kind === "MIX") {
           if (saleType === "WHOLESALE")
@@ -387,6 +404,8 @@ export async function POST(request) {
               stockRows,
               "MIXTURE_SALE",
               settings,
+              [],
+              stockBuffer,
             );
             const total = multiplyMoney(baseQuantity,product.loosePricePerUnit);
             ingredientTotal += total;
@@ -454,6 +473,7 @@ export async function POST(request) {
                 Array.isArray(item.openPackageCounts)
                   ? item.openPackageCounts.map(Number)
                   : [],
+                stockBuffer,
               );
               const unitPrice = wholesaleLooseRate(product),
                 total = amount(looseQuantity * unitPrice);
@@ -518,6 +538,8 @@ export async function POST(request) {
               stockRows,
               "WHOLESALE_SALE",
               settings,
+              [],
+              stockBuffer,
             );
             let freeProduct = null;
             if (!sameProductFree && line.freeQuantity > 0) {
@@ -548,6 +570,8 @@ export async function POST(request) {
                 stockRows,
                 "WHOLESALE_FREE",
                 settings,
+                [],
+                stockBuffer,
               );
             }
             saleItems.push({
@@ -640,6 +664,7 @@ export async function POST(request) {
             undefined,
             settings,
             openPackageCounts,
+            stockBuffer,
           );
           const unitPrice =
             saleMode === "PACKAGE"
@@ -928,7 +953,7 @@ export async function POST(request) {
         await customer.save({ session: dbSession });
       }
       if (stockRows.length)
-        await StockTransaction.create(
+        await StockTransaction.insertMany(
           stockRows.map((row) => ({
             ...row,
             referenceType: "SALE",
@@ -937,13 +962,15 @@ export async function POST(request) {
           })),
           { session: dbSession, ordered: true },
         );
+      await stockBuffer.flush();
       await AuditLog.create([{actorId:session.sub,action:'INVOICE_FINALIZED',module:'sales',targetType:'Sale',targetId:completedSale._id,description:`Issued ${invoiceNumber}`,metadata:{invoiceNumber,documentType,total,tax:gstInvoice.tax,placeOfSupply,ruleVersion:GST_RULE_VERSION}}],{session:dbSession});
     });
-    return ok(completedSale, 201);
+    mark("transaction");
+    return timed(ok({ ...(completedSale.toObject?.() || completedSale), receiptSnapshot }, 201));
   } catch (error) {
     // Plain validation errors abort the transaction and are safe to correct/retry.
     if(error?.constructor===Error&&!error.status)error.status=422;
-    return apiError(error);
+    return timed(apiError(error));
   } finally {
     if (dbSession) await dbSession.endSession();
   }

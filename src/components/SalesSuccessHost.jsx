@@ -20,7 +20,7 @@ export default function SalesSuccessHost() {
     printedSaleRef.current = saleId;
     printThermalReceipt(sourceRef.current, () => {
       setSale((current) => current === sale ? null : current);
-    });
+    }, sale.receiptSnapshot);
   }, [sale]);
 
   if (!sale) return null;

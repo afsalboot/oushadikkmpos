@@ -679,7 +679,7 @@ export default function SalesWorkspaceModern() {
       for (const field of fields) if (!field.reportValidity()) return;
       window.dispatchEvent(
         new CustomEvent("oushadi-open-checkout", {
-          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, wholesaleDiscountPercent, cartCustomer },
+          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, wholesaleDiscountPercent, cartCustomer, settings },
         }),
       );
     };
@@ -705,7 +705,7 @@ export default function SalesWorkspaceModern() {
       layout?.classList.remove("sales-cart-grid");
       workspace?.classList.remove("sales-cart-workspace");
     };
-  }, [cart, mode, wholesaleDiscountEnabled, wholesaleDiscountPercent, cartCustomer]);
+  }, [cart, mode, wholesaleDiscountEnabled, wholesaleDiscountPercent, cartCustomer, settings]);
   useEffect(() => {
     const completed = () => {
       setCartCustomer({});

@@ -142,7 +142,7 @@ export default function SalesCheckoutHostV2() {
         setDeliveryAddress(draft.deliveryAddress || "");
         setDeliveryStateCode(draft.deliveryStateCode || "");
       }
-      api("/api/settings")
+      (event.detail?.settings ? Promise.resolve(event.detail.settings) : api("/api/settings"))
         .then((value) => {
           setSettings(value);
           setDiscountType(

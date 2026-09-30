@@ -337,10 +337,10 @@ export function ThermalReceipt({ sale }) {
   );
 }
 
-export async function printThermalReceipt(source, onFinished) {
+export async function printThermalReceipt(source, onFinished, receiptSnapshot) {
   if (!source) return;
-  let receipt = { width: source.querySelector("[data-receipt-width]")?.dataset.receiptWidth || "80mm" };
-  try {
+  let receipt = receiptSnapshot || { width: source.querySelector("[data-receipt-width]")?.dataset.receiptWidth || "80mm" };
+  if (!receiptSnapshot) try {
     const response = await fetch("/api/settings/receipt", { cache: "no-store" });
     if (response.ok) receipt = (await response.json()).data.receipt;
   } catch { /* Keep the document's last known width when offline. */ }
