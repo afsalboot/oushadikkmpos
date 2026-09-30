@@ -12,6 +12,7 @@ export const PRODUCT_IMPORT_FIELDS = [
 ];
 export const REQUIRED_PRODUCT_IMPORT_FIELDS = ["name", "category", "base_unit", "package_type", "package_size", "package_price"];
 export const PRODUCT_TEMPLATE_FIELDS = PRODUCT_IMPORT_FIELDS.filter(field => field !== "opening_packages");
+export const productCategoryKey = value => String(value ?? "").trim().toLowerCase();
 export const cleanProductImportRow = row => Object.fromEntries(Object.entries(row || {}).filter(([, value]) => value !== undefined && value !== null && !(typeof value === "string" && !value.trim())));
 export const productImportAliases = Object.fromEntries(PRODUCT_IMPORT_FIELDS.flatMap(field => [
   [field, field], [field.replaceAll("_", " "), field], [field.replaceAll("_", ""), field],

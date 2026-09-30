@@ -5,7 +5,7 @@ import { ok, fail, apiError } from "@/lib/api";
 import { Category, Product, Supplier } from "@/models";
 import { normalizeProductInput, validateProductInput } from "@/lib/product-validation";
 import { createProduct } from "@/services/product.service";
-import { cleanProductImportRow } from "@/lib/product-import-fields";
+import { cleanProductImportRow, productCategoryKey } from "@/lib/product-import-fields";
 
 const slugify = (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -18,7 +18,7 @@ export async function POST(request) {
     if (rows.length > 1000) return fail("Import is limited to 1,000 rows at a time");
 
     const categories = await Category.find({ active: true }).lean();
-    const categoryMap = new Map(categories.map((category) => [category.name.trim().toLowerCase(), category]));
+    const categoryMap = new Map(categories.map((category) => [productCategoryKey(category.name), category]));
     const suppliers = await Supplier.find({ active: { $ne: false } }).select("name").lean();
     const supplierMap = new Map(suppliers.map((supplier) => [supplier.name.trim().toLowerCase(), supplier]));
     const existingProducts = await Product.find({}, { sku: 1, barcode: 1 }).lean();
@@ -32,14 +32,14 @@ export async function POST(request) {
       const row = cleanProductImportRow(rows[index]);
       const rowNumber = index + 2;
       const categoryName = String(row.category || "").trim();
-      let category = categoryMap.get(categoryName.toLowerCase());
+      let category = categoryMap.get(productCategoryKey(categoryName));
       const rowErrors = [];
 
       if (!categoryName) rowErrors.push("Category is required");
       if (!category && categoryName && createMissingCategories) {
         try {
           category = await Category.create({ name: categoryName, slug: slugify(categoryName), isSystem: false, active: true });
-          categoryMap.set(categoryName.toLowerCase(), category);
+          categoryMap.set(productCategoryKey(categoryName), category);
         } catch (error) {
           if (error?.code === 11000) {
             category = await Category.findOne({ name: { $regex: `^${categoryName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } });

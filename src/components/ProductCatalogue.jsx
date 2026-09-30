@@ -55,7 +55,7 @@ import { calculateLineGST } from "@/services/gst.service";
 import BarcodeInput from "@/components/barcode/BarcodeInput";
 import { detectBarcodeType } from "@/lib/barcode";
 import { BULK_PRODUCT_FIELDS, parseBulkProductChanges } from "@/lib/product-bulk-fields";
-import { PRODUCT_IMPORT_FIELDS, REQUIRED_PRODUCT_IMPORT_FIELDS, productImportAliases, cleanProductImportRow } from "@/lib/product-import-fields";
+import { PRODUCT_IMPORT_FIELDS, REQUIRED_PRODUCT_IMPORT_FIELDS, productImportAliases, cleanProductImportRow, productCategoryKey } from "@/lib/product-import-fields";
 import { PRODUCT_SAMPLE_FIELDS, productImportSampleRows } from "@/lib/product-import-sample";
 
 const money = (value) =>
@@ -1973,7 +1973,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
     [rawRows, headers, mapping],
   );
   const categoryNames = useMemo(
-    () => new Set(categories.map((item) => item.name.toLowerCase())),
+    () => new Set(categories.map((item) => productCategoryKey(item.name))),
     [categories],
   );
   const preview = useMemo(
@@ -1981,7 +1981,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
       mappedRows.map((row, index) => {
         const errors = [];
         const clean = cleanProductImportRow(row);
-        const category = categories.find(item => item.name.toLowerCase() === String(row.category || "").trim().toLowerCase());
+        const category = categories.find(item => productCategoryKey(item.name) === productCategoryKey(row.category));
         errors.push(...validateProductInput(normalizeProductInput({ ...clean, sku: clean.sku || "AUTO-GENERATED", categoryId: category?._id })));
         for (const field of REQUIRED_IMPORT)
           if (!String(row[field] ?? "").trim())
@@ -1992,7 +1992,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
           errors.push("Package size must be greater than zero");
         if (
           row.category &&
-          !categoryNames.has(String(row.category).trim().toLowerCase())
+          !categoryNames.has(productCategoryKey(row.category))
         )
           errors.push("Unknown category");
         const sku = String(row.sku || "").toUpperCase();
@@ -2046,6 +2046,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
     URL.revokeObjectURL(url);
   }
   async function run() {
+    if (importing) return;
     setImporting(true);
     try {
       const response = await api("/api/products/import", {
@@ -2070,7 +2071,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
     }
   }
   return (
-    <Modal onClose={onClose} wide>
+    <Modal onClose={importing ? () => {} : onClose} wide>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--green)]">
@@ -2081,7 +2082,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
             Add multiple products and opening stock using CSV.
           </p>
         </div>
-        <button onClick={onClose}>
+        <button onClick={onClose} disabled={importing} aria-label="Close import" className="disabled:opacity-40">
           <X />
         </button>
       </div>
@@ -2174,7 +2175,28 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
           </div>
         </div>
       )}
-      {step === 3 && (
+      {importing && (
+        <div className="my-10 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 sm:p-10" aria-busy="true">
+          <div role="status" aria-live="polite">
+            <h3 className="text-xl font-extrabold text-[var(--green)]">Adding your products</h3>
+            <p className="mt-2 text-sm text-[var(--muted)]">Processing {mappedRows.length} rows and saving opening stock. Keep this window open until the import finishes.</p>
+          </div>
+          <div role="progressbar" aria-label="Product import in progress" className="mt-6 h-3 overflow-hidden rounded-full bg-emerald-100">
+            <div className="product-import-progress h-full w-1/3 rounded-full bg-[var(--green)]" />
+          </div>
+          <style jsx>{`
+            .product-import-progress { animation: product-import-slide 1.5s ease-in-out infinite; }
+            @keyframes product-import-slide {
+              from { transform: translateX(-100%); }
+              to { transform: translateX(300%); }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .product-import-progress { animation: none; width: 100%; opacity: 0.6; }
+            }
+          `}</style>
+        </div>
+      )}
+      {step === 3 && !importing && (
         <div className="mt-6">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="card p-4">
@@ -2238,9 +2260,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
               disabled={!valid.length || importing}
               onClick={run}
             >
-              {importing
-                ? `Importing ${valid.length} products…`
-                : `Import ${valid.length} products`}
+              {`Import ${valid.length} products`}
             </button>
           </div>
         </div>
