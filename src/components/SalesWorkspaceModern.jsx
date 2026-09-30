@@ -116,6 +116,15 @@ function Badge({ children, t = "gray" }) {
   );
 }
 function Step({ value, max, onChange }) {
+  const [draft, setDraft] = useState(null);
+  function commit() {
+    if (draft === null) return;
+    const quantity = Number(draft);
+    setDraft(null);
+    if (!Number.isInteger(quantity) || quantity < 1) return toast.error("Enter a whole quantity of at least 1.");
+    if (quantity > max) return toast.error(`Only ${max} available for this sale.`);
+    onChange(quantity);
+  }
   return (
     <div className="inline-flex items-center overflow-hidden rounded-lg border border-[var(--line)] bg-white">
       <button
@@ -127,9 +136,12 @@ function Step({ value, max, onChange }) {
       >
         <Minus size={14} />
       </button>
-      <b className="grid h-9 min-w-9 place-items-center border-x border-[var(--line)] text-sm tabular-nums">
-        {value}
-      </b>
+      <input type="number" inputMode="numeric" min="1" max={max} step="1"
+        className="h-9 w-16 min-w-0 border-x border-[var(--line)] bg-white px-1 text-center text-sm font-bold tabular-nums"
+        aria-label="Product quantity" value={draft ?? String(value)}
+        onChange={event => setDraft(event.target.value)} onBlur={commit}
+        onFocus={event => event.currentTarget.select()}
+        onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } if (event.key === "Escape") { setDraft(null); } }} />
       <button
         type="button"
         className="grid size-9 place-items-center text-[var(--green)] disabled:cursor-not-allowed disabled:text-gray-300"
