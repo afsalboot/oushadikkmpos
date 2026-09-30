@@ -738,7 +738,7 @@ export async function POST(request) {
       const pricing = calculateSalePricing({
         consultationFeeEnabled: body.consultationFeeEnabled === true,
         consultationFee: body.consultationFee,
-        wholesaleDiscount: body.wholesaleDiscountEnabled === true ? body.wholesaleDiscountPercent ?? 0 : undefined,
+        wholesaleDiscount: body.wholesaleDiscountEnabled === true ? body.items.map(item => item.saleWholesaleDiscountPercent ?? 0) : undefined,
         items: saleItems.map((item, index) => ({
           amount: item.total,
           gstRate: item.gstRate,
@@ -772,6 +772,12 @@ export async function POST(request) {
         throw new Error(pricing.validationErrors[0]);
       if (pricing.approvalRequired)
         throw new Error("Administrator approval is required for this discount");
+      if (body.wholesaleDiscountEnabled === true) saleItems.forEach((item, index) => {
+        if (item.kind === "PRODUCT" && item.saleMode !== "WHOLESALE") {
+          item.wholesaleDiscountPercent = Number(body.items[index].saleWholesaleDiscountPercent || 0);
+          item.wholesaleDiscountAmount = pricing.lineDiscounts[index] || 0;
+        }
+      });
       const requestedDiscount = pricing.totalDiscount,
         gstInvoice = pricing.gst;
       gstInvoice.lines.forEach((tax, index) =>

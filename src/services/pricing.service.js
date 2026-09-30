@@ -69,6 +69,23 @@ export function calculateDiscount({items=[],cartSubtotal,discount={},settings,cu
 }
 
 export function calculateWholesaleDiscount(items, subtotal, percentage) {
+  if (Array.isArray(percentage)) {
+    const errors = [];
+    const lineDiscounts = items.map((item, index) => {
+      const value = Number(percentage[index] ?? 0);
+      if (!Number.isFinite(value) || value < 0 || value > 100) {
+        errors.push("Each product wholesale discount must be between 0% and 100%.");
+        return 0;
+      }
+      if (item.kind === "MIX" || item.saleMode === "WHOLESALE") return 0;
+      return multiplyMoney(Number(item.amount ?? item.total ?? 0), value / 100);
+    });
+    const totalDiscount = sumMoney(lineDiscounts);
+    return { itemDiscount: totalDiscount, cartDiscount: 0, automaticDiscount: 0,
+      totalDiscount, subtotalAfterDiscount: money(subtotal - totalDiscount),
+      approvalRequired: false, lineDiscounts, discountType: "ITEM", discountValue: 0,
+      reason: "Wholesale discount", validationErrors: [...new Set(errors)] };
+  }
   const value = Number(percentage);
   const valid = Number.isFinite(value) && value >= 0 && value <= 100;
   const totalDiscount = valid ? multiplyMoney(subtotal, value / 100) : 0;

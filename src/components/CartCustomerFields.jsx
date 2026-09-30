@@ -30,7 +30,12 @@ export default function CartCustomerFields({ value, onChange, wholesale }) {
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [value.name, value.phone, selected, directory]);
-  const update = (field, next) => onChange({ ...value, [field]: next, ...(["name", "phone"].includes(field) ? { selected: null } : {}) });
+  const update = (field, next) => {
+    const formatted = ["name", "doctorName"].includes(field)
+      ? next.replace(/(^|\s)(\p{L})/gu, (_, space, letter) => space + letter.toUpperCase())
+      : next;
+    onChange({ ...value, [field]: formatted, ...(["name", "phone"].includes(field) ? { selected: null } : {}) });
+  };
   return (
     <div id="cart-customer-fields" className="cart-customer-compact" onInvalidCapture={(event) => { const details = event.target.closest("details"); if (details) details.open = true; }}>
       <div className="mb-1 flex items-center justify-between gap-2 text-[11px] text-[var(--muted)]"><span className="font-bold">Customer · {wholesale ? "Wholesale" : "Retail"}</span><span>{selected ? "Linked customer" : "Optional"}</span></div>

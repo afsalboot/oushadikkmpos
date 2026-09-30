@@ -51,7 +51,7 @@ export default function SalesCheckoutHostV2() {
     [searched, setSearched] = useState(false),
     [duplicate, setDuplicate] = useState(null),
     [discountType, setDiscountType] = useState("FIXED"),
-    [discountValue, setDiscountValue] = useState(""),
+    [, setDiscountValue] = useState(""),
     [payment, setPayment] = useState("CASH"),
     [cashReceived, setCashReceived] = useState(""),
     [splitCash, setSplitCash] = useState(""),
@@ -244,14 +244,14 @@ export default function SalesCheckoutHostV2() {
     () => amount(cart.reduce((sum, item) => sum + lineTotal(item), 0)),
     [cart],
   );
-  const discountEnabled = wholesaleDiscountEnabled,
-    enteredDiscount = Number(discountValue || 0),
-    discountLimit = 100,
-    discountValid = !wholesaleDiscountEnabled || (Number.isFinite(enteredDiscount) && enteredDiscount >= 0 && enteredDiscount <= 100);
+  const discountValid = !wholesaleDiscountEnabled || cart.every(item => {
+    const value = Number(item.saleWholesaleDiscountPercent || 0);
+    return Number.isFinite(value) && value >= 0 && value <= 100;
+  });
   const pricing=calculateSalePricing({
     consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
     consultationFee: cartCustomer?.consultationFee,
-    wholesaleDiscount: wholesaleDiscountEnabled ? enteredDiscount : undefined,
+    wholesaleDiscount: wholesaleDiscountEnabled ? cart.map(item => item.saleWholesaleDiscountPercent || 0) : undefined,
     items:cart.map(item=>({...item,amount:lineTotal(item),gstRate:item.kind==="MIX"?settings?.gst?.defaultRate:item.gstRate,useDefaultGstRate:item.kind==="MIX"?true:item.useDefaultGstRate})),
     discount:{type:"PERCENTAGE",value:0,reason:discountReason},
     settings,currentUser:{role:settings?._capabilities?.role||"STAFF"},paymentMethod:payment,placeOfSupply
@@ -386,6 +386,7 @@ export default function SalesCheckoutHostV2() {
               quantity: item.quantity,
               baseQuantity: item.looseQuantity,
               freeQuantity: wholesaleDiscountEnabled ? item.freeQuantity || 0 : 0,
+              saleWholesaleDiscountPercent: wholesaleDiscountEnabled ? item.saleWholesaleDiscountPercent || 0 : 0,
               openPackageCounts: item.openPackageCounts,
             },
     );
@@ -453,7 +454,7 @@ export default function SalesCheckoutHostV2() {
           wholesaleDiscountEnabled,
           consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
           consultationFee: cartCustomer?.consultationFee,
-          wholesaleDiscountPercent: wholesaleDiscountEnabled ? enteredDiscount : 0,
+
           supplyContext:{fulfilment,deliveryAddress,deliveryStateCode},
           discountReason,
           payments,
@@ -918,71 +919,15 @@ export default function SalesCheckoutHostV2() {
                         onChange={(event) => { setWholesaleDiscountEnabled(event.target.checked); setDiscountType("PERCENTAGE"); setDiscountValue(""); }} />
                       Wholesale
                     </label>}
-                    {cartCustomer && wholesaleDiscountEnabled && <p className="text-sm text-[var(--green)]">Wholesale · {enteredDiscount}% discount</p>}
-                    {cartCustomer && discount > 0 && <div className="flex justify-between text-[var(--green)]"><span>Wholesale discount</span><strong>-{money(discount)}</strong></div>}
-                    {discountEnabled && !cartCustomer && (
-                      <>
-                        <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
-                          {!wholesaleDiscountEnabled && settings?.discount?.allowFixed !== false &&
-                            settings?.discount?.allowPercentage !== false && (
-                              <select
-                                className="field !min-h-10"
-                                value={discountType}
-                                onChange={(event) => {
-                                  setDiscountType(event.target.value);
-                                  setDiscountValue("");
-                                }}
-                                aria-label="Discount type"
-                              >
-                                <option value="FIXED">₹ Fixed</option>
-                                <option value="PERCENTAGE">% Percent</option>
-                              </select>
-                            )}
-                          <label
-                            className={
-                              !wholesaleDiscountEnabled && settings?.discount?.allowFixed !== false &&
-                              settings?.discount?.allowPercentage !== false
-                                ? ""
-                                : "col-span-2"
-                            }
-                          >
-                            <span className="label">Wholesale discount %</span>
-                            <input
-                              className="field !min-h-10"
-                              type="number"
-                              min="0"
-                              max={
-                                Number.isFinite(discountLimit)
-                                  ? discountLimit
-                                  : undefined
-                              }
-                              step="0.01"
-                              value={discountValue}
-                              onChange={(event) =>
-                                setDiscountValue(event.target.value)
-                              }
-                              placeholder={
-                                discountType === "PERCENTAGE"
-                                  ? "Discount %"
-                                  : "Discount amount"
-                              }
-                            />
-                          </label>
-                        </div>
-                        {!discountValid && (
-                          <p className="text-xs font-bold text-[var(--red)]">
-                            Maximum allowed:{" "}
-                            {discountType === "PERCENTAGE"
-                              ? `${discountLimit}%`
-                              : money(discountLimit)}
-                          </p>
-                        )}
-                        <div className="flex justify-between text-[var(--green)]">
-                          <span>Wholesale discount</span>
-                          <strong>-{money(discount)}</strong>
-                        </div>
-                      </>
-                    )}
+                    {wholesaleDiscountEnabled && cart.map((item, index) => item.kind === "PRODUCT" && item.saleMode !== "WHOLESALE" ? (
+                      <label key={item._id || index} className="mt-2 flex items-center justify-between gap-3 text-sm">
+                        <span>{item.name} — Discount %</span>
+                        <input type="number" className="field !min-h-9 !w-24" min="0" max="100" step="0.01"
+                          aria-label={`Wholesale discount percentage for ${item.name}`} value={item.saleWholesaleDiscountPercent ?? ""} placeholder="0"
+                          onChange={event => { const value = event.target.value; setCart(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, saleWholesaleDiscountPercent: value } : row)); }} />
+                      </label>
+                    ) : null)}
+                    {wholesaleDiscountEnabled && discount > 0 && <div className="flex justify-between text-[var(--green)]"><span>Product discounts</span><strong>-{money(discount)}</strong></div>}
                     {settings?.roundOff?.enabled && (
                       <div className="flex justify-between">
                         <span>Round off</span>

@@ -547,7 +547,6 @@ export default function SalesWorkspaceModern() {
     [filter, setFilter] = useState("All"),
     [cart, setCart] = useState([]),
     [wholesaleDiscountEnabled, setWholesaleDiscountEnabled] = useState(false),
-    [wholesaleDiscountPercent, setWholesaleDiscountPercent] = useState(""),
     [saleCustomer, setSaleCustomer] = useState(null),
     [cartCustomer, setCartCustomer] = useState({}),
     [heldSales, setHeldSales] = useState([]),
@@ -679,7 +678,7 @@ export default function SalesWorkspaceModern() {
       for (const field of fields) if (!field.reportValidity()) return;
       window.dispatchEvent(
         new CustomEvent("oushadi-open-checkout", {
-          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, wholesaleDiscountPercent, cartCustomer, settings },
+          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, cartCustomer, settings },
         }),
       );
     };
@@ -705,13 +704,12 @@ export default function SalesWorkspaceModern() {
       layout?.classList.remove("sales-cart-grid");
       workspace?.classList.remove("sales-cart-workspace");
     };
-  }, [cart, mode, wholesaleDiscountEnabled, wholesaleDiscountPercent, cartCustomer, settings]);
+  }, [cart, mode, wholesaleDiscountEnabled, cartCustomer, settings]);
   useEffect(() => {
     const completed = () => {
       setCartCustomer({});
       setCart([]);
       setWholesaleDiscountEnabled(false);
-      setWholesaleDiscountPercent("");
       api("/api/products?sales=true")
         .then(setProducts)
         .catch(() => {});
@@ -774,13 +772,11 @@ export default function SalesWorkspaceModern() {
             label: `Sale ${current.length + 1}`,
             cart,
             wholesaleDiscountEnabled,
-            wholesaleDiscountPercent,
             heldAt: new Date().toISOString(),
           },
         ]);
       setCart([]);
       setWholesaleDiscountEnabled(false);
-      setWholesaleDiscountPercent("");
       setQuick(null);
       setMode("PRODUCT");
       toast.success(
@@ -796,7 +792,7 @@ export default function SalesWorkspaceModern() {
       links.forEach((link) =>
         link.removeEventListener("click", start, { capture: true }),
       );
-  }, [cart, wholesaleDiscountEnabled, wholesaleDiscountPercent]);
+  }, [cart, wholesaleDiscountEnabled]);
   const cats = useMemo(
       () => [
         ...new Set(products.map((p) => p.categoryId?.name).filter(Boolean)),
@@ -829,7 +825,7 @@ export default function SalesWorkspaceModern() {
     cartPricing = calculateSalePricing({
       consultationFeeEnabled: cartCustomer.consultationFeeEnabled === true,
       consultationFee: cartCustomer.consultationFee,
-      wholesaleDiscount: wholesaleDiscountEnabled ? wholesaleDiscountPercent || 0 : undefined,
+      wholesaleDiscount: wholesaleDiscountEnabled ? cart.map(item => item.saleWholesaleDiscountPercent || 0) : undefined,
       items: cart.map((i) => ({ ...i, discount: undefined, amount: total(i),
         gstRate: i.kind === "MIX" ? settings?.gst?.defaultRate : i.gstRate,
         useDefaultGstRate: i.kind === "MIX" ? true : i.useDefaultGstRate,
@@ -920,7 +916,6 @@ export default function SalesWorkspaceModern() {
           label: `Sale ${current.length + 1}`,
           cart,
           wholesaleDiscountEnabled,
-          wholesaleDiscountPercent,
           customer: saleCustomer,
           cartCustomer,
           heldAt: new Date().toISOString(),
@@ -928,7 +923,6 @@ export default function SalesWorkspaceModern() {
       ]);
     setCart([]);
     setWholesaleDiscountEnabled(false);
-    setWholesaleDiscountPercent("");
     setSaleCustomer(null);
     setCartCustomer({});
     sessionStorage.removeItem("oushadi-preselected-customer");
@@ -949,7 +943,6 @@ export default function SalesWorkspaceModern() {
               label: `Sale ${remaining.length + 1}`,
               cart,
               wholesaleDiscountEnabled,
-              wholesaleDiscountPercent,
               customer: saleCustomer,
               cartCustomer,
               heldAt: new Date().toISOString(),
@@ -959,7 +952,6 @@ export default function SalesWorkspaceModern() {
     });
     setCart(sale.cart.map((item) => ({ ...item, discount: undefined })));
     setWholesaleDiscountEnabled(Boolean(sale.wholesaleDiscountEnabled));
-    setWholesaleDiscountPercent(sale.wholesaleDiscountPercent || "");
     setSaleCustomer(sale.customer || null);
     setCartCustomer(sale.cartCustomer || { name: sale.customer?.name || "", phone: sale.customer?.phone || "", selected: sale.customer || null });
     if (sale.customer)
@@ -1107,6 +1099,7 @@ export default function SalesWorkspaceModern() {
               quantity: i.quantity,
               baseQuantity: i.looseQuantity,
               freeQuantity: wholesaleDiscountEnabled ? i.freeQuantity || 0 : 0,
+              saleWholesaleDiscountPercent: wholesaleDiscountEnabled ? i.saleWholesaleDiscountPercent || 0 : 0,
             },
       );
     setSaving(true);
@@ -1117,7 +1110,6 @@ export default function SalesWorkspaceModern() {
         body: JSON.stringify({
           items,
           wholesaleDiscountEnabled,
-          wholesaleDiscountPercent,
           customerId: customerMode === "EXISTING" ? customerId : undefined,
           customer:
             customerMode === "NEW"
@@ -1134,7 +1126,6 @@ export default function SalesWorkspaceModern() {
       toast.success(`Sale ${sale.invoiceNumber} completed`);
       setCart([]);
       setWholesaleDiscountEnabled(false);
-      setWholesaleDiscountPercent("");
       setCheckout(false);
       setProducts(await api("/api/products?sales=true"));
     } catch (error) {
@@ -1350,7 +1341,7 @@ export default function SalesWorkspaceModern() {
                         confirmText: "Clear all",
                         cancelText: "Cancel",
                         variant: "warning",
-                      })) && (setCart([]), setCartCustomer({}), setWholesaleDiscountEnabled(false), setWholesaleDiscountPercent(""))
+                      })) && (setCart([]), setCartCustomer({}), setWholesaleDiscountEnabled(false))
                     }
                   >
                     Clear all
@@ -1403,6 +1394,14 @@ export default function SalesWorkspaceModern() {
                           </button>
                         </div>
                         <ExpiredStockWarning product={i} />
+                        {wholesaleDiscountEnabled && i.kind === "PRODUCT" && i.saleMode !== "WHOLESALE" && (
+                          <label className="my-2 flex items-center justify-between gap-2 text-xs">
+                            <span>Wholesale discount %</span>
+                            <input type="number" className="field !min-h-8 !w-20" min="0" max="100" step="0.01"
+                              aria-label={`Wholesale discount percentage for ${i.name}`} placeholder="0" value={i.saleWholesaleDiscountPercent ?? ""}
+                              onChange={event => { const value = event.target.value; setCart(current => current.map(item => item._id === i._id ? { ...item, saleWholesaleDiscountPercent: value } : item)); }} />
+                          </label>
+                        )}
                         {wholesaleDiscountEnabled && i.kind === "PRODUCT" && ["PACKAGE", "LOOSE"].includes(i.saleMode) && (
                           <label className="my-2 flex items-center justify-between gap-2 text-xs">
                             <span>Free quantity ({i.saleMode === "LOOSE" ? i.looseUnit || i.baseUnit : i.packageType})</span>
@@ -1453,7 +1452,7 @@ export default function SalesWorkspaceModern() {
                           )}
                           <span className="min-w-0 text-right">
                             <b className="block tabular-nums">
-                              {money(total(i))}
+                              {money(wholesaleDiscountEnabled ? cartPricing.gst.lines[cart.indexOf(i)]?.total ?? total(i) : total(i))}
                             </b>
                             <small className="block truncate text-[10px] text-[var(--muted)]">
                               {calculation}
@@ -1483,17 +1482,9 @@ export default function SalesWorkspaceModern() {
               <label className="mb-3 flex items-center gap-2 text-sm font-bold">
                 <input type="checkbox" className="size-4 accent-[var(--green)]"
                   checked={wholesaleDiscountEnabled}
-                  onChange={(e) => { setWholesaleDiscountEnabled(e.target.checked); if (!e.target.checked) { setWholesaleDiscountPercent(""); setCart(current => current.map(item => item.saleMode === "WHOLESALE" ? item : { ...item, freeQuantity: 0 })); } }} />
+                  onChange={(e) => { setWholesaleDiscountEnabled(e.target.checked); if (!e.target.checked) { setCart(current => current.map(item => item.saleMode === "WHOLESALE" ? item : { ...item, freeQuantity: 0, saleWholesaleDiscountPercent: "" })); } }} />
                 Wholesale
               </label>
-              {wholesaleDiscountEnabled && <label className="mb-3 flex items-center justify-between gap-3 text-sm">
-                Wholesale discount %
-                <input type="number" className="field !min-h-9 !w-24" min="0" max="100" step="0.01"
-                  aria-label="Wholesale discount percentage" placeholder="0" value={wholesaleDiscountPercent}
-                  onChange={(e) => { const value = e.target.value;
-                    if (value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100)) setWholesaleDiscountPercent(value);
-                  }} />
-              </label>}
 
               {cartPricing.totalDiscount > 0 && <div className="flex justify-between text-sm"><span>Discount</span><b>-{money(cartPricing.totalDiscount)}</b></div>}
               <div className="flex justify-between">

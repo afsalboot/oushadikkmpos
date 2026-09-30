@@ -2,6 +2,33 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { calculateSalePricing } from "../src/services/pricing.service.js";
 
+test("product wholesale percentages discount only their own lines without stacking", () => {
+  const result = calculateSalePricing({
+    items: [{ kind: "PRODUCT", amount: 200 }, { kind: "PRODUCT", amount: 100 }, { kind: "PRODUCT", amount: 50 }],
+    wholesaleDiscount: [10, 20, 0],
+    discount: { type: "PERCENTAGE", value: 50 },
+    settings: { gst: { enabled: false }, discount: { enabled: true, automaticEnabled: true, automaticAbove: 1, automaticPercentage: 20 } },
+    consultationFeeEnabled: true, consultationFee: 30,
+  });
+  assert.deepEqual(result.lineDiscounts, [20, 20, 0]);
+  assert.equal(result.cartDiscount, 0);
+  assert.equal(result.automaticDiscount, 0);
+  assert.equal(result.itemDiscount, 40);
+  assert.equal(result.total, 340);
+  assert.deepEqual(result.gst.lines.map(line => line.discount), [20, 20, 0]);
+  assert.deepEqual(result.validationErrors, []);
+});
+
+test("product wholesale discounts validate every percentage and preserve existing wholesale prices", () => {
+  const settings = { gst: { enabled: false }, discount: { enabled: false } };
+  for (const value of [-1, 101, "bad", Infinity]) {
+    assert.ok(calculateSalePricing({ items: [{ amount: 100 }], settings, wholesaleDiscount: [value] }).validationErrors.length);
+  }
+  const result = calculateSalePricing({ items: [{ amount: 100, kind: "PRODUCT" }, { amount: 200, kind: "MIX" }, { amount: 300, saleMode: "WHOLESALE" }], settings, wholesaleDiscount: [100, 50, 50] });
+  assert.deepEqual(result.lineDiscounts, [100, 0, 0]);
+  assert.equal(result.total, 500);
+});
+
 test("wholesale bill discount works with normal discounts disabled", () => {
   const settings = { discount: { enabled: false, cartLevel: false, itemLevel: false,
     allowPercentage: false, requireReason: true }, gst: { enabled: false }, roundOff: { enabled: false } };

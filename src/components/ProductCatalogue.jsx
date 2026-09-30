@@ -2009,9 +2009,6 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
   );
   const valid = preview.filter((entry) => !entry.errors.length);
   const failed = preview.filter((entry) => entry.errors.length);
-  const mappingRows = headers.filter(header => mapping[header] !== "manufacturer").map(header => ({ header }));
-  const categoryRowIndex = mappingRows.findIndex(({ header }) => mapping[header] === "category");
-  mappingRows.splice(categoryRowIndex < 0 ? 0 : categoryRowIndex + 1, 0, { brand: true });
   function template() {
     const csv = Papa.unparse(
       productImportSampleRows(categories.find(category => category.active !== false)?.name),
@@ -2144,27 +2141,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
             </p>
           </div>
           <div className="card max-h-[52vh] divide-y overflow-auto">
-            {mappingRows.map(({ header, brand }) => brand ? (
-              <div className="grid items-center gap-3 p-3 sm:grid-cols-[1fr_auto_1fr]" key="brand-column-picker">
-                <strong className="text-sm">Brand name</strong>
-                <ChevronRight size={16} />
-                <select
-                  className="field !min-h-10"
-                  aria-label="CSV column for Brand name"
-                  value={headers.find(column => mapping[column] === "manufacturer") || ""}
-                  onChange={event => {
-                    const column = event.target.value;
-                    setMapping(current => ({
-                      ...Object.fromEntries(Object.entries(current).map(([key, value]) => [key, value === "manufacturer" ? "Ignore Column" : value])),
-                      ...(column ? { [column]: "manufacturer" } : {}),
-                    }));
-                  }}
-                >
-                  <option value="">Select CSV column (optional)</option>
-                  {headers.map(column => <option key={column} value={column}>{column}</option>)}
-                </select>
-              </div>
-            ) : (
+            {headers.map((header) => (
               <div
                 className="grid items-center gap-3 p-3 sm:grid-cols-[1fr_auto_1fr]"
                 key={header}
@@ -2174,6 +2151,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
                 <select
                   className="field !min-h-10"
                   value={mapping[header]}
+                  aria-label={`System field for ${header}`}
                   onChange={(e) =>
                     setMapping((current) => ({
                       ...current,
