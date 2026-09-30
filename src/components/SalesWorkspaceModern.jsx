@@ -1539,8 +1539,8 @@ export default function SalesWorkspaceModern() {
                 Build Ayurvedic mixture
               </h2>
             </div>
-            <div className="max-h-[60vh] space-y-4 overflow-auto p-5">
-              <label>
+            <div className="flex max-h-[60vh] flex-col gap-4 overflow-auto p-5 [&>*]:shrink-0">
+              <label className="block">
                 <span className="label">Mix label (optional)</span>
                 <input
                   className="field"
