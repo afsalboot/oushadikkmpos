@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import CategoryScroller from "@/components/CategoryScroller";
+import BulkProductEntry from "@/components/BulkProductEntry";
 import ExpiredStockWarning from "@/components/ExpiredStockWarning";
 import {
   BASE_UNITS,
@@ -47,10 +48,15 @@ import {
   calculateLooseUnitPrice,
   capitalizeProductWords,
   parseBoolean,
+  normalizeProductInput,
+  validateProductInput,
 } from "@/lib/product-validation";
 import { calculateLineGST } from "@/services/gst.service";
 import BarcodeInput from "@/components/barcode/BarcodeInput";
 import { detectBarcodeType } from "@/lib/barcode";
+import { BULK_PRODUCT_FIELDS, parseBulkProductChanges } from "@/lib/product-bulk-fields";
+import { PRODUCT_IMPORT_FIELDS, PRODUCT_TEMPLATE_FIELDS, REQUIRED_PRODUCT_IMPORT_FIELDS, productImportAliases, cleanProductImportRow } from "@/lib/product-import-fields";
+import { productImportSampleRows } from "@/lib/product-import-sample";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -1892,65 +1898,10 @@ function ProductDrawer({
   );
 }
 
-const IMPORT_FIELDS = [
-  "Ignore Column",
-  "name",
-  "sku",
-  "barcode",
-  "manufacturer",
-  "hsn_code",
-  "taxable",
-  "use_default_gst_rate",
-  "gst_rate",
-  "gst_price_mode",
-  "category",
-  "base_unit",
-  "package_unit",
-  "package_type",
-  "package_size",
-  "package_price",
-  "allow_package_sale",
-  "allow_loose_sale",
-  "loose_pricing_method",
-  "loose_price",
-  "loose_unit",
-  "loose_conversion_type",
-  "units_per_package",
-  "price_tiers",
-  "allow_mix",
-  "wholesale_enabled",
-  "wholesale_price",
-  "wholesale_min_qty",
-  "wholesale_unit",
-  "units_per_wholesale_pack",
-  "wholesale_price_tiers",
-  "allow_wholesale_loose_sale",
-  "free_scheme_enabled",
-  "free_scheme_type",
-  "free_scheme_buy_qty",
-  "free_scheme_free_qty",
-  "reorder_level",
-  "opening_packages",
-  "opening_quantity",
-  "batch_tracking",
-  "batch_number",
-  "manufacturing_date",
-  "expiry_date",
-  "purchase_price",
-  "supplier",
-  "pos_visible",
-  "status",
-];
-const REQUIRED_IMPORT = [
-  "name",
-  "sku",
-  "category",
-  "base_unit",
-  "package_type",
-  "package_size",
-  "package_price",
-];
+const IMPORT_FIELDS = ["Ignore Column", ...PRODUCT_IMPORT_FIELDS];
+const REQUIRED_IMPORT = REQUIRED_PRODUCT_IMPORT_FIELDS;
 const aliases = {
+  ...productImportAliases,
   ...Object.fromEntries(IMPORT_FIELDS.slice(1).map((field) => [field, field])),
   "medicine name": "name",
   name: "name",
@@ -1972,7 +1923,9 @@ const aliases = {
   package_price: "package_price",
 };
 
-function ImportWizard({ categories, onClose, onImported }) {
+function ImportWizard({ categories, onClose, onImported, manualEntry = false }) {
+  const [manual, setManual] = useState(manualEntry);
+  const [manualRows, setManualRows] = useState([]);
   const inputRef = useRef(null);
   const [step, setStep] = useState(1);
   const [headers, setHeaders] = useState([]);
@@ -2027,8 +1980,11 @@ function ImportWizard({ categories, onClose, onImported }) {
     () =>
       mappedRows.map((row, index) => {
         const errors = [];
+        const clean = cleanProductImportRow(row);
+        const category = categories.find(item => item.name.toLowerCase() === String(row.category || "").trim().toLowerCase());
+        errors.push(...validateProductInput(normalizeProductInput({ ...clean, categoryId: category?._id })));
         for (const field of REQUIRED_IMPORT)
-          if (!String(row[field] || "").trim())
+          if (!String(row[field] ?? "").trim())
             errors.push(`${field} is required`);
         if (row.base_unit && !BASE_UNITS.includes(String(row.base_unit).trim()))
           errors.push(`Invalid base unit \"${row.base_unit}\"`);
@@ -2047,214 +2003,17 @@ function ImportWizard({ categories, onClose, onImported }) {
           ) !== index
         )
           errors.push("Duplicate SKU in file");
-        return { row, index: index + 2, errors };
+        return { row, index: index + 2, errors: [...new Set(errors)] };
       }),
-    [mappedRows, categoryNames],
+    [mappedRows, categoryNames, categories],
   );
   const valid = preview.filter((entry) => !entry.errors.length);
   const failed = preview.filter((entry) => entry.errors.length);
   function template() {
-    const category = categories[0]?.name || "REPLACE_WITH_EXISTING_CATEGORY";
-    const emptyRow = () =>
-      Object.fromEntries(IMPORT_FIELDS.slice(1).map((field) => [field, ""]));
-    const packageSample = {
-      ...emptyRow(),
-      name: "Sample Herbal Oil",
-      sku: "SAMPLE-OIL-200",
-      manufacturer: "Sample Ayurveda",
-      hsn_code: "30049011",
-      taxable: "true",
-      use_default_gst_rate: "true",
-      gst_price_mode: "STORE",
-      category,
-      base_unit: "ml",
-      package_unit: "ml",
-      package_type: "Bottle",
-      package_size: "200",
-      package_price: "180",
-      allow_package_sale: "true",
-      allow_loose_sale: "true",
-      loose_pricing_method: "TIERS",
-      price_tiers: "50:48|100:90",
-      allow_mix: "true",
-      wholesale_enabled: "true",
-      wholesale_price: "160",
-      wholesale_min_qty: "6",
-      wholesale_unit: "Carton",
-      units_per_wholesale_pack: "12",
-      wholesale_price_tiers: "12:155|24:150",
-      allow_wholesale_loose_sale: "false",
-      free_scheme_enabled: "true",
-      free_scheme_type: "SAME_PRODUCT",
-      free_scheme_buy_qty: "10",
-      free_scheme_free_qty: "1",
-      reorder_level: "1000",
-      opening_packages: "0",
-      opening_quantity: "0",
-      batch_tracking: "false",
-      purchase_price: "120",
-      pos_visible: "true",
-      status: "ACTIVE",
-    };
-    const countSample = {
-      ...emptyRow(),
-      name: "Sample Ayurvedic Tablets",
-      sku: "SAMPLE-TAB-JAR",
-      manufacturer: "Sample Ayurveda",
-      taxable: "true",
-      use_default_gst_rate: "false",
-      gst_rate: "5",
-      gst_price_mode: "INCLUSIVE",
-      category,
-      base_unit: "kg",
-      package_unit: "kg",
-      package_type: "Jar",
-      package_size: "1",
-      package_price: "900",
-      allow_package_sale: "true",
-      allow_loose_sale: "true",
-      loose_pricing_method: "count_based",
-      loose_price: "3",
-      loose_unit: "tablet",
-      loose_conversion_type: "count_on_open",
-      allow_mix: "false",
-      wholesale_enabled: "false",
-      reorder_level: "5",
-      opening_packages: "0",
-      opening_quantity: "0",
-      batch_tracking: "false",
-      pos_visible: "true",
-      status: "ACTIVE",
-    };
-    const powderSample = {
-      ...emptyRow(),
-      name: "Sample Herbal Powder",
-      sku: "SAMPLE-POWDER-100",
-      manufacturer: "Sample Ayurveda",
-      hsn_code: "30049011",
-      taxable: "true",
-      use_default_gst_rate: "true",
-      gst_price_mode: "STORE",
-      category,
-      base_unit: "g",
-      package_unit: "g",
-      package_type: "Packet",
-      package_size: "100",
-      package_price: "85",
-      allow_package_sale: "true",
-      allow_loose_sale: "true",
-      loose_pricing_method: "PROPORTIONAL",
-      allow_mix: "true",
-      wholesale_enabled: "false",
-      reorder_level: "500",
-      opening_packages: "0",
-      opening_quantity: "0",
-      batch_tracking: "false",
-      purchase_price: "55",
-      pos_visible: "true",
-      status: "ACTIVE",
-    };
-    const syrupSample = {
-      ...emptyRow(),
-      name: "Sample Herbal Syrup",
-      sku: "SAMPLE-SYRUP-100",
-      manufacturer: "Sample Ayurveda",
-      hsn_code: "30049011",
-      taxable: "true",
-      use_default_gst_rate: "true",
-      gst_price_mode: "STORE",
-      category,
-      base_unit: "ml",
-      package_unit: "ml",
-      package_type: "Bottle",
-      package_size: "100",
-      package_price: "120",
-      allow_package_sale: "true",
-      allow_loose_sale: "false",
-      allow_mix: "false",
-      wholesale_enabled: "true",
-      wholesale_price: "105",
-      wholesale_min_qty: "12",
-      wholesale_unit: "Carton",
-      units_per_wholesale_pack: "24",
-      free_scheme_enabled: "false",
-      reorder_level: "600",
-      opening_packages: "0",
-      opening_quantity: "0",
-      batch_tracking: "false",
-      purchase_price: "75",
-      pos_visible: "true",
-      status: "ACTIVE",
-    };
-    const capsuleSample = {
-      ...emptyRow(),
-      name: "Sample Herbal Capsules",
-      sku: "SAMPLE-CAP-STRIP",
-      manufacturer: "Sample Ayurveda",
-      taxable: "true",
-      use_default_gst_rate: "false",
-      gst_rate: "5",
-      gst_price_mode: "INCLUSIVE",
-      category,
-      base_unit: "tablets",
-      package_unit: "tablets",
-      package_type: "Strip",
-      package_size: "10",
-      package_price: "80",
-      allow_package_sale: "true",
-      allow_loose_sale: "true",
-      loose_pricing_method: "count_based",
-      loose_price: "9",
-      loose_unit: "capsule",
-      loose_conversion_type: "fixed",
-      units_per_package: "10",
-      allow_mix: "false",
-      wholesale_enabled: "false",
-      reorder_level: "100",
-      opening_packages: "0",
-      opening_quantity: "0",
-      batch_tracking: "false",
-      purchase_price: "48",
-      pos_visible: "true",
-      status: "ACTIVE",
-    };
-    const creamSample = {
-      ...emptyRow(),
-      name: "Sample Herbal Cream",
-      sku: "SAMPLE-CREAM-30",
-      manufacturer: "Sample Ayurveda",
-      taxable: "true",
-      use_default_gst_rate: "true",
-      gst_price_mode: "STORE",
-      category,
-      base_unit: "g",
-      package_unit: "g",
-      package_type: "Tube",
-      package_size: "30",
-      package_price: "140",
-      allow_package_sale: "true",
-      allow_loose_sale: "false",
-      allow_mix: "false",
-      wholesale_enabled: "false",
-      reorder_level: "300",
-      opening_packages: "0",
-      opening_quantity: "0",
-      batch_tracking: "false",
-      purchase_price: "90",
-      pos_visible: "true",
-      status: "ACTIVE",
-    };
     const csv = Papa.unparse(
-      [
-        packageSample,
-        countSample,
-        powderSample,
-        syrupSample,
-        capsuleSample,
-        creamSample,
-      ],
+      productImportSampleRows(categories.find(category => category.active !== false)?.name),
       {
-        columns: IMPORT_FIELDS.slice(1),
+        columns: PRODUCT_TEMPLATE_FIELDS,
         newline: "\r\n",
       },
     );
@@ -2263,7 +2022,7 @@ function ImportWizard({ categories, onClose, onImported }) {
     );
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "oushadi-products-template.csv";
+    anchor.download = "oushadhi-products-template.csv";
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -2293,7 +2052,7 @@ function ImportWizard({ categories, onClose, onImported }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          rows: mappedRows,
+          rows: mappedRows.map(cleanProductImportRow),
           createMissingCategories: false,
           duplicateMode: "SKIP",
         }),
@@ -2341,8 +2100,10 @@ function ImportWizard({ categories, onClose, onImported }) {
           </div>
         ))}
       </div>
-      {step === 1 && (
+      {step === 1 && manual && <BulkProductEntry categories={categories} initialRows={manualRows} onCancel={() => setManual(false)} onReview={rows => { setManualRows(rows); setHeaders(PRODUCT_IMPORT_FIELDS); setRawRows(rows); setMapping(Object.fromEntries(PRODUCT_IMPORT_FIELDS.map(field => [field, field]))); setFileName("Manual bulk entry"); setStep(3); }} />}
+      {step === 1 && !manual && (
         <div className="mt-6">
+          <button type="button" className="btn mb-4" onClick={() => setManual(true)}>Enter products manually</button>
           <button
             className="grid min-h-64 w-full place-items-center rounded-2xl border-2 border-dashed border-[#9eb1a2] bg-[#f7faf6] p-8 text-center"
             onClick={() => inputRef.current?.click()}
@@ -2469,7 +2230,7 @@ function ImportWizard({ categories, onClose, onImported }) {
             </table>
           </div>
           <div className="mt-5 flex justify-between">
-            <button className="btn" onClick={() => setStep(2)}>
+            <button className="btn" disabled={importing} onClick={() => setStep(manual ? 1 : 2)}>
               Back
             </button>
             <button
@@ -2527,349 +2288,31 @@ function ImportWizard({ categories, onClose, onImported }) {
   );
 }
 
-function BulkUpdateModal({ count, onClose, onApply }) {
-  const [wholesaleStatus, setWholesaleStatus] = useState("");
-  const [pricingMethod, setPricingMethod] = useState("");
-  const [wholesalePrice, setWholesalePrice] = useState("");
-  const [wholesaleDiscount, setWholesaleDiscount] = useState("");
-  const [wholesaleMinQty, setWholesaleMinQty] = useState("");
-  const [wholesaleSaleUnit, setWholesaleSaleUnit] = useState("");
-  const [wholesalePack, setWholesalePack] = useState("");
-  const [unitsPerWholesalePack, setUnitsPerWholesalePack] = useState("");
-  const [wholesalePackPrice, setWholesalePackPrice] = useState("");
-  const [wholesaleLoose, setWholesaleLoose] = useState("");
-  const [wholesaleLoosePrice, setWholesaleLoosePrice] = useState("");
-  const [freeScheme, setFreeScheme] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  function optionalNumber(value, label, { integer = false, max } = {}) {
-    if (value === "") return undefined;
-    const parsed = Number(value);
-    if (
-      !Number.isFinite(parsed) ||
-      parsed < 0 ||
-      (integer && (!Number.isInteger(parsed) || parsed < 1)) ||
-      (max !== undefined && parsed > max)
-    ) {
-      toast.error(`${label} is invalid.`);
-      return null;
-    }
-    return parsed;
-  }
-
+function BulkUpdateModal({ count, categories, products, onClose, onApply }) {
+  const [changes, setChanges] = useState({}), [saving, setSaving] = useState(false);
   async function submit(event) {
     event.preventDefault();
-    const changes = {};
-    const fixedPrice =
-      pricingMethod === "FIXED"
-        ? optionalNumber(wholesalePrice, "Wholesale price")
-        : undefined;
-    const discount =
-      pricingMethod === "DISCOUNT_FROM_RETAIL"
-        ? optionalNumber(wholesaleDiscount, "Wholesale discount", { max: 100 })
-        : undefined;
-    const minimum = optionalNumber(
-      wholesaleMinQty,
-      "Minimum wholesale quantity",
-      { integer: true },
-    );
-    const packagesPerPack = optionalNumber(
-      unitsPerWholesalePack,
-      "Packages per wholesale pack",
-      { integer: true },
-    );
-    const packPrice =
-      wholesalePack === "DISABLED"
-        ? undefined
-        : optionalNumber(wholesalePackPrice, "Wholesale pack price");
-    const loosePrice =
-      wholesaleLoose === "DISABLED"
-        ? undefined
-        : optionalNumber(wholesaleLoosePrice, "Wholesale loose price");
-    if (
-      [fixedPrice, discount, minimum, packagesPerPack, packPrice, loosePrice].includes(
-        null,
-      )
-    )
-      return;
-
-    if (wholesaleStatus)
-      changes.wholesaleEnabled = wholesaleStatus === "ENABLED";
-    if (pricingMethod) changes.wholesalePricingMethod = pricingMethod;
-    if (fixedPrice !== undefined) changes.wholesalePrice = fixedPrice;
-    if (discount !== undefined)
-      changes.wholesaleDiscountPercent = discount;
-    if (minimum !== undefined) changes.wholesaleMinQty = minimum;
-    if (wholesaleSaleUnit)
-      changes.wholesaleSaleUnit = wholesaleSaleUnit;
-    if (wholesalePack)
-      changes.wholesalePackEnabled = wholesalePack === "ENABLED";
-    if (packagesPerPack !== undefined)
-      changes.unitsPerWholesalePack = packagesPerPack;
-    if (packPrice !== undefined) changes.wholesalePackPrice = packPrice;
-    if (wholesaleLoose)
-      changes.allowWholesaleLooseSale = wholesaleLoose === "ENABLED";
-    if (loosePrice !== undefined)
-      changes.wholesaleLoosePrice = loosePrice;
-    if (freeScheme)
-      changes.freeSchemeEnabled = freeScheme === "ENABLED";
-    if (!Object.keys(changes).length)
-      return toast.error("Choose at least one wholesale field to update.");
+    let parsed;
+    try { parsed = parseBulkProductChanges(changes); } catch (error) { return toast.error(error.message); }
     setSaving(true);
-    try {
-      await onApply(changes);
-    } finally {
-      setSaving(false);
-    }
+    try { await onApply(parsed); } finally { setSaving(false); }
   }
-
-  const currencyField = (label, value, setValue) => (
-    <label>
-      <span className="label">{label}</span>
-      <span className="flex overflow-hidden rounded-xl border border-[var(--line)] bg-white focus-within:border-[var(--green)] focus-within:ring-2 focus-within:ring-emerald-100">
-        <span className="grid min-h-11 place-items-center border-r border-[var(--line)] px-3 font-bold text-[var(--muted)]">
-          ₹
-        </span>
-        <input
-          className="min-w-0 flex-1 px-3 outline-none"
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="Do not change"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-        />
-      </span>
-    </label>
-  );
-  return (
-    <Modal wide onClose={() => !saving && onClose()}>
-      <form onSubmit={submit}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-[var(--green)]">
-              Mass update
-            </p>
-            <h2 className="mt-1 text-2xl font-extrabold">
-              Update {count} selected {count === 1 ? "product" : "products"}
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-              Update wholesale settings for the selected products. Only
-              completed fields will change. Inventory, stock, batch history,
-              retail pricing and other product details remain untouched.
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            disabled={saving}
-          >
-            <X />
-          </button>
-        </div>
-        <section className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 sm:p-5">
-          <div>
-            <strong className="text-base">Wholesale</strong>
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Do not change preserves each selected product&apos;s existing value.
-            </p>
-          </div>
-
-          <div className="mt-5 space-y-5">
-            <div className="rounded-xl border bg-white p-4">
-              <h3 className="text-sm font-extrabold">Wholesale Pricing</h3>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <label>
-                  <span className="label">Wholesale Status</span>
-                  <select
-                    className="field"
-                    value={wholesaleStatus}
-                    onChange={(event) => setWholesaleStatus(event.target.value)}
-                  >
-                    <option value="">Do not change</option>
-                    <option value="ENABLED">Enable Wholesale</option>
-                    <option value="DISABLED">Disable Wholesale</option>
-                  </select>
-                </label>
-                <label>
-                  <span className="label">Wholesale Pricing Method</span>
-                  <select
-                    className="field"
-                    value={pricingMethod}
-                    onChange={(event) => setPricingMethod(event.target.value)}
-                  >
-                    <option value="">Do not change</option>
-                    <option value="FIXED">Fixed Wholesale Price</option>
-                    <option value="DISCOUNT_FROM_RETAIL">
-                      Discount from Retail %
-                    </option>
-                  </select>
-                </label>
-                {pricingMethod === "FIXED" &&
-                  currencyField(
-                    "Wholesale Price",
-                    wholesalePrice,
-                    setWholesalePrice,
-                  )}
-                {pricingMethod === "DISCOUNT_FROM_RETAIL" && (
-                  <label>
-                    <span className="label">
-                      Wholesale Discount from Retail %
-                    </span>
-                    <span className="flex overflow-hidden rounded-xl border border-[var(--line)] bg-white focus-within:border-[var(--green)] focus-within:ring-2 focus-within:ring-emerald-100">
-                      <input
-                        className="min-w-0 flex-1 px-3 outline-none"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        placeholder="Example: 10"
-                        value={wholesaleDiscount}
-                        onChange={(event) =>
-                          setWholesaleDiscount(event.target.value)
-                        }
-                      />
-                      <span className="grid min-h-11 place-items-center border-l border-[var(--line)] px-3 font-bold text-[var(--muted)]">
-                        %
-                      </span>
-                    </span>
-                  </label>
-                )}
-                <label>
-                  <span className="label">Minimum Wholesale Qty</span>
-                  <input
-                    className="field"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="Do not change"
-                    value={wholesaleMinQty}
-                    onChange={(event) => setWholesaleMinQty(event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span className="label">Wholesale Unit</span>
-                  <select
-                    className="field"
-                    value={wholesaleSaleUnit}
-                    onChange={(event) =>
-                      setWholesaleSaleUnit(event.target.value)
-                    }
-                  >
-                    <option value="">Do not change</option>
-                    <option value="PACKAGE">Package</option>
-                    <option value="WHOLESALE_PACK">Wholesale Pack</option>
-                    <option value="LOOSE_UNIT">Loose Unit</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-white p-4">
-              <h3 className="text-sm font-extrabold">Wholesale Pack</h3>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <label>
-                  <span className="label">Wholesale Pack</span>
-                  <select
-                    className="field"
-                    value={wholesalePack}
-                    onChange={(event) => setWholesalePack(event.target.value)}
-                  >
-                    <option value="">Do not change</option>
-                    <option value="ENABLED">Enable</option>
-                    <option value="DISABLED">Disable</option>
-                  </select>
-                </label>
-                <label>
-                  <span className="label">Packages per Wholesale Pack</span>
-                  <input
-                    className="field"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="Example: 12"
-                    value={unitsPerWholesalePack}
-                    onChange={(event) =>
-                      setUnitsPerWholesalePack(event.target.value)
-                    }
-                  />
-                </label>
-                {wholesalePack !== "DISABLED" &&
-                  currencyField(
-                    "Wholesale Pack Price",
-                    wholesalePackPrice,
-                    setWholesalePackPrice,
-                  )}
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-white p-4">
-              <h3 className="text-sm font-extrabold">Loose Wholesale</h3>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <label>
-                  <span className="label">Wholesale Loose Sale</span>
-                  <select
-                    className="field"
-                    value={wholesaleLoose}
-                    onChange={(event) => setWholesaleLoose(event.target.value)}
-                  >
-                    <option value="">Do not change</option>
-                    <option value="ENABLED">Enable</option>
-                    <option value="DISABLED">Disable</option>
-                  </select>
-                </label>
-                {wholesaleLoose !== "DISABLED" &&
-                  currencyField(
-                    "Wholesale Loose Price",
-                    wholesaleLoosePrice,
-                    setWholesaleLoosePrice,
-                  )}
-              </div>
-              <p className="mt-3 text-xs text-[var(--muted)]">
-                Price per tablet, gram, ml, piece, or the product&apos;s configured
-                loose unit.
-              </p>
-            </div>
-
-            <div className="rounded-xl border bg-white p-4">
-              <h3 className="text-sm font-extrabold">Schemes</h3>
-              <label className="mt-4 block sm:max-w-[calc(50%-0.5rem)]">
-                <span className="label">Free Quantity Scheme</span>
-                <select
-                  className="field"
-                  value={freeScheme}
-                  onChange={(event) => setFreeScheme(event.target.value)}
-                >
-                  <option value="">Do not change</option>
-                  <option value="ENABLED">Enable</option>
-                  <option value="DISABLED">Disable</option>
-                </select>
-              </label>
-            </div>
-          </div>
-        </section>
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            className="btn"
-            onClick={onClose}
-            disabled={saving}
-          >
-            Cancel
-          </button>
-          <button className="btn btn-primary" disabled={saving}>
-            {saving ? (
-              <LoaderCircle className="loading-shimmer-icon" size={17} />
-            ) : (
-              <Check size={17} />
-            )}
-            {saving ? "Updating…" : "Update wholesale settings"}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
+  return <Modal wide onClose={() => !saving && onClose()}><form onSubmit={submit}>
+    <div className="flex justify-between gap-4"><div><h2 className="text-xl font-extrabold">Bulk update {count} products</h2><p className="mt-2 text-sm text-[var(--muted)]">Check only the fields you want to change. Unchecked fields keep their existing values.</p><p className="mt-1 text-xs text-[var(--muted)]">Stock quantities use Stock adjustment. Stock units and conversions cannot change while stock exists.</p></div><button type="button" className="btn" disabled={saving} onClick={onClose} aria-label="Close"><X size={18} /></button></div>
+    <fieldset disabled={saving} className="mt-5 space-y-4">
+      {[...new Set(BULK_PRODUCT_FIELDS.map(field => field[2]))].map(group => <details key={group} className="rounded-xl border p-4" open={group === "Details"}><summary className="cursor-pointer font-bold">{group}</summary><div className="mt-4 grid gap-4 sm:grid-cols-2">
+        {BULK_PRODUCT_FIELDS.filter(field => field[2] === group).map(([key, label, , type, min, max]) => {
+          const enabled = key in changes;
+          const choices = type === "category" ? categories.filter(row => row.active !== false).map(row => [row._id, row.name]) : type === "product" ? products.filter(row => row.active !== false).map(row => [row._id, row.name]) : type === "boolean" ? [["true", "Yes"], ["false", "No"]] : Array.isArray(type) ? type.map(value => [value, value]) : null;
+          return <div key={key}><label className="mb-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={enabled} onChange={event => setChanges(current => { const next = { ...current }; if (event.target.checked) next[key] = type === "boolean" ? true : ""; else delete next[key]; return next; })} />{label}</label>
+            {choices ? <select className="field" aria-label={label} disabled={!enabled} required={enabled} value={String(changes[key] ?? "")} onChange={event => setChanges({ ...changes, [key]: type === "boolean" ? event.target.value === "true" : event.target.value })}><option value="">Choose value</option>{choices.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select> :
+              <input className="field" aria-label={label} disabled={!enabled} required={enabled} type={["number", "integer"].includes(type) ? "number" : "text"} min={min} max={max} step={type === "integer" ? "1" : "any"} placeholder={type === "tiers" ? "10:100|20:180" : "Do not change"} value={changes[key] ?? ""} onChange={event => setChanges({ ...changes, [key]: event.target.value })} />}
+          </div>;
+        })}
+      </div></details>)}
+      <button className="btn btn-primary w-full" disabled={saving || !Object.keys(changes).length}>{saving ? "Updating…" : `Update ${count} products`}</button>
+    </fieldset>
+  </form></Modal>;
 }
 
 function ProductActions({ product, actions }) {
@@ -3325,10 +2768,10 @@ export default function ProductCatalogue() {
   async function applyBulkUpdate(changes) {
     if (
       !(await confirmAction({
-        title: `Update wholesale settings for ${selected.size} selected ${selected.size === 1 ? "product" : "products"}?`,
+        title: `Update ${selected.size} selected ${selected.size === 1 ? "product" : "products"}?`,
         description:
-          "Only the completed wholesale fields will change. Other product and inventory details will remain untouched.",
-        confirmText: "Update wholesale settings",
+          "Only the checked fields will change for every selected product.",
+        confirmText: "Update products",
         cancelText: "Cancel",
       }))
     )
@@ -3481,6 +2924,7 @@ export default function ProductCatalogue() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button className="btn" onClick={() => setImportOpen("MANUAL")}><Plus size={17} />Bulk Add</button>
           <button className="btn" onClick={() => setImportOpen(true)}>
             <FileSpreadsheet size={17} />
             Import CSV
@@ -3856,6 +3300,7 @@ export default function ProductCatalogue() {
       )}
       {importOpen && (
         <ImportWizard
+          manualEntry={importOpen === "MANUAL"}
           categories={categories}
           onClose={() => setImportOpen(false)}
           onImported={() => load()}
@@ -3863,6 +3308,8 @@ export default function ProductCatalogue() {
       )}
       {bulkUpdateOpen && (
         <BulkUpdateModal
+          categories={categories}
+          products={products}
           count={selected.size}
           onClose={() => setBulkUpdateOpen(false)}
           onApply={applyBulkUpdate}

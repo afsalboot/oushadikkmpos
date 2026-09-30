@@ -5,6 +5,7 @@ import { ok, fail, apiError } from "@/lib/api";
 import { Category, Product, Supplier } from "@/models";
 import { normalizeProductInput, validateProductInput } from "@/lib/product-validation";
 import { createProduct } from "@/services/product.service";
+import { cleanProductImportRow } from "@/lib/product-import-fields";
 
 const slugify = (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -28,7 +29,7 @@ export async function POST(request) {
     const results = [];
 
     for (let index = 0; index < rows.length; index += 1) {
-      const row = rows[index] || {};
+      const row = cleanProductImportRow(rows[index]);
       const rowNumber = index + 2;
       const categoryName = String(row.category || "").trim();
       let category = categoryMap.get(categoryName.toLowerCase());
@@ -58,6 +59,12 @@ export async function POST(request) {
         supplierId: supplier?._id,
         packageSellingPrice: row.packageSellingPrice ?? row.packagePrice,
       });
+      if (normalized.freeSchemeEnabled && normalized.freeSchemeType === "DIFFERENT_PRODUCT") {
+        const reference = normalized.freeSchemeFreeProduct;
+        const freeProduct = existingProducts.find(product => String(product._id) === reference || product.sku?.toUpperCase() === String(reference).toUpperCase());
+        if (!freeProduct) rowErrors.push("Free product must reference an existing product SKU or ID");
+        else normalized.freeSchemeFreeProduct = freeProduct._id;
+      }
       rowErrors.push(...validateProductInput(normalized));
       const existingDuplicate = existingSkus.has(normalized.sku) || (normalized.barcode && existingBarcodes.has(normalized.barcode));
       if (existingDuplicate && duplicateMode === "SKIP") {
@@ -81,6 +88,7 @@ export async function POST(request) {
         });
         usedSkus.add(product.sku);
         if (product.barcode) usedBarcodes.add(product.barcode);
+        existingProducts.push({ _id: product._id, sku: product.sku, barcode: product.barcode });
         results.push({ row: rowNumber, name: product.name, status: "IMPORTED" });
       } catch (error) {
         results.push({ row: rowNumber, name: normalized.name, status: "ERROR", errors: [error?.code === 11000 ? "SKU or barcode already exists" : error.message] });

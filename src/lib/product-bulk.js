@@ -26,6 +26,8 @@ export function bulkProductSectionsTouched(changes = {}) {
       "freeSchemeType",
       "freeSchemeBuyQty",
       "freeSchemeFreeQty",
+      "freeSchemeFreeProduct",
+      "wholesalePriceTiers",
     ].some((field) => changes[field] !== undefined) ||
     (changes.pricePercent !== undefined && changes.adjustWholesale === true);
   return { gst, wholesale };

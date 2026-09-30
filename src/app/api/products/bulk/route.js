@@ -6,8 +6,11 @@ import {
   InventoryBatch,
   Product,
   AuditLog,
+  Category,
+  Settings,
 } from "@/models";
-import { WHOLESALE_UNITS, validateWholesaleProduct } from "@/lib/wholesale";
+import { WHOLESALE_UNITS } from "@/lib/wholesale";
+import { parseBulkProductChanges, bulkProductUpdate } from "@/lib/product-bulk-fields";
 import {
   MAX_BULK_PRODUCTS,
   classifyBulkDeletion,
@@ -29,181 +32,40 @@ function productIds(values) {
 export async function PATCH(request) {
   let session;
   try {
-    const actor=await requireSession("products.edit");
+    const actor = await requireSession("products.edit");
     await connectDb();
-    const body = await request.json();
-    const ids = productIds(body.ids);
-    if (!ids.length) return fail("Select at least one valid product");
-    if ((body.ids || []).length > MAX_BULK_PRODUCTS)
-      return fail(`Bulk updates are limited to ${MAX_BULK_PRODUCTS} products`);
-
-    const changes = body.changes || {};
-    const wholesaleFields = new Set([
-      "wholesaleEnabled",
-      "wholesalePricingMethod",
-      "wholesalePrice",
-      "wholesaleDiscountPercent",
-      "wholesaleMinQty",
-      "wholesaleSaleUnit",
-      "wholesalePackEnabled",
-      "unitsPerWholesalePack",
-      "wholesalePackPrice",
-      "allowWholesaleLooseSale",
-      "wholesaleLoosePrice",
-      "freeSchemeEnabled",
-    ]);
-    if (Object.keys(changes).some((field) => !wholesaleFields.has(field)))
-      return fail("Mass update supports wholesale settings only");
-    if (
-      Object.values(changes).some(
-        (value) => typeof value === "string" && !value.trim(),
-      )
-    )
-      return fail("Blank values must be omitted from a mass update");
-    const { wholesale: wholesaleTouched } =
-      bulkProductSectionsTouched(changes);
-    const fixed = {};
-    if (typeof changes.wholesaleEnabled === "boolean") {
-      fixed.wholesaleEnabled = changes.wholesaleEnabled;
-    }
-    if (changes.wholesalePricingMethod !== undefined) {
-      if (!["FIXED", "DISCOUNT_FROM_RETAIL"].includes(changes.wholesalePricingMethod))
-        return fail("Wholesale pricing method is invalid");
-      fixed.wholesalePricingMethod = changes.wholesalePricingMethod;
-    }
-    for (const field of [
-      "wholesalePrice",
-      "wholesalePackPrice",
-      "wholesaleLoosePrice",
-    ]) {
-      if (changes[field] === undefined) continue;
-      const value = Number(changes[field]);
-      if (!Number.isFinite(value) || value < 0)
-        return fail(`${field} must be zero or greater`);
-      fixed[field] = value;
-    }
-    if (changes.wholesaleDiscountPercent !== undefined) {
-      const value = Number(changes.wholesaleDiscountPercent);
-      if (!Number.isFinite(value) || value < 0 || value > 100)
-        return fail("Wholesale discount must be between 0% and 100%");
-      fixed.wholesaleDiscountPercent = value;
-    }
-    if (changes.wholesaleMinQty !== undefined) {
-      const value = Number(changes.wholesaleMinQty);
-      if (!Number.isInteger(value) || value <= 0)
-        return fail(
-          "Wholesale minimum quantity must be a positive whole number",
-        );
-      fixed.wholesaleMinQty = value;
-    }
-    if (changes.wholesaleUnit !== undefined) {
-      if (
-        ![
-          "Piece",
-          "Tablet",
-          "Bottle",
-          "Packet",
-          "Jar",
-          "Box",
-          "Carton",
-        ].includes(changes.wholesaleUnit)
-      )
-        return fail("Wholesale pack is invalid");
-      fixed.wholesaleUnit = changes.wholesaleUnit;
-    }
-    if (changes.wholesaleSaleUnit !== undefined) {
-      if (!["PACKAGE", "WHOLESALE_PACK", "LOOSE_UNIT"].includes(changes.wholesaleSaleUnit))
-        return fail("Wholesale sale unit is invalid");
-      fixed.wholesaleSaleUnit = changes.wholesaleSaleUnit;
-    }
-    if (typeof changes.wholesalePackEnabled === "boolean")
-      fixed.wholesalePackEnabled = changes.wholesalePackEnabled;
-    if (changes.unitsPerWholesalePack !== undefined) {
-      const value = Number(changes.unitsPerWholesalePack);
-      if (!Number.isInteger(value) || value <= 0)
-        return fail(
-          "Packages per wholesale pack must be a positive whole number",
-        );
-      fixed.unitsPerWholesalePack = value;
-    }
-    if (typeof changes.allowWholesaleLooseSale === "boolean")
-      fixed.allowWholesaleLooseSale = changes.allowWholesaleLooseSale;
-    if (typeof changes.freeSchemeEnabled === "boolean")
-      fixed.freeSchemeEnabled = changes.freeSchemeEnabled;
-    if (changes.freeSchemeType !== undefined) {
-      if (
-        !["SAME_PRODUCT", "DIFFERENT_PRODUCT"].includes(changes.freeSchemeType)
-      )
-        return fail("Free scheme type is invalid");
-      fixed.freeSchemeType = changes.freeSchemeType;
-      if (changes.freeSchemeType === "SAME_PRODUCT")
-        fixed.freeSchemeFreeProduct = null;
-    }
-    for (const field of ["freeSchemeBuyQty", "freeSchemeFreeQty"]) {
-      if (changes[field] === undefined) continue;
-      const value = Number(changes[field]);
-      if (!Number.isInteger(value) || value <= 0)
-        return fail("Free scheme quantities must be positive whole numbers");
-      fixed[field] = value;
-    }
-
-    if (!Object.keys(fixed).length)
-      return fail("Choose at least one wholesale field to update");
-
-    const products = await Product.find({ _id: { $in: ids } }).lean();
-    if (!products.length) return fail("No selected products were found", 404);
-    const operations = products.map((product) => {
-      const update = { ...fixed };
-      if (update.wholesalePackEnabled === true) {
-        if (!product.wholesaleUnit || product.wholesaleUnit === product.packageType)
-          update.wholesaleUnit = product.stockPackType || "Box";
-        if (
-          changes.unitsPerWholesalePack === undefined &&
-          Number(product.unitsPerWholesalePack || 1) <= 1 &&
-          Number(product.unitsPerStockPack || 1) > 1
-        )
-          update.unitsPerWholesalePack = Number(product.unitsPerStockPack);
-      }
-      if (wholesaleTouched) {
-        const candidate = { ...product, ...update };
-        Object.assign(
-          update,
-          missingWholesaleDefaults(candidate, WHOLESALE_UNITS),
-        );
-      }
-      return {
-        updateOne: { filter: { _id: product._id }, update: { $set: update } },
-      };
-    });
-
-    const invalid = operations.flatMap((operation, index) => {
-      const candidate = {
-        ...products[index],
-        ...operation.updateOne.update.$set,
-      };
-      const errors = wholesaleTouched
-        ? validateWholesaleProduct(candidate)
-        : [];
-      if (
-        changes.freeSchemeEnabled === true &&
-        !candidate.wholesaleEnabled
-      )
-        errors.push("Enable wholesale before enabling a free scheme");
-      return errors.length ? [`${candidate.name}: ${errors.join("; ")}`] : [];
-    });
-    if (invalid.length) return fail(invalid.slice(0, 5).join(". "));
-
+    const body = await request.json(), ids = productIds(body.ids);
+    if (!ids.length || ids.length !== new Set(body.ids || []).size) return fail("Select valid products");
+    if ((body.ids || []).length > MAX_BULK_PRODUCTS) return fail(`Bulk updates are limited to ${MAX_BULK_PRODUCTS} products`);
+    let changes;
+    try { changes = parseBulkProductChanges(body.changes || {}); } catch (error) { return fail(error.message); }
     session = await mongoose.startSession();
+    let updated = 0;
     await session.withTransaction(async () => {
+      const products = await Product.find({ _id: { $in: ids } }).session(session).lean();
+      if (products.length !== ids.length) throw new Error("Some selected products no longer exist. Refresh and try again.");
+      if (changes.categoryId && (!mongoose.isValidObjectId(changes.categoryId) || !await Category.exists({ _id: changes.categoryId, active: true }).session(session))) throw new Error("Select an active category");
+      if (changes.freeSchemeFreeProduct && (!mongoose.isValidObjectId(changes.freeSchemeFreeProduct) || !await Product.exists({ _id: changes.freeSchemeFreeProduct, active: true }).session(session))) throw new Error("Select an active free product");
+      const settings = await Settings.findOne({ key: "global" }).session(session).lean();
+      const stocked = await InventoryBatch.distinct("productId", { productId: { $in: ids }, $or: [{ sealedPackages: { $gt: 0 } }, { openQuantity: { $gt: 0 } }] }).session(session);
+      const stockedIds = new Set(stocked.map(String));
+      const wholesaleTouched = bulkProductSectionsTouched(changes).wholesale;
+      const operations = products.map(product => {
+        const defaults = wholesaleTouched ? missingWholesaleDefaults({ ...product, ...changes }, WHOLESALE_UNITS) : {};
+        let update;
+        try { update = bulkProductUpdate({ ...product, ...defaults }, changes, { hasStock: stockedIds.has(String(product._id)), requireHsn: settings?.gst?.enabled && settings.gst.requireHsn }); }
+        catch (error) { throw new Error(`${product.name}: ${error.message}`); }
+        return { updateOne: { filter: { _id: product._id }, update: { $set: { ...defaults, ...update } } } };
+      });
       await Product.bulkWrite(operations, { session });
-      await AuditLog.insertMany(products.map((product,index)=>({actorId:actor.sub,action:"PRODUCT_BULK_UPDATED",module:"products",targetType:"Product",targetId:product._id,description:"Bulk product update",metadata:{before:product,changes:operations[index].updateOne.update.$set}})),{session});
+      await AuditLog.insertMany(products.map((product, index) => ({ actorId: actor.sub, action: "PRODUCT_BULK_UPDATED", module: "products", targetType: "Product", targetId: product._id, description: "Bulk product update", metadata: { before: product, changes: operations[index].updateOne.update.$set } })), { session });
+      updated = products.length;
     });
-    return ok({ matched: products.length, updated: operations.length });
+    return ok({ matched: updated, updated });
   } catch (error) {
+    if (error.constructor === Error && !error.status) error.status = 422;
     return apiError(error);
-  } finally {
-    if (session) await session.endSession();
-  }
+  } finally { if (session) await session.endSession(); }
 }
 
 export async function DELETE(request) {

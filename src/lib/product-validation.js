@@ -49,13 +49,15 @@ export function normalizeProductInput(input = {}) {
   const requestedGstPriceMode = String(input.gstPriceMode ?? input.gst_price_mode ?? "STORE").trim().toUpperCase();
   const stockPackType = ["Box", "Carton"].includes(input.stockPackType ?? input.stock_pack_type) ? input.stockPackType ?? input.stock_pack_type : "Box";
   const unitsPerStockPack = Number(input.unitsPerStockPack ?? input.units_per_stock_pack ?? 1);
-  const openingStockPacks = Number(input.openingStockPacks ?? input.opening_stock_packs ?? 0);
-  const openingIndividualPackages = Number(input.openingIndividualPackages ?? input.opening_individual_packages ?? input.openingPackages ?? input.opening_packages ?? 0);
+  const hasOpeningBreakdown = [input.openingStockPacks, input.opening_stock_packs, input.openingIndividualPackages, input.opening_individual_packages].some(value => value !== undefined && value !== null && value !== "");
+  const legacyOpeningPackages = Number(input.openingPackages ?? input.opening_packages ?? 0);
+  const openingStockPacks = hasOpeningBreakdown ? Number(input.openingStockPacks ?? input.opening_stock_packs ?? 0) : Math.floor(legacyOpeningPackages / unitsPerStockPack);
+  const openingIndividualPackages = hasOpeningBreakdown ? Number(input.openingIndividualPackages ?? input.opening_individual_packages ?? 0) : legacyOpeningPackages % unitsPerStockPack;
   return {
     name: capitalizeProductWords(input.name || "").trim(),
     sku: String(input.sku || "").trim().toUpperCase(),
     barcode: normalizeBarcode(input.barcode),
-    barcodeType: BARCODE_TYPES.includes(String(input.barcodeType || "").toUpperCase()) ? String(input.barcodeType).toUpperCase() : detectBarcodeType(input.barcode),
+    barcodeType: BARCODE_TYPES.includes(String(input.barcodeType ?? input.barcode_type ?? "").toUpperCase()) ? String(input.barcodeType ?? input.barcode_type).toUpperCase() : detectBarcodeType(input.barcode),
     categoryId: input.categoryId,
     manufacturer: capitalizeProductWords(input.manufacturer ?? input.brand ?? "").trim(),
     hsnCode: String(input.hsnCode ?? input.hsn_code ?? input.hsn ?? "").trim(),
