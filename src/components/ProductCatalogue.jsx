@@ -1934,6 +1934,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
+  const [errorsOnly, setErrorsOnly] = useState(true);
   function load(file) {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024)
@@ -2027,17 +2028,21 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
     URL.revokeObjectURL(url);
   }
   function errorReport() {
-    const rows = (result?.results || [])
+    const entries = step === 3
+      ? failed.map(entry => ({ row: entry.index, name: entry.row.name, status: "ERROR", errors: entry.errors }))
+      : result?.results || [];
+    const rows = entries
       .filter((entry) => entry.status !== "IMPORTED")
       .map((entry) => ({
         row: entry.row,
         sku: mappedRows[entry.row - 2]?.sku || "",
         product_name: entry.name,
-        field: "",
+        category: mappedRows[entry.row - 2]?.category || "",
+        status: entry.status,
         error: (entry.errors || []).join("; "),
       }));
     const url = URL.createObjectURL(
-      new Blob([Papa.unparse(rows)], { type: "text/csv" }),
+      new Blob(["\ufeff", Papa.unparse(rows, { escapeFormulae: true })], { type: "text/csv;charset=utf-8" }),
     );
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -2217,6 +2222,14 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
               <strong className="mt-1 block text-2xl">{preview.length}</strong>
             </div>
           </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-sm font-bold">
+              <input type="checkbox" checked={errorsOnly} onChange={event => setErrorsOnly(event.target.checked)} />
+              Errors only ({failed.length})
+            </label>
+            {failed.length > 0 && <button type="button" className="btn" onClick={errorReport}><Download size={16} />Download error report ({failed.length})</button>}
+          </div>
+          <p className="mt-2 text-sm text-[var(--muted)]" role="status">{errorsOnly ? `${failed.length} products with errors` : `All ${preview.length} products`}. Row numbers refer to your uploaded sheet, including the header.</p>
           <div className="table-wrap card mt-4 max-h-80">
             <table>
               <thead>
@@ -2229,17 +2242,17 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
                 </tr>
               </thead>
               <tbody>
-                {preview.slice(0, 200).map((entry) => (
+                {(errorsOnly ? failed : preview).map((entry) => (
                   <tr key={entry.index}>
                     <td>{entry.index}</td>
                     <td className="font-bold">{entry.row.name || "—"}</td>
                     <td>{entry.row.sku || "—"}</td>
                     <td>{entry.row.category || "—"}</td>
-                    <td>
+                    <td className="!whitespace-normal min-w-64">
                       {entry.errors.length ? (
-                        <span className="text-xs font-bold text-red-700">
-                          {entry.errors.join("; ")}
-                        </span>
+                        <ul className="list-disc space-y-1 pl-4 text-xs font-bold text-red-700">
+                          {entry.errors.map(error => <li key={error}>{error}</li>)}
+                        </ul>
                       ) : (
                         <span className="text-xs font-bold text-[var(--green)]">
                           <CheckCircle2 className="mr-1 inline" size={14} />
@@ -2249,6 +2262,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
                     </td>
                   </tr>
                 ))}
+                {errorsOnly && !failed.length && <tr><td colSpan={5} className="text-center text-[var(--green)]">No validation errors. All products are ready to import.</td></tr>}
               </tbody>
             </table>
           </div>
