@@ -6,7 +6,7 @@ import { Category, Product, Supplier } from "@/models";
 import { normalizeProductInput, validateProductInput } from "@/lib/product-validation";
 import { createProduct } from "@/services/product.service";
 import { cleanProductImportRow, productCategoryKey } from "@/lib/product-import-fields";
-import { createProductImportDuplicateIndex } from "@/lib/product-import-duplicates";
+import { createProductImportDuplicateIndex, PRODUCT_DUPLICATE_OPTIONS } from "@/lib/product-import-duplicates";
 
 const slugify = (value) => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -14,7 +14,8 @@ export async function POST(request) {
   try {
     const auth = await requireSession("products.import");
     await connectDb();
-    const { rows, createMissingCategories = false, duplicateMode = "SKIP" } = await request.json();
+    const { rows, createMissingCategories = false, duplicateMode = "SKIP", duplicateBy = "DETAILS", previewOnly = false } = await request.json();
+    if (!PRODUCT_DUPLICATE_OPTIONS.some(([value]) => value === duplicateBy)) return fail("Invalid duplicate matching field");
     if (!Array.isArray(rows) || !rows.length) return fail("Import contains no rows");
     if (rows.length > 1000) return fail("Import is limited to 1,000 rows at a time");
 
@@ -23,7 +24,7 @@ export async function POST(request) {
     const suppliers = await Supplier.find({ active: { $ne: false } }).select("name").lean();
     const supplierMap = new Map(suppliers.map((supplier) => [supplier.name.trim().toLowerCase(), supplier]));
     const existingProducts = await Product.find({}, { sku: 1, barcode: 1, name: 1, manufacturer: 1, categoryId: 1, baseUnit: 1, packageUnit: 1, packageType: 1, packageSize: 1 }).lean();
-    const identityIndex = createProductImportDuplicateIndex(existingProducts);
+    const identityIndex = createProductImportDuplicateIndex(existingProducts, duplicateBy);
     const usedSkus = new Set(existingProducts.map((product) => product.sku?.toUpperCase()).filter(Boolean));
     const usedBarcodes = new Set(existingProducts.map((product) => product.barcode).filter(Boolean));
     const results = [];
@@ -36,7 +37,7 @@ export async function POST(request) {
       const rowErrors = [];
 
       if (!categoryName) rowErrors.push("Category is required");
-      if (!category && categoryName && createMissingCategories) {
+      if (!category && categoryName && createMissingCategories && !previewOnly) {
         try {
           category = await Category.create({ name: categoryName, slug: slugify(categoryName), isSystem: false, active: true });
           categoryMap.set(productCategoryKey(categoryName), category);
@@ -69,8 +70,11 @@ export async function POST(request) {
       rowErrors.push(...validateProductInput(normalized));
       const identityMatch = identityIndex.find(normalized);
       const existingDuplicate = usedSkus.has(normalized.sku) || (normalized.barcode && usedBarcodes.has(normalized.barcode)) || identityMatch;
+      const duplicateReason = identityMatch
+        ? `Duplicate by ${PRODUCT_DUPLICATE_OPTIONS.find(([value]) => value === duplicateBy)[1]}: matches ${identityMatch.row ? `sheet row ${identityMatch.row}` : `existing product ${identityMatch.sku}`}`
+        : "SKU or barcode already exists or is repeated in this sheet";
       if (existingDuplicate && duplicateMode === "SKIP") {
-        results.push({ row: rowNumber, name: normalized.name || "Unnamed product", status: "SKIPPED", errors: [identityMatch ? `Matching product already exists (${identityMatch.sku}): same name, category, package size and unit${normalized.manufacturer ? ", and brand" : ""}. Stock was not added.` : "Existing SKU or barcode skipped. Stock was not added."] });
+        results.push({ row: rowNumber, name: normalized.name || "Unnamed product", status: "SKIPPED", duplicate: true, errors: [duplicateReason] });
         continue;
       }
       if (identityMatch) rowErrors.push(`Matching product already exists (${identityMatch.sku})`);
@@ -79,6 +83,15 @@ export async function POST(request) {
 
       if (rowErrors.length) {
         results.push({ row: rowNumber, name: normalized.name || "Unnamed product", status: "ERROR", errors: [...new Set(rowErrors)] });
+        continue;
+      }
+
+      if (previewOnly) {
+        usedSkus.add(normalized.sku);
+        if (normalized.barcode) usedBarcodes.add(normalized.barcode);
+        identityIndex.add({ ...normalized, importRow: rowNumber });
+        existingProducts.push({ ...normalized, _id: new mongoose.Types.ObjectId() });
+        results.push({ row: rowNumber, name: normalized.name, status: "VALID", errors: [] });
         continue;
       }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Papa from "papaparse";
 import { importProductsWithProgress } from "@/lib/product-import-progress";
+import { PRODUCT_DUPLICATE_OPTIONS } from "@/lib/product-import-duplicates";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   AlertTriangle,
@@ -1937,6 +1938,9 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
   const [importProgress, setImportProgress] = useState({ completed: 0, total: 0, percent: 0 });
   const [result, setResult] = useState(null);
   const [errorsOnly, setErrorsOnly] = useState(true);
+  const [duplicateBy, setDuplicateBy] = useState("DETAILS");
+  const [skipDuplicates, setSkipDuplicates] = useState(true);
+  const [duplicateCheck, setDuplicateCheck] = useState(null);
   function load(file) {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024)
@@ -1979,6 +1983,18 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
     () => new Set(categories.map((item) => productCategoryKey(item.name))),
     [categories],
   );
+  useEffect(() => {
+    if (step !== 3) return;
+    let cancelled = false;
+    api("/api/products/import", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: mappedRows.map(cleanProductImportRow), previewOnly: true, duplicateBy, duplicateMode: "SKIP" }),
+    }).then(response => { if (!cancelled) setDuplicateCheck({ rows: mappedRows, duplicateBy, results: response.results }); })
+      .catch(error => { if (!cancelled) setDuplicateCheck({ rows: mappedRows, duplicateBy, error: error.message }); });
+    return () => { cancelled = true; };
+  }, [step, mappedRows, duplicateBy]);
+  const currentCheck = duplicateCheck?.rows === mappedRows && duplicateCheck?.duplicateBy === duplicateBy;
+  const checkError = currentCheck ? duplicateCheck?.error || "" : "";
+  const checkReady = currentCheck && Array.isArray(duplicateCheck?.results);
   const preview = useMemo(
     () =>
       mappedRows.map((row, index) => {
@@ -2006,12 +2022,17 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
           ) !== index
         )
           errors.push("Duplicate SKU in file");
-        return { row, index: index + 2, errors: [...new Set(errors)] };
+        const checked = checkReady ? duplicateCheck.results[index] : null;
+        const duplicate = checked?.status === "SKIPPED";
+        if (checked?.status === "ERROR") errors.push(...checked.errors);
+        return { row, index: index + 2, duplicate, duplicateReason: duplicate ? checked.errors.join("; ") : "", errors: duplicate ? [] : [...new Set(errors)] };
       }),
-    [mappedRows, categoryNames, categories],
+    [mappedRows, categoryNames, categories, checkReady, duplicateCheck],
   );
-  const valid = preview.filter((entry) => !entry.errors.length);
+  const valid = preview.filter((entry) => !entry.errors.length && !entry.duplicate);
   const failed = preview.filter((entry) => entry.errors.length);
+  const duplicates = preview.filter(entry => entry.duplicate);
+  const issues = preview.filter(entry => entry.errors.length || entry.duplicate);
   function template() {
     const csv = Papa.unparse(
       productImportSampleRows(categories.find(category => category.active !== false)?.name),
@@ -2031,7 +2052,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
   }
   function errorReport() {
     const entries = step === 3
-      ? failed.map(entry => ({ row: entry.index, name: entry.row.name, status: "ERROR", errors: entry.errors }))
+      ? issues.map(entry => ({ row: entry.index, name: entry.row.name, status: entry.duplicate ? "DUPLICATE" : "ERROR", errors: entry.duplicate ? [entry.duplicateReason] : entry.errors }))
       : result?.results || [];
     const rows = entries
       .filter((entry) => entry.status !== "IMPORTED")
@@ -2054,6 +2075,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
   }
   async function run() {
     if (importing) return;
+    if (!checkReady || checkError) return toast.error("Wait for duplicate checking to finish.");
     setImporting(true);
     try {
       const response = await importProductsWithProgress(mappedRows.map(cleanProductImportRow), rows => api("/api/products/import", {
@@ -2062,7 +2084,8 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
         body: JSON.stringify({
           rows,
           createMissingCategories: false,
-          duplicateMode: "SKIP",
+          duplicateMode: skipDuplicates ? "SKIP" : "ERROR",
+          duplicateBy,
         }),
       }), setImportProgress);
       setResult(response);
@@ -2198,11 +2221,17 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
       )}
       {step === 3 && !importing && (
         <div className="mt-6">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+            <label><span className="label">Check duplicates by</span><select className="field" value={duplicateBy} onChange={event => setDuplicateBy(event.target.value)}>{PRODUCT_DUPLICATE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <div className="self-center"><label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={skipDuplicates} onChange={event => setSkipDuplicates(event.target.checked)} />Skip duplicates</label><p className="mt-1 text-xs text-[var(--muted)]">{skipDuplicates ? "Matching products are skipped without adding stock." : "Matching products are reported as errors; no duplicate products are created."} SKU and barcode uniqueness always applies.</p></div>
+          </div>
+          {!checkReady && !checkError && <p role="status" className="mb-3 text-sm">Checking existing products and duplicate rows in this sheet…</p>}
+          {checkError && <p role="alert" className="mb-3 text-sm text-red-700">Duplicate check failed: {checkError}. Go Back and validate again.</p>}
+          <div className="grid gap-3 sm:grid-cols-4">
             <div className="card p-4">
               <small className="text-[var(--muted)]">Valid</small>
               <strong className="mt-1 block text-2xl text-[var(--green)]">
-                {valid.length}
+                {checkReady ? valid.length : "—"}
               </strong>
             </div>
             <div className="card p-4">
@@ -2215,15 +2244,16 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
               <small className="text-[var(--muted)]">Total rows</small>
               <strong className="mt-1 block text-2xl">{preview.length}</strong>
             </div>
+            <div className="card p-4"><small className="text-[var(--muted)]">Duplicates</small><strong className="mt-1 block text-2xl text-amber-700">{checkReady ? duplicates.length : "—"}</strong></div>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-sm font-bold">
               <input type="checkbox" checked={errorsOnly} onChange={event => setErrorsOnly(event.target.checked)} />
-              Errors only ({failed.length})
+              Errors and duplicates only ({issues.length})
             </label>
-            {failed.length > 0 && <button type="button" className="btn" onClick={errorReport}><Download size={16} />Download error report ({failed.length})</button>}
+            {issues.length > 0 && <button type="button" className="btn" onClick={errorReport}><Download size={16} />Download issues report ({issues.length})</button>}
           </div>
-          <p className="mt-2 text-sm text-[var(--muted)]" role="status">{errorsOnly ? `${failed.length} products with errors` : `All ${preview.length} products`}. Row numbers refer to your uploaded sheet, including the header.</p>
+          <p className="mt-2 text-sm text-[var(--muted)]" role="status">{errorsOnly ? `${failed.length} errors and ${duplicates.length} duplicates` : `All ${preview.length} products`}. Row numbers refer to your uploaded sheet, including the header.</p>
           <div className="table-wrap card mt-4 max-h-80">
             <table>
               <thead>
@@ -2236,14 +2266,14 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
                 </tr>
               </thead>
               <tbody>
-                {(errorsOnly ? failed : preview).map((entry) => (
+                {(errorsOnly ? issues : preview).map((entry) => (
                   <tr key={entry.index}>
                     <td>{entry.index}</td>
                     <td className="font-bold">{entry.row.name || "—"}</td>
                     <td>{entry.row.sku || "—"}</td>
                     <td>{entry.row.category || "—"}</td>
                     <td className="!whitespace-normal min-w-64">
-                      {entry.errors.length ? (
+                      {entry.duplicate ? <span className="text-xs font-bold text-amber-700">{skipDuplicates ? "Will skip" : "Duplicate error"}: {entry.duplicateReason}</span> : entry.errors.length ? (
                         <ul className="list-disc space-y-1 pl-4 text-xs font-bold text-red-700">
                           {entry.errors.map(error => <li key={error}>{error}</li>)}
                         </ul>
@@ -2256,7 +2286,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
                     </td>
                   </tr>
                 ))}
-                {errorsOnly && !failed.length && <tr><td colSpan={5} className="text-center text-[var(--green)]">No validation errors. All products are ready to import.</td></tr>}
+                {errorsOnly && !issues.length && <tr><td colSpan={5} className="text-center text-[var(--green)]">{checkReady ? "No errors or duplicates found." : "Waiting for duplicate check…"}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -2266,7 +2296,7 @@ function ImportWizard({ categories, onClose, onImported, manualEntry = false }) 
             </button>
             <button
               className="btn btn-primary"
-              disabled={!valid.length || importing}
+              disabled={!checkReady || Boolean(checkError) || !valid.length || importing}
               onClick={run}
             >
               {`Import ${valid.length} products`}
