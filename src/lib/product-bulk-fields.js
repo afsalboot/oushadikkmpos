@@ -17,7 +17,7 @@ export const BULK_PRODUCT_FIELDS = [
   ["packageSellingPrice", "Package selling price", "Pricing", "number", 0],
   ["allowPackageSale", "Package sale", "Pricing", "boolean"],
   ["allowLooseSale", "Loose sale", "Pricing", "boolean"],
-  ["allowMixture", "Custom mix", "Pricing", "boolean"],
+  ["allowMixture", "Custom Mix", "Custom Mix", "boolean"],
   ["loosePricingMethod", "Loose pricing method", "Pricing", ["PROPORTIONAL", "CUSTOM", "TIERS", "count_based"]],
   ["loosePricePerUnit", "Loose price per unit", "Pricing", "number", 0],
   ["looseUnit", "Loose selling unit", "Pricing", [...new Set([...BASE_UNITS, ...LOOSE_UNITS])]],
