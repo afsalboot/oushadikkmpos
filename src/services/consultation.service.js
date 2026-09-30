@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { Consultation, Doctor, DocumentCounter, Settings, Customer, AuditLog } from "@/models";
 import { normalizeSettings } from "@/services/settings.service";
 import { dashboardToday, dashboardRange } from "@/lib/dashboard-dates";
-import { CONSULTATION_BRANCH, consultationInput, consultationMoney } from "@/lib/consultation";
+import { CONSULTATION_BRANCH, consultationInput, consultationPatient, consultationMoney } from "@/lib/consultation";
 
 const reject = (message, status = 422) => { throw Object.assign(new Error(message), { status }); };
 export const consultationAllowed = (actor, action) => actor.role === "ADMIN" || actor.permissions.includes(`consultation.${action}`);
@@ -16,7 +16,7 @@ export async function listConsultations(params) {
   await requireConsultation();
   let dates;
   try { dates = dashboardRange("custom", params.get("from") || dashboardToday(), params.get("to") || dashboardToday()); } catch (error) { reject(error.message); }
-  const filter = { branchId: CONSULTATION_BRANCH, createdAt: { $gte: dates.start, $lte: dates.end } };
+  const filter = { branchId: CONSULTATION_BRANCH, deletedAt: null, createdAt: { $gte: dates.start, $lte: dates.end } };
   const doctor = params.get("doctor"), status = params.get("status"), method = params.get("paymentMethod");
   if (doctor) { if (!validId(doctor)) reject("Invalid doctor"); filter.doctorId = new mongoose.Types.ObjectId(doctor); }
   if (status) { if (!["COMPLETED", "CANCELLED"].includes(status)) reject("Invalid status"); filter.status = status; }
@@ -76,6 +76,52 @@ export async function createConsultation(body, actor) {
     if (error.code === 11000) { const previous = await Consultation.findOne({ requestId: body.requestId, createdBy: actor.sub }).lean(); if (previous) return previous; }
     throw error;
   }
+}
+export async function updateConsultation(id, body, actor) {
+  if (!consultationAllowed(actor, "edit")) reject("You cannot update consultations", 403);
+  await requireConsultation();
+  if (!validId(id) || !validId(body.doctorId)) reject("Invalid consultation or doctor");
+  if (Object.keys(body).some(key => !["patient", "doctorId"].includes(key))) reject("Only patient and doctor details can be updated");
+  let patient;
+  try { patient = consultationPatient(body); } catch (error) { reject(error.message); }
+  return mongoose.connection.transaction(async (session) => {
+    const settings = await Settings.findOneAndUpdate({ key: "global", "features.consultation": true }, { $inc: { consultationWriteVersion: 1 } }, { session, returnDocument: "after" });
+    if (!settings) reject("Consultation is disabled", 403);
+    const row = await Consultation.findById(id).session(session);
+    if (!row || row.deletedAt) reject("Consultation not found", 404);
+    if (row.status !== "COMPLETED") reject("Cancelled consultations cannot be updated");
+    const before = { patient: row.toObject().patient, doctorId: row.doctorId, doctorSnapshot: row.toObject().doctorSnapshot };
+    if (String(row.doctorId) !== body.doctorId) {
+      const doctor = await Doctor.findOneAndUpdate({ _id: body.doctorId, active: true }, { $inc: { revision: 1 } }, { session, returnDocument: "after" }).lean();
+      if (!doctor) reject("Select an active doctor");
+      row.doctorId = doctor._id;
+      row.doctorSnapshot = { name: doctor.name, qualification: doctor.qualification };
+    }
+    row.patient = patient;
+    await row.save({ session });
+    await AuditLog.create([{ actorId: actor.sub, action: "CONSULTATION_UPDATED", module: "consultation", targetType: "Consultation", targetId: row._id, description: `Updated ${row.opNumber}`, metadata: { before, after: { patient, doctorId: row.doctorId, doctorSnapshot: row.toObject().doctorSnapshot } } }], { session });
+    return row.toObject();
+  });
+}
+export async function deleteConsultation(id, body, actor) {
+  if (!consultationAllowed(actor, "delete")) reject("You cannot delete consultations", 403);
+  await requireConsultation();
+  if (!validId(id)) reject("Invalid consultation");
+  const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 500) : "";
+  if (!reason) reject("Deletion reason is required");
+  return mongoose.connection.transaction(async (session) => {
+    const settings = await Settings.findOneAndUpdate({ key: "global", "features.consultation": true }, { $inc: { consultationWriteVersion: 1 } }, { session, returnDocument: "after" });
+    if (!settings) reject("Consultation is disabled", 403);
+    const row = await Consultation.findById(id).session(session);
+    if (!row) reject("Consultation not found", 404);
+    if (row.deletedAt) return { deleted: true };
+    if (row.status !== "CANCELLED") reject("Cancel and refund the consultation before deleting it");
+    if (Number(row.refundedAmount || 0) !== Number(row.consultationFee)) reject("The consultation refund must be completed before deletion");
+    row.deletedAt = new Date(); row.deletedBy = actor.sub; row.deletionReason = reason;
+    await row.save({ session });
+    await AuditLog.create([{ actorId: actor.sub, action: "CONSULTATION_DELETED", module: "consultation", targetType: "Consultation", targetId: row._id, description: `Removed ${row.opNumber} from the consultation list`, metadata: { reason, retainedFinancialHistory: true } }], { session });
+    return { deleted: true };
+  });
 }
 export async function cancelConsultation(id, body, actor) {
   await requireConsultation();

@@ -688,6 +688,9 @@ const consultationSchema = new Schema({
   cancellationReason: String,
   refundedAmount: { type: Number, default: 0 },
   refundReference: String,
+  deletedAt: Date,
+  deletedBy: { type: Schema.Types.ObjectId, ref: "User" },
+  deletionReason: String,
 }, { timestamps: true });
 consultationSchema.index({ branchId: 1, dayKey: 1, tokenNumber: 1 }, { unique: true });
 consultationSchema.index({ createdAt: -1, status: 1 });

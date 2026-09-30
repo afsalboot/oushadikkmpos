@@ -5,6 +5,7 @@ import { Plus, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { dashboardToday } from "@/lib/dashboard-dates";
 import ConsultationPrintButton from "@/components/ConsultationTicket";
+import ConsultationActions from "@/components/ConsultationActions";
 
 const money = value => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value || 0);
 const dateTime = value => new Intl.DateTimeFormat("en-IN", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(value));
@@ -17,6 +18,7 @@ function Dialog({ title, children, close, busy = false }) {
 }
 const blank = () => ({ patient: { name: "", phone: "", age: "", gender: "" }, doctorId: "", consultationFee: "", paymentMethod: "", paymentReference: "", customerId: "", requestId: crypto.randomUUID() });
 export default function ConsultationWorkspace({ report = false }) {
+  const [editing, setEditing] = useState(null), [deleting, setDeleting] = useState(null), [deleteReason, setDeleteReason] = useState("");
   const [options, setOptions] = useState(null), [data, setData] = useState(null), [error, setError] = useState(""), [loading, setLoading] = useState(true), [revision, setRevision] = useState(0);
   const [filters, setFilters] = useState({ from: dashboardToday(), to: dashboardToday(), search: "", doctor: "", paymentMethod: "", status: "", page: 1 });
   const [form, setForm] = useState(null), [saving, setSaving] = useState(false), [matches, setMatches] = useState([]), [looking, setLooking] = useState(false);
@@ -43,7 +45,37 @@ export default function ConsultationWorkspace({ report = false }) {
     event.preventDefault(); if (saving) return; setSaving(true);
     try { await api(`/api/consultations/${cancel._id}/cancel`, post({ reason, refundConfirmed, refundReference })); setCancel(null); setDetail(null); setRevision(value => value + 1); toast.success("Consultation cancelled and refund recorded"); } catch (e) { toast.error(e.message); } finally { setSaving(false); }
   }
+  async function editRecord(row) {
+    try {
+      const current = await api(`/api/consultations/${row._id}`);
+      setEditing({ ...current, patient: { name: "", phone: "", age: "", gender: "", ...current.patient } });
+    } catch (e) { toast.error(e.message); }
+  }
+  async function saveUpdate(event) {
+    event.preventDefault(); if (saving) return; setSaving(true);
+    try {
+      await api(`/api/consultations/${editing._id}`, { ...post({ patient: editing.patient, doctorId: editing.doctorId }), method: "PATCH" });
+      setEditing(null); setRevision(value => value + 1); toast.success("Consultation updated");
+    } catch (e) { toast.error(e.message); } finally { setSaving(false); }
+  }
+  async function deleteRecord(event) {
+    event.preventDefault(); if (saving) return; setSaving(true);
+    try {
+      await api(`/api/consultations/${deleting._id}`, { ...post({ reason: deleteReason }), method: "DELETE" });
+      setDeleting(null); changeFilter("page", 1); setRevision(value => value + 1); toast.success("Consultation deleted from the list");
+    } catch (e) { toast.error(e.message); } finally { setSaving(false); }
+  }
   return <div className="space-y-5">
+    {editing && <Dialog title={`Update ${editing.opNumber}`} busy={saving} close={() => setEditing(null)}><form onSubmit={saveUpdate}><fieldset disabled={saving} className="space-y-4">
+      <p className="text-sm text-[var(--muted)]">Update patient and doctor details. The collected fee, payment and ticket numbers stay unchanged.</p>
+      <label className="block"><span className="label">Patient name *</span><input className="field" required maxLength={120} value={editing.patient.name} onChange={e => setEditing({ ...editing, patient: { ...editing.patient, name: e.target.value } })} /></label>
+      <label className="block"><span className="label">Phone</span><input className="field" type="tel" maxLength={24} value={editing.patient.phone} onChange={e => setEditing({ ...editing, patient: { ...editing.patient, phone: e.target.value } })} /></label>
+      <div className="grid gap-4 sm:grid-cols-2"><label><span className="label">Age</span><input className="field" type="number" min="0" max="130" step="1" value={editing.patient.age ?? ""} onChange={e => setEditing({ ...editing, patient: { ...editing.patient, age: e.target.value } })} /></label>
+      <label><span className="label">Gender</span><select className="field" value={editing.patient.gender} onChange={e => setEditing({ ...editing, patient: { ...editing.patient, gender: e.target.value } })}><option value="">Not specified</option><option>Male</option><option>Female</option><option>Other</option></select></label></div>
+      <label className="block"><span className="label">Doctor *</span><select className="field" required value={editing.doctorId} onChange={e => setEditing({ ...editing, doctorId: e.target.value })}>{options.doctors.filter(doctor => doctor.active || doctor._id === editing.doctorId).map(doctor => <option key={doctor._id} value={doctor._id}>{doctor.name}{doctor.active ? "" : " (inactive)"}</option>)}</select></label>
+      <button className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+    </fieldset></form></Dialog>}
+    {deleting && <Dialog title={`Delete ${deleting.opNumber}`} busy={saving} close={() => setDeleting(null)}>{deleting.status !== "CANCELLED" ? <p>Cancel and refund this consultation using Cancel / Refund before deleting it.</p> : <form onSubmit={deleteRecord} className="space-y-4"><p>Remove this ticket from the consultation list? Payment, refund and audit history will be retained.</p><label className="block"><span className="label">Reason *</span><textarea className="field" required maxLength={500} value={deleteReason} disabled={saving} onChange={e => setDeleteReason(e.target.value)} /></label><button className="btn btn-danger" disabled={saving}>{saving ? "Deleting…" : "Delete consultation"}</button></form>}</Dialog>}
     <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-3xl font-extrabold">{report ? "Consultation Report" : "Consultation"}</h1><p className="mt-1 text-sm text-[var(--muted)]">Reception registration and OP tickets</p></div><div className="flex flex-wrap gap-2"><Link className="btn" href={report ? "/consultations" : "/consultations/report"}>{report ? "Reception" : "Consultation report"}</Link><button className="btn" onClick={() => setRevision(value => value + 1)} aria-label="Refresh"><RefreshCw size={16} /></button>{!report && capabilities.create && <button className="btn btn-primary" onClick={() => { setForm({ ...blank(), paymentMethod: options.payments.enabledMethods[0] || "" }); setMatches([]); }}><Plus size={16} />New Consultation</button>}</div></header>
     <section className="grid gap-3 sm:grid-cols-3"><div className="card p-4"><p>Completed consultations</p><b className="text-2xl">{data?.summary.count ?? "—"}</b></div><div className="card p-4"><p>Consultation collection</p><b className="text-2xl">{data ? money(data.summary.collection) : "—"}</b></div><div className="card p-4"><p>Cancelled / refunded</p><b className="text-2xl">{data?.summary.cancelled ?? "—"}</b></div></section>
     <section className="card grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -54,7 +86,7 @@ export default function ConsultationWorkspace({ report = false }) {
       <label><span className="label">Branch</span><select className="field" aria-label="Branch"><option>Main store</option></select></label>
     </section>
     {error && <p className="card border-red-200 p-4 text-red-700" role="alert">{error}</p>}
-    <section className="card overflow-x-auto" aria-busy={loading}><table className="w-full whitespace-nowrap text-left text-sm"><thead><tr>{["Token", "OP Number", "Patient", "Phone", "Doctor", "Fee", "Payment", "Date / Time", "Status", "Created by", "Actions"].map(label => <th key={label} className="p-3">{label}</th>)}</tr></thead><tbody>{data?.rows.map(row => <tr className="border-t" key={row._id}><td className="p-3 font-bold">{row.tokenNumber}</td><td className="p-3">{row.opNumber}</td><td className="p-3">{row.patient.name}</td><td className="p-3">{row.patient.phone || "—"}</td><td className="p-3">{row.doctorSnapshot.name}</td><td className="p-3">{money(row.consultationFee)}</td><td className="p-3">{row.paymentMethod}</td><td className="p-3">{dateTime(row.createdAt)}</td><td className="p-3">{row.status}</td><td className="p-3">{row.creatorSnapshot?.name || "—"}</td><td className="p-3"><div className="flex gap-2"><button className="btn" onClick={() => view(row)}>View</button>{capabilities.print && <button className="btn" onClick={() => view(row, true)}>Print</button>}{capabilities.cancel && row.status === "COMPLETED" && <button className="btn" onClick={() => { setCancel(row); setReason(""); setRefundConfirmed(false); setRefundReference(""); }}>Cancel</button>}</div></td></tr>)}</tbody></table>{!data?.rows.length && <p className="p-8 text-center">{loading ? "Loading consultations…" : "No consultations in this period."}</p>}</section>
+    <section className="card overflow-x-auto" aria-busy={loading}><table className="w-full whitespace-nowrap text-left text-sm"><thead><tr>{["Token", "OP Number", "Patient", "Phone", "Doctor", "Fee", "Payment", "Date / Time", "Status", "Created by", "Actions"].map(label => <th key={label} className="p-3">{label}</th>)}</tr></thead><tbody>{data?.rows.map(row => <tr className="border-t" key={row._id}><td className="p-3 font-bold">{row.tokenNumber}</td><td className="p-3">{row.opNumber}</td><td className="p-3">{row.patient.name}</td><td className="p-3">{row.patient.phone || "—"}</td><td className="p-3">{row.doctorSnapshot.name}</td><td className="p-3">{money(row.consultationFee)}</td><td className="p-3">{row.paymentMethod}</td><td className="p-3">{dateTime(row.createdAt)}</td><td className="p-3">{row.status}</td><td className="p-3">{row.creatorSnapshot?.name || "—"}</td><td className="p-3"><ConsultationActions row={row} capabilities={capabilities} onView={() => view(row)} onPrint={() => view(row, true)} onUpdate={() => editRecord(row)} onCancel={() => { setCancel(row); setReason(""); setRefundConfirmed(false); setRefundReference(""); }} onDelete={() => { setDeleting(row); setDeleteReason(""); }} /></td></tr>)}</tbody></table>{!data?.rows.length && <p className="p-8 text-center">{loading ? "Loading consultations…" : "No consultations in this period."}</p>}</section>
     {data && <div className="flex items-center justify-between"><span className="text-sm">{data.pagination.total} records · Page {data.pagination.page} of {data.pagination.pages}</span><div className="flex gap-2"><button className="btn" disabled={filters.page <= 1 || loading} onClick={() => changeFilter("page", filters.page - 1)}>Previous</button><button className="btn" disabled={filters.page >= data.pagination.pages || loading} onClick={() => changeFilter("page", filters.page + 1)}>Next</button></div></div>}
     {form && <Dialog title="New Consultation" busy={saving} close={() => setForm(null)}><form onSubmit={create}><fieldset disabled={saving} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2"><label><span className="label">Patient name *</span><input autoFocus className="field" required maxLength={120} value={form.patient.name} onChange={e => patient("name", e.target.value)} /></label><label><span className="label">Phone</span><input className="field" type="tel" maxLength={24} value={form.patient.phone} onChange={e => patient("phone", e.target.value)} /></label></div>

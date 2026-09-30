@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { normalizeSettings } from "../src/services/settings.service.js";
 import { dashboardToday, dashboardRange } from "../src/lib/dashboard-dates.js";
-import { CONSULTATION_BRANCH, consultationInput, consultationMoney } from "../src/lib/consultation.js";
+import { CONSULTATION_BRANCH, consultationInput, consultationPatient, consultationMoney } from "../src/lib/consultation.js";
 
 const source = (await readFile(new URL("../src/services/consultation.service.js", import.meta.url), "utf8"))
   .replace(/^import .*;\r?\n/gm, "").replace(/export /g, "");
@@ -14,7 +14,7 @@ function harness({ enabled = true, lockEnabled = true, existing = null, inactive
   const lean = value => ({ lean: async () => value });
   const row = { _id: "cccccccccccccccccccccccc", opNumber: "OP000001", status: cancelled ? "CANCELLED" : "COMPLETED", consultationFee: 200, paymentMethod: "CASH", toObject() { return { ...this }; }, async save(options) { writes.push({ type: "save", options }); } };
   const deps = {
-    normalizeSettings, dashboardToday, dashboardRange, CONSULTATION_BRANCH, consultationInput, consultationMoney,
+    normalizeSettings, dashboardToday, dashboardRange, CONSULTATION_BRANCH, consultationInput, consultationPatient, consultationMoney,
     mongoose: { connection: { transaction: async fn => fn(session) } },
     Settings: { findOne: () => lean(settings), findOneAndUpdate: () => { const value = lockEnabled ? settings : null; return { ...lean(value), then: resolve => resolve(value) }; } },
     Doctor: { init: async () => {}, findOneAndUpdate: () => lean(inactive ? null : { _id: body.doctorId, name: "Doctor", qualification: "BAMS", consultationFee: 200 }) },
@@ -23,7 +23,7 @@ function harness({ enabled = true, lockEnabled = true, existing = null, inactive
     Consultation: { init: async () => {}, findOne: () => lean(existing), findById: () => ({ session: async () => row }), create: async (rows, options) => { writes.push({ type: "create", rows, options }); return [{ ...rows[0], _id: row._id, toObject() { return { ...this }; } }]; } },
     AuditLog: { create: async (rows, options) => { writes.push({ type: "audit", rows, options }); } },
   };
-  const service = new Function(...Object.keys(deps), `${source}; return {createConsultation,cancelConsultation};`)(...Object.values(deps));
+  const service = new Function(...Object.keys(deps), `${source}; return {createConsultation,cancelConsultation,updateConsultation,deleteConsultation};`)(...Object.values(deps));
   return { service, writes, session, row };
 }
 test("disabled feature rejects creation before writes, including a concurrent settings toggle", async () => {
@@ -65,4 +65,60 @@ test("retrying cancellation does not record another refund", async () => {
   const h = harness({ cancelled: true });
   await h.service.cancelConsultation(h.row._id, { reason: "Patient left", refundConfirmed: true }, actor);
   assert.equal(h.writes.length, 0);
+});
+
+test("updates correct patient and doctor snapshots without changing collected payment", async () => {
+  const h = harness();
+  h.row.patient = { name: "Old name" }; h.row.doctorId = "dddddddddddddddddddddddd";
+  const result = await h.service.updateConsultation(h.row._id, { patient: { name: "Correct name", phone: "1234567890", age: 30 }, doctorId: body.doctorId }, actor);
+  assert.equal(result.patient.name, "Correct name");
+  assert.equal(result.doctorSnapshot.name, "Doctor");
+  assert.equal(result.consultationFee, 200); assert.equal(result.paymentMethod, "CASH");
+  assert.equal(result.opNumber, "OP000001");
+  assert.deepEqual(h.writes.map(write => write.type), ["save", "audit"]);
+  assert.ok(h.writes.every(write => write.options.session === h.session));
+  assert.equal(h.writes[1].rows[0].metadata.before.patient.name, "Old name");
+});
+
+test("updates reject invalid patient, financial edits, inactive doctor and cancelled tickets", async () => {
+  const h = harness(), update = { patient: { name: "Patient" }, doctorId: body.doctorId };
+  await assert.rejects(h.service.updateConsultation(h.row._id, { ...update, patient: { name: "" } }, actor), /Patient name/);
+  await assert.rejects(h.service.updateConsultation(h.row._id, { ...update, consultationFee: 1 }, actor), /Only patient/);
+  const inactive = harness({ inactive: true });
+  await assert.rejects(inactive.service.updateConsultation(inactive.row._id, update, actor), /active doctor/);
+  const cancelled = harness({ cancelled: true });
+  await assert.rejects(cancelled.service.updateConsultation(cancelled.row._id, update, actor), /Cancelled/);
+  assert.equal(h.writes.length + inactive.writes.length + cancelled.writes.length, 0);
+});
+
+test("delete requires completed cancellation and retains payment and refund records", async () => {
+  const h = harness();
+  await assert.rejects(h.service.deleteConsultation(h.row._id, { reason: "Duplicate" }, actor), /Cancel and refund/);
+  h.row.status = "CANCELLED";
+  await assert.rejects(h.service.deleteConsultation(h.row._id, { reason: "Duplicate" }, actor), /refund must be completed/);
+  h.row.refundedAmount = 200;
+  await assert.rejects(h.service.deleteConsultation(h.row._id, { reason: " " }, actor), /reason/);
+  assert.equal(h.writes.length, 0);
+  assert.deepEqual(await h.service.deleteConsultation(h.row._id, { reason: "Duplicate" }, actor), { deleted: true });
+  assert.ok(h.row.deletedAt instanceof Date); assert.equal(h.row.deletedBy, actor.sub);
+  assert.equal(h.row.consultationFee, 200); assert.equal(h.row.refundedAmount, 200);
+  assert.deepEqual(h.writes.map(write => write.type), ["save", "audit"]);
+  assert.ok(h.writes.every(write => write.options.session === h.session));
+  await h.service.deleteConsultation(h.row._id, { reason: "Retry" }, actor);
+  assert.equal(h.writes.length, 2);
+});
+
+test("update and delete require explicit permissions and the enabled feature", async () => {
+  for (const method of ["updateConsultation", "deleteConsultation"]) {
+    const payload = { patient: { name: "Patient" }, doctorId: body.doctorId, reason: "Duplicate" };
+    const h = harness();
+    await assert.rejects(h.service[method](h.row._id, payload, { ...actor, role: "CASHIER", permissions: ["consultation.view"] }), error => error.status === 403);
+    assert.equal(h.writes.length, 0);
+    for (const options of [{ enabled: false }, { lockEnabled: false }]) {
+      const disabled = harness(options);
+      const input = method === "updateConsultation" ? { patient: payload.patient, doctorId: payload.doctorId } : { reason: payload.reason };
+      await assert.rejects(disabled.service[method](disabled.row._id, input, actor), error => error.status === 403);
+      assert.equal(disabled.writes.length, 0);
+    }
+  }
 });
