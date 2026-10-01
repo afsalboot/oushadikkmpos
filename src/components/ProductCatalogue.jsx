@@ -2626,6 +2626,7 @@ export default function ProductCatalogue() {
   const [query, setQuery] = useState(""),
     [page, setPage] = useState(1),
     [category, setCategory] = useState("ALL"),
+    [brands, setBrands] = useState([]),
     [stockFilter, setStockFilter] = useState([]),
     [capability, setCapability] = useState([]),
     [visibility, setVisibility] = useState([]),
@@ -2710,6 +2711,8 @@ export default function ProductCatalogue() {
   const filtered = useMemo(
     () =>
       products.filter((product) => {
+        const brand = String(product.manufacturer || "").trim().replace(/\s+/g, " ").toLowerCase();
+        if (brands.length && !brands.includes(brand || "__unbranded__")) return false;
         if (category !== "ALL" && String(product.categoryId?._id) !== category)
           return false;
         if (
@@ -2767,8 +2770,16 @@ export default function ProductCatalogue() {
           return false;
         return true;
       }),
-    [products, category, stockFilter, capability, visibility, more],
+    [products, category, brands, stockFilter, capability, visibility, more],
   );
+  const brandOptions = useMemo(() => {
+    const options = new Map(brands.map(brand => [brand, brand === "__unbranded__" ? "No brand" : brand]));
+    for (const product of products) {
+      const brand = String(product.manufacturer || "").trim().replace(/\s+/g, " ");
+      options.set(brand.toLowerCase() || "__unbranded__", brand || "No brand");
+    }
+    return [...options].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [products, brands]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice(
@@ -2896,6 +2907,7 @@ export default function ProductCatalogue() {
     setCapability([]);
     setVisibility([]);
     setMore([]);
+    setBrands([]);
     setQuery("");
   };
   async function patchProduct(product, changes, message) {
@@ -3123,6 +3135,10 @@ export default function ProductCatalogue() {
               setMore(values);
             }}
           />
+          <MultiSelectFilter label="Brand" searchable clearLabel="All brands" values={brands} options={brandOptions}
+            triggerClassName="btn !min-h-10 min-w-40"
+            openTriggerClassName="border-[var(--green)] ring-2 ring-emerald-100"
+            onChange={values => { setPage(1); setBrands(values); }} />
           <button className="btn !min-h-10" onClick={reset}>
             <X size={15} />
             Reset filters

@@ -13,8 +13,11 @@ export default function MultiSelectFilter({
   onChange,
   triggerClassName = "field",
   openTriggerClassName = "",
+  searchable = false,
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const matchingOptions = options.filter(option => !searchable || String(typeof option === "object" ? option.label : option).toLowerCase().includes(search.trim().toLowerCase()));
   const selected = new Set(values.map(String));
   const displayLabel = values.length
     ? `${label} (${values.length})`
@@ -30,7 +33,7 @@ export default function MultiSelectFilter({
   }
 
   return (
-    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+    <DropdownMenu.Root open={open} onOpenChange={value => { setOpen(value); if (!value) setSearch(""); }}>
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
@@ -54,6 +57,7 @@ export default function MultiSelectFilter({
           avoidCollisions
           className="z-[120] max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto rounded-xl border border-[var(--line)] bg-white p-2 shadow-xl"
         >
+          {searchable && <div className="sticky top-0 z-10 bg-white pb-2"><input className="field !min-h-9" aria-label={`Search ${label.toLowerCase()}`} placeholder={`Search ${label.toLowerCase()}…`} value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (!["Escape", "Tab"].includes(event.key)) event.stopPropagation(); }} /></div>}
           <DropdownMenu.Item
             className="cursor-pointer select-none rounded-lg px-3 py-2 text-sm font-bold outline-none hover:bg-slate-50 focus:bg-slate-50"
             onSelect={() => {
@@ -63,7 +67,7 @@ export default function MultiSelectFilter({
           >
             {clearLabel || `All ${label.toLowerCase()}`}
           </DropdownMenu.Item>
-          {options.map((option) => {
+          {matchingOptions.map((option) => {
             const value = typeof option === "object" ? option.value : option;
             const optionLabel =
               typeof option === "object" ? option.label : option;
@@ -82,6 +86,7 @@ export default function MultiSelectFilter({
               </DropdownMenu.CheckboxItem>
             );
           })}
+          {searchable && matchingOptions.length === 0 && <p className="px-3 py-2 text-sm text-[var(--muted)]">No matching brands.</p>}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
