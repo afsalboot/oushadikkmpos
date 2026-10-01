@@ -554,6 +554,7 @@ export default function SalesWorkspaceModern() {
   const confirmAction = useConfirm();
   const [mode, setMode] = useState("PRODUCT"),
     [products, setProducts] = useState([]),
+    [categories, setCategories] = useState([]),
     [settings, setSettings] = useState(null),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("All"),
@@ -623,6 +624,9 @@ export default function SalesWorkspaceModern() {
   useEffect(() => {
     api("/api/products?sales=true")
       .then(setProducts)
+      .catch((e) => toast.error(e.message));
+    api("/api/categories")
+      .then(setCategories)
       .catch((e) => toast.error(e.message));
     api("/api/settings")
       .then(setSettings)
@@ -807,13 +811,16 @@ export default function SalesWorkspaceModern() {
   }, [cart, wholesaleDiscountEnabled]);
   const cats = useMemo(
       () => [
-        ...new Set(products.map((p) => p.categoryId?.name).filter(Boolean)),
-      ],
-      [products],
+        ...new Set([
+          ...categories.filter(category => category.active !== false).map(category => category.name),
+          ...products.map((p) => p.categoryId?.name),
+        ].filter(Boolean)),
+      ].sort((a, b) => a.localeCompare(b)),
+      [products, categories],
     ),
     filters = [
       "All",
-      ...cats.slice(0, 6),
+      ...cats,
       "Low Stock",
       "Loose Sale",
       "Opened Stock",
