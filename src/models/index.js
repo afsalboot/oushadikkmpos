@@ -195,6 +195,7 @@ const productSchema = new Schema(
   { timestamps: true },
 );
 productSchema.add({
+  duplicateKey: { type: String, unique: true, sparse: true },
   wholesalePricingMethod: {
     type: String,
     enum: ["FIXED", "DISCOUNT_FROM_RETAIL"],
@@ -487,6 +488,7 @@ const supplierSchema = new Schema(
 );
 const purchaseItemSchema = new Schema(
   {
+    batchId: { type: Schema.Types.ObjectId, ref: "InventoryBatch" },
     productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     productSnapshot: {
       name: String,

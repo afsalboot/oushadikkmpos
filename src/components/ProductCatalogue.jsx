@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Papa from "papaparse";
 import { importProductsWithProgress } from "@/lib/product-import-progress";
 import { PRODUCT_DUPLICATE_OPTIONS } from "@/lib/product-import-duplicates";
+import { productMergeProblem } from "@/lib/product-duplicates";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   AlertTriangle,
@@ -2615,6 +2616,66 @@ function ProductRow({
   );
 }
 
+function DuplicateProducts({ onClose, onMerged }) {
+  const confirmAction = useConfirm();
+  const [matchBy, setMatchBy] = useState("DETAILS");
+  const [groups, setGroups] = useState([]);
+  const [canMerge, setCanMerge] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [targets, setTargets] = useState({});
+  const [excluded, setExcluded] = useState(() => new Set());
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let active = true;
+    api(`/api/products/duplicates?matchBy=${matchBy}`).then(result => {
+      if (!active) return;
+      setGroups(result.groups);
+      setCanMerge(result.canMerge);
+      setTargets({});
+      setExcluded(new Set());
+    }).catch(error => { if (active) setError(error.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [matchBy, revision]);
+  async function merge(target, sources) {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    try {
+      const accepted = await confirmAction({ title: "Merge duplicate products?", description: `Keep ${target.name} (${target.sku}) and its prices and settings. Move stock and linked history from ${sources.map(product => product.sku).join(", ")} into it, then remove those duplicate catalogue records. Historical invoice details stay intact.`, confirmText: "Merge products", variant: "danger" });
+      if (!accepted) return;
+      await api("/api/products/merge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ targetId: target._id, sourceIds: sources.map(product => product._id), matchBy }) });
+      toast.success(`Merged ${sources.length} duplicate products`);
+      onMerged();
+      setLoading(true);
+      setError("");
+      setRevision(value => value + 1);
+    } catch (error) { toast.error(error.message); }
+    finally { lock.current = false; setBusy(false); }
+  }
+  return <Modal wide onClose={() => { if (!busy) onClose(); }}>
+    <div className="flex items-start justify-between gap-3"><div><h2 className="text-xl font-extrabold">Check duplicate products</h2><p className="mt-1 text-sm text-[var(--muted)]">Checks the entire catalogue, including inactive products. Select a record to keep and duplicates to merge into it.</p></div><button className="btn" aria-label="Close duplicate check" disabled={busy} onClick={onClose}><X size={18} /></button></div>
+    <label className="mt-5 block text-sm font-bold">Match duplicates by<select className="field mt-2" value={matchBy} disabled={busy} onChange={event => { setLoading(true); setError(""); setMatchBy(event.target.value); }}>{PRODUCT_DUPLICATE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    <p className="mt-3 text-sm text-[var(--muted)]">The kept product supplies future prices, tax and sales settings. Batches retain their quantities, costs and expiry dates. Merging requires matching brands and stock conversions.</p>
+    {!canMerge && !loading && <p className="mt-3 text-sm">Only the owner can merge products.</p>}
+    {loading ? <p className="py-8">Checking products…</p> : error ? <p role="alert" className="py-5 text-red-600">{error}</p> : !groups.length ? <p className="py-8">No duplicates found for this matching option.</p> : <div className="mt-5 space-y-4">{groups.map(group => {
+      const groupId = group[0]._id;
+      const target = group.find(product => product._id === targets[groupId]) || group[0];
+      const sources = group.filter(product => product._id !== target._id && !excluded.has(product._id));
+      const problem = sources.map(source => productMergeProblem(target, source)).find(Boolean);
+      return <section key={groupId} className="rounded-xl border p-4"><h3 className="font-extrabold">{group[0].name} · {group.length} matches</h3>
+        <label className="mt-3 block text-sm font-bold">Product to keep<select className="field mt-1" value={target._id} disabled={busy} onChange={event => setTargets(current => ({ ...current, [groupId]: event.target.value }))}>{group.map(product => <option key={product._id} value={product._id}>{product.name} · {product.sku} · {product.packageSize} {product.packageUnit || product.baseUnit} · {money(product.packageSellingPrice)}</option>)}</select></label>
+        <div className="my-3 space-y-2">{group.map(product => <label key={product._id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" disabled={busy || product._id === target._id} checked={product._id === target._id || !excluded.has(product._id)} onChange={event => setExcluded(current => { const next = new Set(current); if (event.target.checked) next.delete(product._id); else next.add(product._id); return next; })} /><span><strong>{product.sku}</strong> · {product.manufacturer || "No brand"} · {product.packageSize} {product.packageUnit || product.baseUnit} {product.packageType} · {product.stockLabel} · {money(product.packageSellingPrice)}{product._id === target._id ? " · Keeping" : ""}{product.active === false ? " · Inactive" : ""}</span></label>)}</div>
+        {problem && <p className="mb-3 text-sm text-amber-700">{problem} Deselect incompatible products to merge the others.</p>}
+        <button className="btn btn-primary" disabled={busy || !canMerge || !sources.length || Boolean(problem)} onClick={() => merge(target, sources)}>{busy ? "Please wait…" : `Merge ${sources.length} into kept product`}</button>
+      </section>;
+    })}</div>}
+  </Modal>;
+}
+
 export default function ProductCatalogue() {
   const pageSize = 20;
   const confirmAction = useConfirm();
@@ -2632,6 +2693,7 @@ export default function ProductCatalogue() {
     [visibility, setVisibility] = useState([]),
     [more, setMore] = useState([]);
   const [editor, setEditor] = useState(null),
+    [duplicatesOpen, setDuplicatesOpen] = useState(false),
     [editorMode, setEditorMode] = useState(null),
     [drawer, setDrawer] = useState(null),
     [adjustment, setAdjustment] = useState(null),
@@ -2996,7 +3058,8 @@ export default function ProductCatalogue() {
             visibility.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button className="btn" onClick={() => setDuplicatesOpen(true)}><Copy size={17} />Check duplicates</button>
           <button className="btn" onClick={() => setImportOpen("MANUAL")}><Plus size={17} />Bulk Add</button>
           <button className="btn" onClick={() => setImportOpen(true)}>
             <FileSpreadsheet size={17} />
@@ -3326,6 +3389,7 @@ export default function ProductCatalogue() {
           </div>
         </div>
       )}
+      {duplicatesOpen && <DuplicateProducts onClose={() => setDuplicatesOpen(false)} onMerged={() => { setDrawer(null); setSelected(new Set()); load(); }} />}
       {editor && (
         <ProductEditor
           product={Object.keys(editor).length ? editor : null}

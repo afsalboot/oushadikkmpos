@@ -4,14 +4,15 @@ import mongoose from "mongoose";
 import { Category, InventoryBatch, Product, Purchase, Sale, Settings, StockTransaction, AuditLog } from "@/models";
 import { calculatePhysicalStock, formatPhysicalStock, getLooseUnit, isCountBasedProduct, isLowStock } from "@/services/inventory.service";
 import { normalizeProductInput, validateProductInput } from "@/lib/product-validation";
+import { productDuplicateKey } from "@/lib/product-duplicates";
 
 const daysFromNow = (date) => date ? Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000) : null;
 
 export async function validateProductIdentity({ sku, barcode, excludeId, session }) {
   const skuMatch = sku ? await Product.findOne({ sku, ...(excludeId ? { _id: { $ne: excludeId } } : {}) }).select("name sku").session(session || null).lean() : null;
-  if (skuMatch) throw new Error(`SKU ${sku} already exists.`);
+  if (skuMatch) throw Object.assign(new Error(`SKU ${sku} already exists.`), { status: 409 });
   const barcodeMatch = barcode ? await Product.findOne({ barcode, ...(excludeId ? { _id: { $ne: excludeId } } : {}) }).select("name barcode").session(session || null).lean() : null;
-  if (barcodeMatch) throw new Error(`This barcode is already assigned to ${barcodeMatch.name}.`);
+  if (barcodeMatch) throw Object.assign(new Error(`This barcode is already assigned to ${barcodeMatch.name}.`), { status: 409 });
 }
 
 export async function validateProductCategory(categoryId, session) {
@@ -20,7 +21,16 @@ export async function validateProductCategory(categoryId, session) {
 
 export function productFields(product) {
   const { openingPackages, openingStockPacks, openingIndividualPackages, openingQuantity, batchNumber, manufacturingDate, expiryDate, purchasePrice, supplierId, ...fields } = product;
-  return fields;
+  return { ...fields, duplicateKey: productDuplicateKey(product) };
+}
+
+async function validateProductDetails(product, { excludeId, session, existing } = {}) {
+  const key = productDuplicateKey(product);
+  // Existing duplicate records remain editable until the owner merges them.
+  if (existing && productDuplicateKey(existing) === key) return;
+  const candidates = await Product.find({ categoryId: product.categoryId, packageSize: product.packageSize, ...(excludeId ? { _id: { $ne: excludeId } } : {}) }).session(session || null).lean();
+  const match = candidates.find(candidate => productDuplicateKey(candidate) === key);
+  if (match) throw Object.assign(new Error(`Duplicate product: ${match.name} (${match.sku}). Open Check duplicates in Products to review and merge.`), { status: 409 });
 }
 
 async function validateProductTax(product) {
@@ -75,6 +85,7 @@ export async function createProduct(input, actorId, session) {
   await validateProductTax(normalized);
   await validateProductCategory(normalized.categoryId, session);
   await validateProductIdentity({ sku: normalized.sku, barcode: normalized.barcode, session });
+  await validateProductDetails(normalized, { session });
   const [product] = await Product.create([productFields(normalized)], { session, ordered: true });
   await createOpeningInventory({ product, input: normalized, actorId, session });
   return product;
@@ -89,11 +100,14 @@ export async function updateProduct(id, input, actor) {
   await validateProductTax(normalized);
   await validateProductCategory(normalized.categoryId);
   await validateProductIdentity({ sku: normalized.sku, barcode: normalized.barcode, excludeId: existing._id });
+  await validateProductDetails(normalized, { excludeId: existing._id, existing });
   const batches = await InventoryBatch.find({ productId: existing._id }).lean();
   const stock = calculatePhysicalStock(batches,existing);
   if (stock.hasStock && normalized.packageSize !== existing.packageSize) throw new Error("Package size cannot change while stock exists. Adjust stock to zero first.");
   const before=existing.toObject();
-  existing.set(productFields(normalized));
+  const fields = productFields(normalized);
+  if (!before.duplicateKey && productDuplicateKey(before) === productDuplicateKey(normalized)) delete fields.duplicateKey;
+  existing.set(fields);
   await mongoose.connection.transaction(async session=>{
     await existing.save({session});
     await AuditLog.create([{actorId:actor?.sub,action:"PRODUCT_UPDATED",module:"products",targetType:"Product",targetId:existing._id,description:"Updated product including tax configuration",metadata:{before,after:existing.toObject()}}],{session});
