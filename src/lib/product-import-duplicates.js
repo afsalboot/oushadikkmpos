@@ -1,5 +1,12 @@
 const textKey = value => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 
+export function productVariantIdentity(product) {
+  return JSON.stringify([
+    textKey(product.batchNumber || "OPENING"),
+    Number(product.packageSellingPrice ?? product.packagePrice ?? 0),
+  ]);
+}
+
 export function productImportIdentity(product) {
   const name = textKey(product.name);
   const category = String(product.categoryId?._id ?? product.categoryId ?? "");
@@ -16,7 +23,7 @@ export function createProductImportDuplicateIndex(products = [], matchBy = "DETA
   const keyFor = product => matchBy === "NAME" ? textKey(product.name) || null
     : matchBy === "SKU" ? textKey(product.sku) || null
     : matchBy === "BARCODE" ? String(product.barcode || "").trim() || null
-    : productImportIdentity(product);
+    : productImportIdentity(product) ? JSON.stringify([productImportIdentity(product), productVariantIdentity(product)]) : null;
   const identities = new Map();
   const add = product => {
     const key = keyFor(product);

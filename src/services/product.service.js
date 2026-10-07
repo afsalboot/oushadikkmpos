@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 import { Category, InventoryBatch, Product, Purchase, Sale, Settings, StockTransaction, AuditLog } from "@/models";
 import { calculatePhysicalStock, formatPhysicalStock, getLooseUnit, isCountBasedProduct, isLowStock } from "@/services/inventory.service";
 import { normalizeProductInput, validateProductInput } from "@/lib/product-validation";
-import { productDuplicateKey } from "@/lib/product-duplicates";
+import { productCreationKey } from "@/lib/product-duplicates";
 
 const daysFromNow = (date) => date ? Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000) : null;
 
@@ -20,17 +20,17 @@ export async function validateProductCategory(categoryId, session) {
 }
 
 export function productFields(product) {
-  const { openingPackages, openingStockPacks, openingIndividualPackages, openingQuantity, batchNumber, manufacturingDate, expiryDate, purchasePrice, supplierId, ...fields } = product;
-  return { ...fields, duplicateKey: productDuplicateKey(product) };
+  const { openingPackages, openingStockPacks, openingIndividualPackages, openingQuantity, manufacturingDate, expiryDate, purchasePrice, supplierId, ...fields } = product;
+  return { ...fields, duplicateKey: productCreationKey(product) };
 }
 
 async function validateProductDetails(product, { excludeId, session, existing } = {}) {
-  const key = productDuplicateKey(product);
+  const key = productCreationKey(product);
   // Existing duplicate records remain editable until the owner merges them.
-  if (existing && productDuplicateKey(existing) === key) return;
+  if (existing && productCreationKey(existing) === key) return;
   const candidates = await Product.find({ categoryId: product.categoryId, packageSize: product.packageSize, ...(excludeId ? { _id: { $ne: excludeId } } : {}) }).session(session || null).lean();
-  const match = candidates.find(candidate => productDuplicateKey(candidate) === key);
-  if (match) throw Object.assign(new Error(`Duplicate product: ${match.name} (${match.sku}). Open Check duplicates in Products to review and merge.`), { status: 409 });
+  const match = candidates.find(candidate => productCreationKey(candidate) === key);
+  if (match) throw Object.assign(new Error(`${match.name} (${match.sku}) already has the same batch and selling price (batch: ${product.batchNumber}, price: ${product.packageSellingPrice}). Enter a different batch number or selling price to save a separate product variant.`), { status: 409 });
 }
 
 async function validateProductTax(product) {
@@ -106,7 +106,7 @@ export async function updateProduct(id, input, actor) {
   if (stock.hasStock && normalized.packageSize !== existing.packageSize) throw new Error("Package size cannot change while stock exists. Adjust stock to zero first.");
   const before=existing.toObject();
   const fields = productFields(normalized);
-  if (!before.duplicateKey && productDuplicateKey(before) === productDuplicateKey(normalized)) delete fields.duplicateKey;
+  if (!before.duplicateKey && productCreationKey(before) === productCreationKey(normalized)) delete fields.duplicateKey;
   existing.set(fields);
   await mongoose.connection.transaction(async session=>{
     await existing.save({session});

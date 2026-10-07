@@ -1347,7 +1347,7 @@ function ProductEditor({
             {!edit && (
               <Section
                 title="7. Batch & Expiry"
-                subtitle="Record the batch details and expiry date for the starting stock."
+                subtitle="The same product name can be added with a different batch or selling price."
               >
                 <label className="flex items-center gap-3 text-sm font-bold">
                   <input
@@ -1360,11 +1360,10 @@ function ProductEditor({
                     <FieldLabel help="Track stock using its batch number and expiry date." />
                   </span>
                 </label>
-                {form.batchTracking && (
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <label>
                       <FieldLabel help="The batch or lot number printed on the package.">
-                        Batch Number *
+                        Batch Number {form.batchTracking ? "*" : "(Optional)"}
                       </FieldLabel>
                       <input
                         className="field"
@@ -1373,6 +1372,9 @@ function ProductEditor({
                         onChange={(e) => set("batchNumber", e.target.value)}
                       />
                     </label>
+                </div>
+                {form.batchTracking && (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <label>
                       <FieldLabel help="The supplier who provided this stock. Leave it empty if no supplier needs to be recorded.">
                         Supplier

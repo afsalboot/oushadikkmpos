@@ -10,7 +10,7 @@ import {
   Settings,
 } from "@/models";
 import { WHOLESALE_UNITS } from "@/lib/wholesale";
-import { productDuplicateKey } from "@/lib/product-duplicates";
+import { productCreationKey } from "@/lib/product-duplicates";
 import { parseBulkProductChanges, bulkProductUpdate } from "@/lib/product-bulk-fields";
 import {
   MAX_BULK_PRODUCTS,
@@ -56,8 +56,8 @@ export async function PATCH(request) {
         let update;
         try { update = bulkProductUpdate({ ...product, ...defaults }, changes, { hasStock: stockedIds.has(String(product._id)), requireHsn: settings?.gst?.enabled && settings.gst.requireHsn }); }
         catch (error) { throw new Error(`${product.name}: ${error.message}`); }
-        const nextKey = productDuplicateKey({ ...product, ...update });
-        if (nextKey !== productDuplicateKey(product)) update.duplicateKey = nextKey;
+        const nextKey = productCreationKey({ ...product, ...update });
+        if (nextKey !== productCreationKey(product)) update.duplicateKey = nextKey;
         return { updateOne: { filter: { _id: product._id }, update: { $set: { ...defaults, ...update } } } };
       });
       if (operations.some(operation => Object.hasOwn(operation.updateOne.update.$set, "duplicateKey"))) {
@@ -67,8 +67,8 @@ export async function PATCH(request) {
         for (const operation of operations) {
           const key = operation.updateOne.update.$set.duplicateKey;
           if (!key) continue;
-          const match = finalCatalogue.find(product => String(product._id) !== String(operation.updateOne.filter._id) && productDuplicateKey(product) === key);
-          if (match) throw Object.assign(new Error(`Bulk update would create a duplicate of ${match.name} (${match.sku}). Check duplicates before continuing.`), { status: 409 });
+          const match = finalCatalogue.find(product => String(product._id) !== String(operation.updateOne.filter._id) && productCreationKey(product) === key);
+          if (match) throw Object.assign(new Error(`Bulk update would give ${match.name} (${match.sku}) the same product details, batch and selling price as another product. Use a different batch number or selling price for separate variants.`), { status: 409 });
         }
       }
       await Product.bulkWrite(operations, { session });

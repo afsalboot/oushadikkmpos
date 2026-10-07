@@ -24,7 +24,7 @@ export function apiError(error) {
       { status: 422 },
     );
   if (error?.code === 11000 && (error?.keyPattern?.duplicateKey || error?.keyValue?.duplicateKey))
-    return fail("Matching product details already exist. Open Check duplicates in Products to review and merge.", 409);
+    return fail("This product already exists with the same batch and selling price. Enter a different batch number or selling price to save a separate product variant.", 409);
   if (error?.code === 11000 && (error?.keyPattern?.barcode || error?.keyValue?.barcode))
     return fail("Barcode already belongs to another product", 409);
   if (error?.code === 11000)

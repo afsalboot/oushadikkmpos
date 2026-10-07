@@ -1,8 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findProductDuplicateGroups, productDuplicateKey, productMergeProblem, resolvePurchaseItemBatch } from "../src/lib/product-duplicates.js";
+import { findProductDuplicateGroups, productDuplicateKey, productCreationKey, productMergeProblem, resolvePurchaseItemBatch } from "../src/lib/product-duplicates.js";
 
 const product = { _id: "a", name: "Herbal Oil", categoryId: "oils", manufacturer: "Oushadhi", packageSize: 200, baseUnit: "ml", packageType: "Bottle", sku: "OIL-A" };
+
+test("creation allows batch and price variants but rejects matching batch and price", () => {
+  const original = { ...product, batchNumber: "LOT-1", packageSellingPrice: 100 };
+  assert.notEqual(productCreationKey(original), productCreationKey({ ...original, batchNumber: "LOT-2", packageSellingPrice: 120 }));
+  assert.notEqual(productCreationKey(original), productCreationKey({ ...original, batchNumber: "LOT-2" }));
+  assert.notEqual(productCreationKey(original), productCreationKey({ ...original, packageSellingPrice: 120 }));
+  assert.equal(productCreationKey(original), productCreationKey({ ...original, name: " HERBAL oil ", batchNumber: " lot-1 ", packageSellingPrice: "100" }));
+  assert.equal(productCreationKey(product), productCreationKey({ ...product, batchNumber: "OPENING", packageSellingPrice: 0 }));
+  assert.equal(findProductDuplicateGroups([original, { ...original, batchNumber: "LOT-2", packageSellingPrice: 120 }]).length, 1);
+});
 
 test("duplicate details normalize names and brands while preserving distinct pack sizes and brands", () => {
   const duplicate = { ...product, _id: "b", name: " HERBAL   oil ", manufacturer: " OUSHADHI ", sku: "OIL-B", active: false, categoryId: { _id: "oils" } };

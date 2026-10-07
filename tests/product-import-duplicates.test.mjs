@@ -4,6 +4,19 @@ import { createProductImportDuplicateIndex } from "../src/lib/product-import-dup
 
 const product = { name: "Herbal Oil", manufacturer: "Oushadhi", categoryId: "oil", baseUnit: "ml", packageType: "Bottle", packageSize: 200, sku: "EXISTING" };
 
+test("default imports preserve different batches and selling prices across existing and sheet rows", () => {
+  const original = { ...product, batchNumber: "LOT-1", packageSellingPrice: 100 };
+  const variant = { ...original, sku: "NEW", batchNumber: "LOT-2", packageSellingPrice: 120 };
+  const index = createProductImportDuplicateIndex([original]);
+  assert.equal(index.find(variant), undefined);
+  assert.equal(index.find({ ...original, batchNumber: "LOT-2" }), undefined);
+  assert.equal(index.find({ ...original, packageSellingPrice: 120 }), undefined);
+  assert.equal(index.find({ ...original, batchNumber: " lot-1 ", packageSellingPrice: "100" }).sku, "EXISTING");
+  index.add({ ...variant, importRow: 3 });
+  assert.equal(index.find(variant).row, 3);
+  assert.equal(createProductImportDuplicateIndex([original], "NAME").find(variant).sku, "EXISTING");
+});
+
 test("selected name matching ignores pack size while details matching keeps it distinct", () => {
   const nameIndex = createProductImportDuplicateIndex([product], "NAME");
   const otherPack = { ...product, name: "HERBAL OIL", packageSize: 100, manufacturer: "Other" };

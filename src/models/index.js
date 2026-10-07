@@ -195,6 +195,7 @@ const productSchema = new Schema(
   { timestamps: true },
 );
 productSchema.add({
+  batchNumber: { type: String, trim: true, default: "OPENING" },
   duplicateKey: { type: String, unique: true, sparse: true },
   wholesalePricingMethod: {
     type: String,

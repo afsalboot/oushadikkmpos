@@ -1,6 +1,12 @@
-import { productImportIdentity } from "./product-import-duplicates.js";
+import { productImportIdentity, productVariantIdentity } from "./product-import-duplicates.js";
 
 const text = value => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+
+// Creation distinguishes batch/price variants; review and merge still compare product details.
+export function productCreationKey(product) {
+  const details = productDuplicateKey(product);
+  return details ? JSON.stringify([details, productVariantIdentity(product)]) : null;
+}
 
 export function productDuplicateKey(product, matchBy = "DETAILS") {
   if (matchBy === "NAME") return text(product.name) || null;

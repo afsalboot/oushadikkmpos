@@ -23,7 +23,7 @@ export async function POST(request) {
     const categoryMap = new Map(categories.map((category) => [productCategoryKey(category.name), category]));
     const suppliers = await Supplier.find({ active: { $ne: false } }).select("name").lean();
     const supplierMap = new Map(suppliers.map((supplier) => [supplier.name.trim().toLowerCase(), supplier]));
-    const existingProducts = await Product.find({}, { sku: 1, barcode: 1, name: 1, manufacturer: 1, categoryId: 1, baseUnit: 1, packageUnit: 1, packageType: 1, packageSize: 1 }).lean();
+    const existingProducts = await Product.find({}, { sku: 1, barcode: 1, name: 1, manufacturer: 1, categoryId: 1, baseUnit: 1, packageUnit: 1, packageType: 1, packageSize: 1, batchNumber: 1, packageSellingPrice: 1 }).lean();
     const identityIndex = createProductImportDuplicateIndex(existingProducts, duplicateBy);
     const usedSkus = new Set(existingProducts.map((product) => product.sku?.toUpperCase()).filter(Boolean));
     const usedBarcodes = new Set(existingProducts.map((product) => product.barcode).filter(Boolean));
