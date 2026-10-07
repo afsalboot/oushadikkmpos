@@ -1,8 +1,10 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { saleEditCart } from "@/lib/sale-edit";
 import {checkoutFetch} from "@/lib/checkout-request";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Barcode,
   ChevronLeft,
@@ -550,7 +552,13 @@ function HeldSalesModal({ sales, onClose, onResume, onRemove }) {
     </div>
   );
 }
-export default function SalesWorkspaceModern() {
+export default function SalesWorkspaceModern({ editSaleId = null }) {
+  const router = useRouter();
+  const [editingSale, setEditingSale] = useState(null);
+  const [editingMixIndex, setEditingMixIndex] = useState(undefined);
+  const [editLoading, setEditLoading] = useState(Boolean(editSaleId));
+  const [editError, setEditError] = useState("");
+  const loadedEditRef = useRef(false);
   const confirmAction = useConfirm();
   const [mode, setMode] = useState("PRODUCT"),
     [products, setProducts] = useState([]),
@@ -576,11 +584,48 @@ export default function SalesWorkspaceModern() {
     [payment, setPayment] = useState("CASH"),
     [saving, setSaving] = useState(false);
   useEffect(() => {
+    if (editSaleId) return;
     try {
       const saved = sessionStorage.getItem("oushadi-preselected-customer");
       if (saved) { const customer = JSON.parse(saved); setSaleCustomer(customer); setCartCustomer({ name: customer.name || "", phone: customer.phone || "", selected: customer }); setWholesaleDiscountEnabled(customer.customerType === "WHOLESALE"); }
     } catch {}
-  }, []);
+  }, [editSaleId]);
+  useEffect(() => {
+    if (!editSaleId) {
+      if (loadedEditRef.current) {
+        setEditingSale(null);
+        setEditLoading(false);
+        setEditError("");
+        setCart([]);
+        setCartCustomer({});
+        setSaleCustomer(null);
+        setWholesaleDiscountEnabled(false);
+        setQuick(null);
+        setMix([]);
+        setEditingMixIndex(undefined);
+      }
+      loadedEditRef.current = false;
+      return;
+    }
+    loadedEditRef.current = true;
+    let active = true;
+    setEditLoading(true);
+    setEditError("");
+    api(`/api/sales/${encodeURIComponent(editSaleId)}?edit=true`).then(({ sale, products: available, customer }) => {
+      const billedCart = saleEditCart(sale, available);
+      if (!active) return;
+      setProducts(available);
+      setCart(billedCart);
+      setEditingSale(sale);
+      setSaleCustomer(customer);
+      setWholesaleDiscountEnabled(customer?.customerType === "WHOLESALE" || sale.saleType === "WHOLESALE" || sale.items.some(item => Number(item.wholesaleDiscountPercent) > 0));
+      setCartCustomer({ name: sale.customerSnapshot?.name || "", phone: sale.customerSnapshot?.phone || "", selected: customer,
+        doctorName: sale.customerSnapshot?.doctorName || "", ...sale.supplyContext,
+        consultationFeeEnabled: Number(sale.consultationFee) > 0, consultationFee: sale.consultationFee || "" });
+    }).catch(error => { if (active) { setEditError(error.message); toast.error(error.message); } })
+      .finally(() => { if (active) setEditLoading(false); });
+    return () => { active = false; };
+  }, [editSaleId]);
   useEffect(() => {
     const customerButton = document.querySelector(".sales-cart-customer"),
       header = customerButton?.parentElement;
@@ -622,7 +667,7 @@ export default function SalesWorkspaceModern() {
     };
   }, [mode]);
   useEffect(() => {
-    api("/api/products?sales=true")
+    if (!editSaleId) api("/api/products?sales=true")
       .then(setProducts)
       .catch((e) => toast.error(e.message));
     api("/api/categories")
@@ -631,7 +676,7 @@ export default function SalesWorkspaceModern() {
     api("/api/settings")
       .then(setSettings)
       .catch(() => {});
-  }, []);
+  }, [editSaleId]);
   useEffect(() => {
     if (mode === "MIX") return;
     const strip = document.querySelector("#sales-category-filters");
@@ -694,7 +739,7 @@ export default function SalesWorkspaceModern() {
       for (const field of fields) if (!field.reportValidity()) return;
       window.dispatchEvent(
         new CustomEvent("oushadi-open-checkout", {
-          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, cartCustomer, settings },
+          detail: { cart, source: "PROCEED_PAYMENT", wholesaleDiscountEnabled, cartCustomer, settings, editingSale, saleType: editingSale?.saleType },
         }),
       );
     };
@@ -720,19 +765,21 @@ export default function SalesWorkspaceModern() {
       layout?.classList.remove("sales-cart-grid");
       workspace?.classList.remove("sales-cart-workspace");
     };
-  }, [cart, mode, wholesaleDiscountEnabled, cartCustomer, settings]);
+  }, [cart, mode, wholesaleDiscountEnabled, cartCustomer, settings, editingSale]);
   useEffect(() => {
-    const completed = () => {
+    const completed = (event) => {
       setCartCustomer({});
       setCart([]);
       setWholesaleDiscountEnabled(false);
+      setEditingSale(null);
+      if (event.detail?.edited) router.replace("/sales");
       api("/api/products?sales=true")
         .then(setProducts)
         .catch(() => {});
     };
     window.addEventListener("oushadi-sale-complete", completed);
     return () => window.removeEventListener("oushadi-sale-complete", completed);
-  }, []);
+  }, [router]);
   useEffect(() => {
     const scanned = (event) => {
       const product = event.detail;
@@ -774,6 +821,7 @@ export default function SalesWorkspaceModern() {
     return () => window.removeEventListener("oushadi-barcode-product", scanned);
   }, [cart]);
   useEffect(() => {
+    if (editSaleId) return;
     const links = [...document.querySelectorAll('a[href="/sales"]')].filter(
       (link) => link.textContent?.trim().toLowerCase() === "new sale",
     );
@@ -808,7 +856,7 @@ export default function SalesWorkspaceModern() {
       links.forEach((link) =>
         link.removeEventListener("click", start, { capture: true }),
       );
-  }, [cart, wholesaleDiscountEnabled]);
+  }, [cart, wholesaleDiscountEnabled, editSaleId]);
   const cats = useMemo(
       () => [
         ...new Set([
@@ -850,6 +898,7 @@ export default function SalesWorkspaceModern() {
         useDefaultGstRate: i.kind === "MIX" ? true : i.useDefaultGstRate,
       })),
       settings,
+      discount: editingSale ? { type: editingSale.discountSummary?.discountType || "FIXED", value: editingSale.discountSummary?.discountValue || 0 } : undefined,
       currentUser: { role: settings?._capabilities?.role || "STAFF" },
       placeOfSupply: cartCustomer.fulfilment === "DELIVERY"
         ? cartCustomer.deliveryStateCode || settings?.store?.stateCode
@@ -927,6 +976,7 @@ export default function SalesWorkspaceModern() {
     settings,
   ]);
   function startNewSale() {
+    if (editingSale) return;
     if (cart.length)
       setHeldSales((current) => [
         ...current,
@@ -1006,7 +1056,9 @@ export default function SalesWorkspaceModern() {
     try {
       if (!enabled && quantity + Number(item.freeQuantity || 0) > sealed(item))
         throw new Error(`Insufficient sealed stock for ${item.name} including free quantity`);
-      const updated = setCartItemWholesale(item, enabled, quantity);
+      const updated = item.saleMode === "WHOLESALE" && item.sellBy === "LOOSE"
+        ? { ...item, quantity, wholesaleTotal: Number(item.wholesalePriceApplied) * quantity }
+        : setCartItemWholesale(item, enabled, quantity);
       setCart((current) => current.map((x) => x._id === item._id ? updated : x));
     } catch (error) { toast.error(error.message); }
   }
@@ -1019,6 +1071,11 @@ export default function SalesWorkspaceModern() {
     } catch (error) { toast.error(error.message); }
   }
   function add(i) {
+    if (editingSale?.saleType === "WHOLESALE" && i.kind === "PRODUCT" && i.saleMode === "PACKAGE") {
+      try { i = setCartItemWholesale(i, true, i.quantity); }
+      catch (error) { return toast.error(error.message); }
+    }
+    if (editingSale?.saleType === "WHOLESALE" && i.saleMode === "LOOSE") return toast.error("Add wholesale packages when editing this sale.");
     const wholesaleItem = cart.find((x) => x._id === i._id && x.saleMode === "WHOLESALE");
     if (wholesaleItem) {
       updateCartItem(wholesaleItem, true, wholesaleItem.quantity + i.quantity);
@@ -1047,6 +1104,15 @@ export default function SalesWorkspaceModern() {
     setQuick(null);
     toast.success(`${i.name} added`);
   }
+  function editMix(item) {
+    setMix(item.ingredients.map(ingredient => ({ ...ingredient, mixQuantity: ingredient.baseQuantity })));
+    setMixName(item.name);
+    setPack(item.packageType);
+    setPackPrice(item.packagingPrice || "");
+    setEditingMixIndex(item.billedLineIndex);
+    setCart(current => current.filter(line => line._id !== item._id));
+    setMode("MIX");
+  }
   function ingredient(p) {
     if (mix.some((i) => i._id === p._id)) return;
     if (mix.length && mix[0].baseUnit !== p.baseUnit)
@@ -1068,6 +1134,7 @@ export default function SalesWorkspaceModern() {
     const savedMix = {
       _id: `mix-${crypto.randomUUID()}`,
       kind: "MIX",
+      billedLineIndex: editingMixIndex,
       saleMode: "MIX",
       quantity: 1,
       name: mixName || "Custom Mix",
@@ -1081,6 +1148,7 @@ export default function SalesWorkspaceModern() {
     };
     setCart((current) => [...current, savedMix]);
     setMix([]);
+    setEditingMixIndex(undefined);
     setMixName("");
     setPackPrice("");
     setMode("PRODUCT");
@@ -1153,6 +1221,8 @@ export default function SalesWorkspaceModern() {
       setSaving(false);
     }
   }
+  if (editLoading) return <div className="card p-8" role="status">Loading billed products for editing…</div>;
+  if (editError) return <div className="card p-8"><h1 className="text-xl font-extrabold">Unable to edit sale</h1><p className="mt-2">{editError}</p><Link href={`/sales/${editSaleId}`} className="btn mt-4">Back to sale</Link></div>;
   return (
     <div>
       <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -1166,7 +1236,7 @@ export default function SalesWorkspaceModern() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="btn" onClick={() => setHeldOpen(true)}>
+          <button className="btn" disabled={Boolean(editingSale)} onClick={() => setHeldOpen(true)}>
             <Pause size={16} />
             Held sales{heldSales.length ? ` (${heldSales.length})` : ""}
           </button>
@@ -1181,12 +1251,16 @@ export default function SalesWorkspaceModern() {
             <Barcode size={17} />
             Scan barcode
           </button>
-          <button className="btn btn-primary" onClick={startNewSale}>
+          <button className="btn btn-primary" disabled={Boolean(editingSale)} onClick={startNewSale}>
             <Plus size={17} />
             New sale
           </button>
         </div>
       </header>
+      {editingSale && <section className="card mb-4 flex flex-wrap items-center justify-between gap-3 border-[var(--green)] p-4">
+        <div><h2 className="font-extrabold">Editing {editingSale.invoiceNumber}</h2><p className="mt-1 text-sm text-[var(--muted)]">Billed items are loaded below. Change quantities, remove items, or add more products. Changes apply when you save.</p></div>
+        <Link href={`/sales/${editingSale._id}`} className="btn">Cancel edit</Link>
+      </section>}
       {heldOpen && (
         <HeldSalesModal
           sales={heldSales}
@@ -1412,6 +1486,7 @@ export default function SalesWorkspaceModern() {
                             <Trash2 size={16} />
                           </button>
                         </div>
+                        {editingSale && i.kind === "MIX" && <button type="button" className="btn mt-2" onClick={() => editMix(i)}>Edit mixture</button>}
                         <ExpiredStockWarning product={i} />
                         {wholesaleDiscountEnabled && i.kind === "PRODUCT" && i.saleMode !== "WHOLESALE" && (
                           <label className="my-2 flex items-center justify-between gap-2 text-xs">
@@ -1448,7 +1523,7 @@ export default function SalesWorkspaceModern() {
                           {i.kind !== "MIX" && ["PACKAGE", "WHOLESALE"].includes(i.saleMode) ? (
                             <Step
                               value={i.quantity}
-                              max={sealed(i) - (i.saleMode === "PACKAGE" ? Number(i.freeQuantity || 0) : 0)}
+                              max={i.saleMode === "WHOLESALE" && i.sellBy === "LOOSE" ? looseAvailable(i) : sealed(i) - (i.saleMode === "PACKAGE" ? Number(i.freeQuantity || 0) : 0)}
                               onChange={(quantity) => updateCartItem(i, i.saleMode === "WHOLESALE", quantity)}
                             />
                           ) : i.kind !== "MIX" && i.saleMode === "LOOSE" ? (
@@ -1531,7 +1606,7 @@ export default function SalesWorkspaceModern() {
                 }
               >
                 <WalletCards size={17} />
-                Proceed to Payment <span aria-hidden="true">•</span>{" "}
+                {editingSale ? "Review & Save changes" : "Proceed to Payment"} <span aria-hidden="true">•</span>{" "}
                 {money(grand)}
               </button>
             </div>

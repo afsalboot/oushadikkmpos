@@ -65,6 +65,7 @@ export default function SalesCheckoutHostV2() {
   const [saleType, setSaleType] = useState("SALE");
   const [wholesaleDiscountEnabled, setWholesaleDiscountEnabled] = useState(false);
   const [cartCustomer, setCartCustomer] = useState(null);
+  const [editingSale, setEditingSale] = useState(null);
   const openingRef = useRef(false);
   const [preparing, setPreparing] = useState(false);
   const [directPending, setDirectPending] = useState(false);
@@ -104,6 +105,8 @@ export default function SalesCheckoutHostV2() {
           ? Number(preselected?.defaultDiscount || 0)
           : 0;
       const wholesaleDiscount = event.detail?.wholesaleDiscountEnabled === true;
+      const original = event.detail?.editingSale || null;
+      setEditingSale(original);
       setWholesaleDiscountEnabled(wholesaleDiscount);
       setFulfilment("COUNTER");setDeliveryAddress("");setDeliveryStateCode("");setRecipientStateCode("");setDiscountReason("");
       setSaleType(nextSaleType);
@@ -122,12 +125,14 @@ export default function SalesCheckoutHostV2() {
       setResults([]);
       setDiscountValue(wholesaleDiscount ? String(event.detail?.wholesaleDiscountPercent || "") : "");
       setDiscountType("PERCENTAGE");
-      setPayment("CASH");
-      setCashReceived("");
-      setSplitCash("");
-      setSplitUpi("");
+      const originalPayments = original?.payments || [];
+      const originalMethod = originalPayments.length === 1 ? originalPayments[0].method : "SPLIT";
+      setPayment(original ? originalMethod : "CASH");
+      setCashReceived(originalMethod === "CASH" && original ? String(original.amountPaid || original.total) : "");
+      setSplitCash(original ? String(originalPayments.filter(row => row.method === "CASH").reduce((sum, row) => sum + row.amount, 0)) : "");
+      setSplitUpi(original ? String(originalPayments.filter(row => row.method === "UPI").reduce((sum, row) => sum + row.amount, 0)) : "");
       setNewCreditLimit("0");
-      setReference("");
+      setReference(originalPayments.find(row => row.reference)?.reference || "");
       setDuplicate(null);
       const draft = event.detail?.cartCustomer || null;
       setCartCustomer(draft);
@@ -153,7 +158,7 @@ export default function SalesCheckoutHostV2() {
                 ? "PERCENTAGE"
                 : "FIXED",
           );
-          if (value?.checkout?.enabled === false && draft) {
+          if (value?.checkout?.enabled === false && draft && !original) {
             if (!(value?.payments?.enabledMethods || ["CASH", "UPI"]).includes("CASH")) throw new Error("Enable Cash in Settings to use direct checkout.");
             setOpen(false);
             setDirectPending(true);
@@ -253,7 +258,7 @@ export default function SalesCheckoutHostV2() {
     consultationFee: cartCustomer?.consultationFee,
     wholesaleDiscount: wholesaleDiscountEnabled ? cart.map(item => item.saleWholesaleDiscountPercent || 0) : undefined,
     items:cart.map(item=>({...item,amount:lineTotal(item),gstRate:item.kind==="MIX"?settings?.gst?.defaultRate:item.gstRate,useDefaultGstRate:item.kind==="MIX"?true:item.useDefaultGstRate})),
-    discount:{type:"PERCENTAGE",value:0,reason:discountReason},
+    discount:{type:editingSale?.discountSummary?.discountType || "PERCENTAGE",value:editingSale?.discountSummary?.discountValue || 0,reason:discountReason},
     settings,currentUser:{role:settings?._capabilities?.role||"STAFF"},paymentMethod:payment,placeOfSupply
   });
   const discount=pricing.totalDiscount,gstInvoice=pricing.gst,total=pricing.total,roundOff=pricing.roundOff,
@@ -291,7 +296,7 @@ export default function SalesCheckoutHostV2() {
     discountValid &&
     (payment === "CASH"
       ? Number(cashReceived) >= total
-      : payment === "UPI"
+      : ["UPI", "BANK", "CARD"].includes(payment)
         ? true
         : payment === "CREDIT"
           ? creditValid
@@ -367,6 +372,7 @@ export default function SalesCheckoutHostV2() {
               productId: ingredient._id,
               baseQuantity: ingredient.baseQuantity,
             })),
+            billedLineIndex: item.billedLineIndex,
           }
         : item.saleMode === "WHOLESALE"
           ? {
@@ -378,6 +384,7 @@ export default function SalesCheckoutHostV2() {
               manualFreeQuantity: item.manualFreeQuantity,
               manualFreeReason: item.manualFreeReason,
               discount: item.discount,
+              billedLineIndex: item.billedLineIndex,
             }
           : {
               kind: "PRODUCT",
@@ -388,6 +395,7 @@ export default function SalesCheckoutHostV2() {
               freeQuantity: wholesaleDiscountEnabled ? item.freeQuantity || 0 : 0,
               saleWholesaleDiscountPercent: wholesaleDiscountEnabled ? item.saleWholesaleDiscountPercent || 0 : 0,
               openPackageCounts: item.openPackageCounts,
+              billedLineIndex: item.billedLineIndex,
             },
     );
     const payments =
@@ -402,7 +410,7 @@ export default function SalesCheckoutHostV2() {
             {
               method: payment,
               amount: total,
-              reference: payment === "UPI" ? reference : "",
+              reference: ["UPI", "BANK"].includes(payment) ? reference : "",
             },
           ];
     const newCustomer =
@@ -445,12 +453,13 @@ export default function SalesCheckoutHostV2() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items,
+          ...(editingSale ? { editSaleId: editingSale._id, editVersion: editingSale.updatedAt, editRevision: Number(editingSale.editRevision || 0) } : {}),
           saleType,
           skipCheckout: direct,
           ...customerDetails,
           doctorName: cartCustomer ? cartCustomer.doctorName : form.doctorName,
-          discountType,
-          discountValue: 0,
+          discountType: editingSale?.discountSummary?.discountType || discountType,
+          discountValue: editingSale?.discountSummary?.discountValue || 0,
           wholesaleDiscountEnabled,
           consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
           consultationFee: cartCustomer?.consultationFee,
@@ -463,7 +472,8 @@ export default function SalesCheckoutHostV2() {
       });
       sessionStorage.removeItem("oushadi-preselected-customer");
       setOpen(false);
-      window.dispatchEvent(new CustomEvent("oushadi-sale-complete"));
+      window.dispatchEvent(new CustomEvent("oushadi-sale-complete", { detail: { edited: Boolean(editingSale) } }));
+      if (editingSale) toast.success(`Sale ${completed.invoiceNumber} updated`);
       window.dispatchEvent(
         new CustomEvent("oushadi-sale-success", {
           detail: { sale: completed },
@@ -517,7 +527,7 @@ export default function SalesCheckoutHostV2() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[.16em] text-[var(--green)]">
-                  Checkout
+                  {editingSale ? "Save edited sale" : "Checkout"}
                 </p>
                 <h2
                   id="checkout-title"
@@ -992,7 +1002,8 @@ export default function SalesCheckoutHostV2() {
                     ["CASH", "Cash"],
                     ["UPI", "UPI"],
                     ["SPLIT", "Split"],
-                    ...(saleType === "WHOLESALE"
+                    ...(editingSale && ["BANK", "CARD"].includes(payment) ? [[payment, payment === "BANK" ? "Bank" : "Card"]] : []),
+                    ...(saleType === "WHOLESALE" && !editingSale
                       ? [["CREDIT", "Credit"]]
                       : []),
                   ].map(([value, label]) => (
@@ -1010,12 +1021,12 @@ export default function SalesCheckoutHostV2() {
                   <div className="mt-4 rounded-xl border border-[var(--line)] p-4">
                     <div className="flex justify-between">
                       <span className="text-sm text-[var(--muted)]">
-                        Amount due
+                        {editingSale ? "Revised total" : "Amount due"}
                       </span>
                       <strong>{money(total)}</strong>
                     </div>
                     <label className="mt-4 block">
-                      <span className="label">Cash received</span>
+                      <span className="label">{editingSale ? "Total cash recorded (including already paid)" : "Cash received"}</span>
                       <input
                         className="field text-lg font-extrabold"
                         type="number"
@@ -1041,10 +1052,10 @@ export default function SalesCheckoutHostV2() {
                     )}
                   </div>
                 )}
-                {payment === "UPI" && (
+                {["UPI", "BANK", "CARD"].includes(payment) && (
                   <div className="mt-4 rounded-xl border p-4">
                     <div className="flex justify-between">
-                      <span>UPI amount</span>
+                      <span>{payment} amount</span>
                       <strong>{money(total)}</strong>
                     </div>
                     <label className="mt-4 block">
@@ -1136,6 +1147,11 @@ export default function SalesCheckoutHostV2() {
                     )}
                   </div>
                 )}
+                {editingSale && <div className="mt-4 rounded-xl border border-[var(--line)] p-3 text-sm">
+                  <p className="font-bold">Already paid: {money(editingSale.amountPaid || editingSale.total)}</p>
+                  <p className="mt-1">{total >= Number(editingSale.amountPaid || editingSale.total) ? "Additional amount to collect" : "Amount to refund"}: {money(Math.abs(total - Number(editingSale.amountPaid || editingSale.total)))}</p>
+                  <p className="mt-2 text-xs text-[var(--muted)]">Record the full revised payment breakdown, including the amount already paid.</p>
+                </div>}
                 <button
                   disabled={saving || !paymentValid}
                   className="btn btn-primary mt-5 min-h-12 w-full"
@@ -1147,6 +1163,7 @@ export default function SalesCheckoutHostV2() {
                   )}{" "}
                   {saving
                     ? "Processing payment…"
+                    : editingSale ? `Save changes · ${money(total)}`
                     : payment === "CREDIT"
                       ? `Complete ${money(total)} credit sale`
                       : `Complete ${money(total)} payment`}

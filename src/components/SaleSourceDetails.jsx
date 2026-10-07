@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import OushadhiLogo from "@/components/branding/OushadhiLogo";
-import { ArrowLeft, LoaderCircle, ReceiptText } from "lucide-react";
+import { ArrowLeft, LoaderCircle, ReceiptText, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { receiptDiscountLabel } from "@/lib/receipt-discount";
 
@@ -92,6 +92,8 @@ export default function SaleSourceDetails({ id }) {
           <p className="mt-1 text-3xl font-extrabold text-[var(--green)]">
             {money(sale.total)}
           </p>
+          {sale.canEdit && <Link href={`/sales?edit=${sale._id}`} className="btn btn-primary mt-3"><Pencil size={16} />Edit sale / Add products</Link>}
+          {sale.editRevision > 0 && <p className="mt-2 text-xs text-[var(--muted)]">Edited {sale.editRevision} {sale.editRevision === 1 ? "time" : "times"}</p>}
         </div>
       </div>
       <section className="grid gap-5 lg:grid-cols-[1.4fr_.6fr]">

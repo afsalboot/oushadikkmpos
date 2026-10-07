@@ -892,6 +892,8 @@ export const FiscalGuard = model(
   }),
 );
 Sale.schema.add({
+  editRevision: { type: Number, default: 0, min: 0 },
+  stockAllocations: { type: [Schema.Types.Mixed], default: undefined },
   documentType: {
     type: String,
     enum: [

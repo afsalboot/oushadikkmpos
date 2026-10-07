@@ -38,6 +38,7 @@ import {money,multiplyMoney} from "@/lib/money";
 import { directCheckoutPayments } from "@/lib/direct-checkout";
 import { createSaleStockBuffer } from "@/lib/sale-stock-buffer";
 import { saleFreeQuantity } from "@/lib/sale-free-quantity";
+import { findSaleEditRetry, loadSaleForEdit, restoreSaleStock, saveSaleEdit } from "@/services/sale-edit.service";
 
 const amount = money;
 const escapeRegex = (value) =>
@@ -92,6 +93,7 @@ async function consumeStock(
         packageQuantity: -used,
         unit: product.baseUnit,
         direction: "OUT",
+        allocation: { productId: product._id, batchId: batch._id, sealedPackages: used, openQuantity: 0 },
       });
       remaining -= used;
     } else if (isCountBasedProduct(product)) {
@@ -145,6 +147,7 @@ async function consumeStock(
         looseUnit,
         unit: looseUnit,
         direction: "OUT",
+        allocation: { productId: product._id, batchId: batch._id, sealedPackages: 0, openQuantity: used },
       });
       remaining -= used;
     } else {
@@ -166,6 +169,7 @@ async function consumeStock(
         packageQuantity: next.sealedPackages - beforePackages,
         unit: product.baseUnit,
         direction: "OUT",
+        allocation: { productId: product._id, batchId: batch._id, sealedPackages: 0, openQuantity: used },
       });
       remaining -= used;
     }
@@ -282,12 +286,21 @@ export async function POST(request) {
     await connectDb();
     mark("auth_db");
     const body = await request.json();
+    const editing = Boolean(body.editSaleId);
+    if (editing) {
+      await requireSession("ADMIN");
+      if (!mongoose.isValidObjectId(body.editSaleId)) return fail("Invalid sale", 400);
+    }
     await Promise.all([Sale.init(),FiscalGuard.init()]);
     const requestKey=String(request.headers.get('Idempotency-Key')||'');
     if(!/^[a-zA-Z0-9-]{16,80}$/.test(requestKey))return fail('A checkout retry key is required. Refresh checkout and try again.',422);
     const hash=requestHash(body);
     const previous=await Sale.findOne({requestKey}).lean();
     if(previous)return timed(ok(assertRetryMatches(previous,hash,session.sub)));
+    if (editing) {
+      const retry = await findSaleEditRetry({ AuditLog, requestKey, hash, actorId: session.sub });
+      if (retry) return timed(ok(retry));
+    }
     const saleType = body.saleType === "WHOLESALE" ? "WHOLESALE" : "SALE";
     const directoryType = saleType === "WHOLESALE" || body.wholesaleDiscountEnabled === true ? "WHOLESALE" : "RETAIL";
     if (!Array.isArray(body.items) || !body.items.length)
@@ -310,6 +323,12 @@ export async function POST(request) {
       await FiscalGuard.findOneAndUpdate({key:'issuance'},{$inc:{revision:1}},{upsert:true,session:dbSession});
       const retried=await Sale.findOne({requestKey}).session(dbSession).lean();
       if(retried){completedSale=assertRetryMatches(retried,hash,session.sub);return;}
+      if (editing) {
+        const retry = await findSaleEditRetry({ AuditLog, requestKey, hash, actorId: session.sub, session: dbSession });
+        if (retry) { completedSale = retry; return; }
+      }
+      const originalSale = editing ? await loadSaleForEdit({ Sale, id: body.editSaleId, version: body.editVersion, revision: body.editRevision, session: dbSession }) : null;
+      if (originalSale && body.credit === true) throw new Error("An edited paid sale must remain fully paid.");
       let customer = null;
       if (customerType === "EXISTING") {
         if (!mongoose.isValidObjectId(body.customerId))
@@ -359,10 +378,12 @@ export async function POST(request) {
         dbSession,
       );
       receiptSnapshot = settings?.receipt?.toObject?.() || settings?.receipt;
+      if (originalSale && settings?.gst?.enabled) throw new Error("Disable commercial sale editing while GST invoice issuance is enabled.");
       assertRegistration(settings);
       const supplyContext=resolveSupply(settings,customer,body.supplyContext||{});
       const saleItems = [];
       const stockRows = [];
+      if (originalSale) await restoreSaleStock({ sale: originalSale, InventoryBatch, StockTransaction, session: dbSession, actorId: session.sub });
       const stockBuffer = await createSaleStockBuffer({ InventoryBatch, session: dbSession, settings,
         productIds: [...productIds, ...products.filter(product => product.freeSchemeEnabled && product.freeSchemeType === "DIFFERENT_PRODUCT" && mongoose.isValidObjectId(product.freeSchemeFreeProduct)).map(product => product.freeSchemeFreeProduct)],
       });
@@ -389,7 +410,10 @@ export async function POST(request) {
           const ingredientUnits = new Set();
           let ingredientTotal = 0;
           for (const entry of item.ingredients) {
-            const product = productById.get(String(entry.productId));
+            let product = productById.get(String(entry.productId));
+            const oldMix = originalSale?.items?.[item.billedLineIndex];
+            const oldIngredient = oldMix?.kind === "MIX" ? oldMix.ingredients.find(ingredient => String(ingredient.productId) === String(entry.productId)) : null;
+            if (oldIngredient) product = { ...product, loosePricePerUnit: oldIngredient.unitPrice };
             if (!product?.allowMixture)
               throw new Error(
                 `${product?.name || "Product"} is not enabled for custom mixes`,
@@ -446,7 +470,13 @@ export async function POST(request) {
             ingredients,
           });
         } else {
-          const product = productById.get(String(item.productId));
+          let product = productById.get(String(item.productId));
+          const billed = originalSale?.items?.[item.billedLineIndex];
+          if (billed?.kind === "PRODUCT" && String(billed.productId) === String(product._id) && billed.saleMode === item.saleMode) {
+            product = { ...product,
+              ...(billed.saleMode === "PACKAGE" ? { packageSellingPrice: billed.unitPrice } : {}),
+              ...(billed.saleMode === "LOOSE" ? { loosePricePerUnit: billed.unitPrice } : {}) };
+          }
           if (saleType === "WHOLESALE" || item.saleMode === "WHOLESALE") {
             if (item.sellBy === "LOOSE") {
               if (!product.allowWholesaleLooseSale || !product.allowLooseSale)
@@ -526,6 +556,10 @@ export async function POST(request) {
                 : null,
               manualFreeReason: item.manualFreeReason,
             });
+            if (billed?.saleMode === "WHOLESALE" && Number(item.quantity) === Number(billed.quantity) && item.sellBy === billed.wholesaleUnit) {
+              line.unitPrice = billed.unitPrice;
+              line.total = multiplyMoney(line.paidPackageQuantity, billed.unitPrice);
+            }
             const sameProductFree =
               !product.freeSchemeEnabled ||
               product.freeSchemeType !== "DIFFERENT_PRODUCT";
@@ -865,7 +899,7 @@ export async function POST(request) {
           }));
       const prefix = settings?.invoice?.prefix || "INV";
       const invoiceDate=new Date();
-      const invoiceNumber = await nextInvoiceNumber({
+      const invoiceNumber = originalSale?.invoiceNumber || await nextInvoiceNumber({
         Counter: DocumentCounter,
         isNumberUsed: (invoiceNumber) => Sale.exists({ invoiceNumber }).session(dbSession),
         prefix,
@@ -882,9 +916,7 @@ export async function POST(request) {
         }),
         { paidQuantity: 0, freeQuantity: 0, totalOutgoing: 0 },
       );
-      [completedSale] = await Sale.create(
-        [
-          {
+      const saleFields = {
             invoiceNumber,
             requestKey,requestHash:hash,
             invoiceDate,financialYear:financialYear(invoiceDate),documentType,documentStatus:"FINALIZED",supplyContext,
@@ -908,6 +940,7 @@ export async function POST(request) {
               stateCode: settings?.store?.stateCode || "",
             },
             items: saleItems,
+            stockAllocations: stockRows.filter(row => row.allocation).map(row => row.allocation),
             subtotal,
             discount: requestedDiscount,
             discountSummary: {
@@ -950,17 +983,16 @@ export async function POST(request) {
             amountPaid: credit?.amountPaid ?? total,
             balanceDue: credit?.balanceDue || 0,
             actorId: new mongoose.Types.ObjectId(session.sub),
-          },
-        ],
-        { session: dbSession, ordered: true },
-      );
+          };
+      if (originalSale) completedSale = await saveSaleEdit({ Sale, AuditLog, original: originalSale, fields: saleFields, session: dbSession, actorId: session.sub, requestKey, hash });
+      else [completedSale] = await Sale.create([saleFields], { session: dbSession, ordered: true });
       if (credit) {
         customer.set("outstandingAmount", credit.outstandingAfter);
         await customer.save({ session: dbSession });
       }
       if (stockRows.length)
         await StockTransaction.insertMany(
-          stockRows.map((row) => ({
+          stockRows.map(({ allocation, ...row }) => ({
             ...row,
             referenceType: "SALE",
             referenceId: completedSale._id,
@@ -969,7 +1001,7 @@ export async function POST(request) {
           { session: dbSession, ordered: true },
         );
       await stockBuffer.flush();
-      await AuditLog.create([{actorId:session.sub,action:'INVOICE_FINALIZED',module:'sales',targetType:'Sale',targetId:completedSale._id,description:`Issued ${invoiceNumber}`,metadata:{invoiceNumber,documentType,total,tax:gstInvoice.tax,placeOfSupply,ruleVersion:GST_RULE_VERSION}}],{session:dbSession});
+      if (!originalSale) await AuditLog.create([{actorId:session.sub,action:'INVOICE_FINALIZED',module:'sales',targetType:'Sale',targetId:completedSale._id,description:`Issued ${invoiceNumber}`,metadata:{invoiceNumber,documentType,total,tax:gstInvoice.tax,placeOfSupply,ruleVersion:GST_RULE_VERSION}}],{session:dbSession});
     });
     mark("transaction");
     return timed(ok({ ...(completedSale.toObject?.() || completedSale), receiptSnapshot }, 201));
