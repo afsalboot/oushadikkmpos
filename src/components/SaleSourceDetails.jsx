@@ -6,6 +6,7 @@ import OushadhiLogo from "@/components/branding/OushadhiLogo";
 import { ArrowLeft, LoaderCircle, ReceiptText, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { receiptDiscountLabel } from "@/lib/receipt-discount";
+import { isExternalPurchase, EXTERNAL_PURCHASE_PAYMENTS } from "@/lib/external-purchase";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -113,6 +114,12 @@ export default function SaleSourceDetails({ id }) {
                 <tr key={`${item.productId || item.name}-${index}`}>
                   <td>
                     <strong>{item.name}</strong>
+                    {isExternalPurchase(item) && item.purchaseCost !== undefined && <div className="mt-2 space-y-1 text-xs text-[var(--muted)]">
+                      <p>Selling price {money(item.unitPrice)} · Purchase Cost {money(item.purchaseCost)} / {item.packageType}</p>
+                      <p>Total cost {money(item.totalPurchaseCost)} · Profit {money(item.total - item.totalPurchaseCost)}</p>
+                      <p>Supplier: {item.externalSupplierName || "—"} · Supplier Payment: {EXTERNAL_PURCHASE_PAYMENTS[item.externalPurchasePaymentMethod]}</p>
+                      {item.externalPurchaseNotes && <p>{item.externalPurchaseNotes}</p>}
+                    </div>}
                     {sale.gstEnabled && (
                       <p className="mt-1 text-xs text-[var(--muted)]">
                         HSN {item.hsnCode || "—"}
@@ -124,9 +131,9 @@ export default function SaleSourceDetails({ id }) {
                       </p>
                     )}
                   </td>
-                  <td>{item.saleMode}</td>
+                  <td>{isExternalPurchase(item) ? "External Purchase" : item.saleMode}</td>
                   <td>
-                    {item.quantity} {item.baseUnit || ""}
+                    {item.quantity} {isExternalPurchase(item) ? item.packageType : item.baseUnit || ""}
                     {Number(item.freeQuantity) > 0 && <small className="block text-[var(--green)]">+ {item.freeQuantity} {item.saleMode === "LOOSE" ? item.baseUnit : item.packageType} free</small>}
                   </td>
                   {sale.gstEnabled && (

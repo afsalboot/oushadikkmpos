@@ -4,10 +4,11 @@ import { requireSession } from "@/lib/auth";
 import { ok, fail, apiError } from "@/lib/api";
 import { Customer, Sale, AuditLog } from "@/models";
 import {customerFields,findDuplicateCustomer} from "@/services/customer.service";
+import { saleForActor } from "@/lib/external-purchase";
 
 export async function GET(_request, { params }) {
   try {
-    await requireSession("customers.view"); await connectDb();
+    const actor = await requireSession("customers.view"); await connectDb();
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) return fail("Invalid customer");
     const customer = await Customer.findById(id).lean();
@@ -17,7 +18,7 @@ export async function GET(_request, { params }) {
     for(const bill of bills)for(const item of bill.items||[]){if(item.kind==="MIX")for(const ingredient of item.ingredients||[])productCounts.set(ingredient.name,(productCounts.get(ingredient.name)||0)+1);else productCounts.set(item.name,(productCounts.get(item.name)||0)+1)}
     const stats={purchaseCount:bills.length,totalSpent:totals.reduce((sum,value)=>sum+value,0),averageBill:bills.length?totals.reduce((sum,value)=>sum+value,0)/bills.length:0,highestBill:totals.length?Math.max(...totals):0,firstPurchaseAt:bills.at(-1)?.createdAt||null,lastPurchaseAt:bills[0]?.createdAt||null};
     const frequentProducts=[...productCounts].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([name,purchases])=>({name,purchases}));
-    return ok({ customer, stats, bills, frequentProducts });
+    return ok({ customer, stats, bills: bills.map(bill => saleForActor(bill, actor)), frequentProducts });
   } catch (error) { return apiError(error); }
 }
 

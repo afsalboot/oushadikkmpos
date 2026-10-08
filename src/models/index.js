@@ -320,6 +320,14 @@ const customerSchema = new Schema(
 );
 const saleItemSchema = new Schema(
   {
+    itemSource: { type: String, enum: ["inventory", "external_purchase"], default: "inventory" },
+    inventoryTracked: { type: Boolean, default: true },
+    purchaseCost: { type: Number, default: 0, min: 0 },
+    totalPurchaseCost: { type: Number, default: 0, min: 0 },
+    externalSupplierName: String,
+    externalPurchasePaymentMethod: { type: String, enum: ["CASH", "UPI", "CARD", "OWNER", "CREDIT"] },
+    externalPurchaseNotes: String,
+    externalPurchaseId: String,
     kind: { type: String, enum: ["PRODUCT", "MIX"], default: "PRODUCT" },
     productId: { type: Schema.Types.ObjectId, ref: "Product" },
     name: { type: String, required: true },
@@ -379,6 +387,9 @@ const paymentSchema = new Schema(
 );
 const saleSchema = new Schema(
   {
+    externalPurchaseRevenue: { type: Number, default: 0 },
+    externalPurchaseCost: { type: Number, default: 0 },
+    externalPurchaseProfit: { type: Number, default: 0 },
     invoiceNumber: { type: String, required: true, unique: true, index: true },
     discountSummary: {
       itemDiscount: Number,
@@ -613,19 +624,21 @@ const expenseSchema = new Schema(
     balanceDue: { type: Number, min: 0 },
     paymentMethod: {
       type: String,
-      enum: ["CASH", "UPI", "CARD", "BANK"],
+      enum: ["CASH", "UPI", "CARD", "BANK", "OWNER", "CREDIT"],
       required: true,
     },
     paymentReference: { type: String, trim: true, default: "" },
     expenseDate: { type: Date, default: Date.now, index: true },
     source: {
       type: String,
-      enum: ["MANUAL", "PURCHASE"],
+      enum: ["MANUAL", "PURCHASE", "EXTERNAL_PURCHASE"],
       default: "MANUAL",
       index: true,
     },
     referenceType: String,
     referenceId: { type: Schema.Types.ObjectId, index: true },
+    saleLineIndex: Number,
+    externalPurchaseId: String,
     supplierId: { type: Schema.Types.ObjectId, ref: "Supplier" },
     staffId: { type: Schema.Types.ObjectId, ref: "User" },
     staffSnapshot: { name: String, email: String, role: String },

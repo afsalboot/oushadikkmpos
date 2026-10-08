@@ -5,6 +5,7 @@ import {apiError,fail,ok} from "@/lib/api";
 import {Sale, StockTransaction, Customer} from "@/models";
 import {getProducts} from "@/services/product.service";
 import {creditSaleStock, saleEditProblem, saleStockReturns} from "@/lib/sale-edit";
+import { saleForActor } from "@/lib/external-purchase";
 
 export async function GET(request,{params}){
   try{
@@ -25,6 +26,6 @@ export async function GET(request,{params}){
       ]);
       return ok({sale, products: creditSaleStock(products, saleStockReturns(sale, rows)), customer});
     }
-    return ok({...sale, canEdit: actor.role === "ADMIN" && !editProblem, editProblem});
+    return ok({...saleForActor(sale, actor), canEdit: actor.role === "ADMIN" && !editProblem, editProblem});
   }catch(error){return apiError(error);}
 }

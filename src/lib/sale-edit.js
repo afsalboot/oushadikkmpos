@@ -1,3 +1,4 @@
+import { isExternalPurchase, inventoryTracked } from "./external-purchase.js";
 // Editing returns consumed stock to its original batches. Packages opened for
 // loose sales stay open; counted units are never inferred from package weight.
 export function saleEditProblem(sale) {
@@ -9,6 +10,7 @@ export function saleEditProblem(sale) {
 }
 
 export function saleStockReturns(sale, rows) {
+  if (sale.items?.length && !sale.items.some(inventoryTracked)) return [];
   if (Array.isArray(sale.stockAllocations) && sale.stockAllocations.length) return sale.stockAllocations;
   return rows.filter(row => row.direction === "OUT").map(row => {
     let mode;
@@ -49,6 +51,7 @@ export function saleEditCart(sale, products) {
     return product;
   };
   return sale.items.map((item, index) => {
+    if (isExternalPurchase(item)) return { ...item, _id: `external-edit-${index}`, billedLineIndex: index, packageSellingPrice: item.unitPrice };
     if (item.kind === "MIX") {
       const ingredients = item.ingredients.map(ingredient => ({ ...get(ingredient.productId), loosePricePerUnit: ingredient.unitPrice, baseQuantity: ingredient.baseQuantity }));
       const ingredientTotal = item.ingredients.reduce((sum, ingredient) => sum + Number(ingredient.total || 0), 0);

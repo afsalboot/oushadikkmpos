@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saleEditCart } from "@/lib/sale-edit";
+import ExternalPurchaseModal from "@/components/ExternalPurchaseModal";
+import { isExternalPurchase } from "@/lib/external-purchase";
 import {checkoutFetch} from "@/lib/checkout-request";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -573,6 +575,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     [heldSales, setHeldSales] = useState([]),
     [heldOpen, setHeldOpen] = useState(false),
     [quick, setQuick] = useState(null),
+    [externalPurchase, setExternalPurchase] = useState(null),
     [mix, setMix] = useState([]),
     [mixName, setMixName] = useState(""),
     [pack, setPack] = useState("Bottle"),
@@ -796,17 +799,14 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
         existing = cart.find(
           (item) =>
             item.kind === "PRODUCT" &&
+            !isExternalPurchase(item) &&
             ["PACKAGE", "WHOLESALE"].includes(item.saleMode) &&
             String(item.productId || item._id) === String(product._id),
         );
       if (!product.allowPackageSale || available <= 0)
-        return toast.error(
-          `${product.name} has no full ${product.packageType}s available`,
-        );
+        return setExternalPurchase(product);
       if (existing && Number(existing.quantity) >= available)
-        return toast.error(
-          `Only ${available} ${product.packageType}${available === 1 ? "" : "s"} available`,
-        );
+        return setExternalPurchase(product);
       add({
         ...product,
         kind: "PRODUCT",
@@ -1043,17 +1043,23 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     if (canSellLoose) return setQuick(product);
     const available = sealed(product);
     const existing = cart.find((item) => item.kind === "PRODUCT" &&
+      !isExternalPurchase(item) &&
       ["PACKAGE", "WHOLESALE"].includes(item.saleMode) &&
       String(item.productId || item._id) === String(product._id));
     if (!product.allowPackageSale || available <= 0)
-      return toast.error(`${product.name} has no full ${product.packageType}s available`);
+      return setExternalPurchase(product);
     if (existing && Number(existing.quantity) >= available)
-      return toast.error(`Only ${available} ${product.packageType}${available === 1 ? "" : "s"} available`);
+      return setExternalPurchase(product);
     add({ ...product, kind: "PRODUCT", saleMode: "PACKAGE", quantity: 1,
       looseQuantity: 0, openPackageCounts: [], baseUnit: product.baseUnit });
   }
   function updateCartItem(item, enabled, quantity = item.quantity) {
     try {
+      if (isExternalPurchase(item)) {
+        if (!(Number(quantity) > 0)) throw new Error("Quantity must be greater than zero.");
+        setCart(current => current.map(line => line._id === item._id ? { ...line, quantity: Number(quantity), total: Number(quantity) * line.unitPrice, totalPurchaseCost: Number(quantity) * line.purchaseCost } : line));
+        return;
+      }
       if (!enabled && quantity + Number(item.freeQuantity || 0) > sealed(item))
         throw new Error(`Insufficient sealed stock for ${item.name} including free quantity`);
       const updated = item.saleMode === "WHOLESALE" && item.sellBy === "LOOSE"
@@ -1168,7 +1174,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       return toast.error("Select a customer");
     const f = Object.fromEntries(new FormData(e.currentTarget)),
       items = cart.map((i) =>
-        i.kind === "MIX"
+        isExternalPurchase(i) ? { ...i, unitPrice: i.packageSellingPrice, productId: i.productId || null } : i.kind === "MIX"
           ? {
               kind: "MIX",
               name: i.name,
@@ -1296,6 +1302,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
             placeholder="Search product name, SKU, category, or scan barcode"
           />
         </div>
+        <button className="btn" type="button" onClick={() => setExternalPurchase({})}><Plus size={16} />External Purchase</button>
       </section>
       {mode !== "MIX" && (
         <div className="relative mb-4">
@@ -1381,6 +1388,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                 </span>
               </div>
               <h2 className="mt-4 text-lg font-extrabold">{p.name}</h2>
+              {mode === "PRODUCT" && <button type="button" className="btn mt-2 !min-h-8 text-xs" onClick={event => { event.stopPropagation(); setExternalPurchase(p); }}>Buy Externally &amp; Add</button>}
               <ExpiredStockWarning product={p} />
               <small className="text-[var(--muted)]">SKU {p.sku}</small>
               <div className="sales-product-badges mt-3 flex flex-wrap gap-1">
@@ -1447,7 +1455,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
               {cart.length ? (
                 [...cart].reverse().map((i) => {
                   const saleLabel =
-                      i.kind === "MIX"
+                      isExternalPurchase(i) ? "External Purchase" : i.kind === "MIX"
                         ? "Composite Sale"
                         : i.saleMode === "LOOSE"
                           ? "Loose Sale"
@@ -1487,7 +1495,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                           </button>
                         </div>
                         {editingSale && i.kind === "MIX" && <button type="button" className="btn mt-2" onClick={() => editMix(i)}>Edit mixture</button>}
-                        <ExpiredStockWarning product={i} />
+                        {isExternalPurchase(i) ? <div className="mt-2 text-xs text-[var(--muted)]">Cost {money(i.purchaseCost)} / {i.packageType} · Total cost {money(i.quantity * i.purchaseCost)}<button className="btn ml-2 !min-h-7 !px-2 text-xs" type="button" onClick={() => setExternalPurchase(i)}>Edit details</button></div> : <ExpiredStockWarning product={i} />}
                         {wholesaleDiscountEnabled && i.kind === "PRODUCT" && i.saleMode !== "WHOLESALE" && (
                           <label className="my-2 flex items-center justify-between gap-2 text-xs">
                             <span>Wholesale discount %</span>
@@ -1496,7 +1504,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                               onChange={event => { const value = event.target.value; setCart(current => current.map(item => item._id === i._id ? { ...item, saleWholesaleDiscountPercent: value } : item)); }} />
                           </label>
                         )}
-                        {wholesaleDiscountEnabled && i.kind === "PRODUCT" && ["PACKAGE", "LOOSE"].includes(i.saleMode) && (
+                        {wholesaleDiscountEnabled && !isExternalPurchase(i) && i.kind === "PRODUCT" && ["PACKAGE", "LOOSE"].includes(i.saleMode) && (
                           <label className="my-2 flex items-center justify-between gap-2 text-xs">
                             <span>Free quantity ({i.saleMode === "LOOSE" ? i.looseUnit || i.baseUnit : i.packageType})</span>
                             <input type="number" className="field !min-h-8 !w-20" min="0" step={i.saleMode === "PACKAGE" || countBased(i) ? "1" : "0.001"}
@@ -1520,7 +1528,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                           <span>{quantityLabel}</span>
                         </div>
                         <div className="mt-3 flex items-end justify-between gap-2">
-                          {i.kind !== "MIX" && ["PACKAGE", "WHOLESALE"].includes(i.saleMode) ? (
+                          {isExternalPurchase(i) ? <input type="number" className="field !min-h-8 !w-24" aria-label={`Quantity for ${i.name}`} min="0.001" max="99999999" step="0.001" value={i.quantity} onChange={event => updateCartItem(i, false, event.target.value)} /> : i.kind !== "MIX" && ["PACKAGE", "WHOLESALE"].includes(i.saleMode) ? (
                             <Step
                               value={i.quantity}
                               max={i.saleMode === "WHOLESALE" && i.sellBy === "LOOSE" ? looseAvailable(i) : sealed(i) - (i.saleMode === "PACKAGE" ? Number(i.freeQuantity || 0) : 0)}
@@ -1714,6 +1722,10 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
         )}
       </div>
       {quick && <QuickSell p={quick} close={() => setQuick(null)} add={add} />}
+      {externalPurchase && <ExternalPurchaseModal key={externalPurchase._id || "new-external"} products={products} initial={externalPurchase} onClose={() => setExternalPurchase(null)} onSave={line => setCart(current => {
+        const existing = current.find(item => item._id === line._id && isExternalPurchase(item));
+        return existing ? current.map(item => item._id === line._id ? line : item) : [...current, line];
+      })} />}
     </div>
   );
 }

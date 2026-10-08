@@ -12,6 +12,8 @@ import {
   StockTransaction,
   AuditLog,
   FiscalGuard,
+  Expense,
+  ExpenseCategory,
 } from "@/models";
 import {
   deductCountBasedLooseStock,
@@ -39,6 +41,8 @@ import { directCheckoutPayments } from "@/lib/direct-checkout";
 import { createSaleStockBuffer } from "@/lib/sale-stock-buffer";
 import { saleFreeQuantity } from "@/lib/sale-free-quantity";
 import { findSaleEditRetry, loadSaleForEdit, restoreSaleStock, saveSaleEdit } from "@/services/sale-edit.service";
+import { buildExternalPurchase, isExternalPurchase, externalPurchaseSummary, saleForActor } from "@/lib/external-purchase";
+import { syncExternalPurchaseExpenses } from "@/services/external-purchase.service";
 
 const amount = money;
 const escapeRegex = (value) =>
@@ -191,7 +195,7 @@ async function consumeStock(
 
 export async function GET(request) {
   try {
-    await requireSession("sales.view");
+    const actor = await requireSession("sales.view");
     await connectDb();
     const parameters = new URL(request.url).searchParams;
     const customerId = parameters.get("customerId");
@@ -251,7 +255,7 @@ export async function GET(request) {
       ]);
       const revenue = amount(totals[0]?.revenue || 0);
       return ok({
-        sales,
+        sales: sales.map(sale => saleForActor(sale, actor)),
         summary: {
           invoices: total,
           revenue,
@@ -267,7 +271,7 @@ export async function GET(request) {
       });
     }
     return ok(
-      await Sale.find(filter).sort({ createdAt: -1 }).limit(100).lean(),
+      (await Sale.find(filter).sort({ createdAt: -1 }).limit(100).lean()).map(sale => saleForActor(sale, actor)),
     );
   } catch (error) {
     return apiError(error);
@@ -356,6 +360,9 @@ export async function POST(request) {
         );
       const productIds = new Set();
       for (const item of body.items) {
+        if (item.itemSource && !["inventory", "external_purchase"].includes(item.itemSource)) throw new Error("Invalid sale item source");
+        if (!isExternalPurchase(item) && item.inventoryTracked === false) throw new Error("Inventory products cannot bypass stock tracking");
+        if (isExternalPurchase(item) && !item.productId) continue;
         if (item.kind === "MIX")
           for (const ingredient of item.ingredients || [])
             productIds.add(String(ingredient.productId));
@@ -385,9 +392,13 @@ export async function POST(request) {
       const stockRows = [];
       if (originalSale) await restoreSaleStock({ sale: originalSale, InventoryBatch, StockTransaction, session: dbSession, actorId: session.sub });
       const stockBuffer = await createSaleStockBuffer({ InventoryBatch, session: dbSession, settings,
-        productIds: [...productIds, ...products.filter(product => product.freeSchemeEnabled && product.freeSchemeType === "DIFFERENT_PRODUCT" && mongoose.isValidObjectId(product.freeSchemeFreeProduct)).map(product => product.freeSchemeFreeProduct)],
+        productIds: [...new Set(body.items.filter(item => !isExternalPurchase(item)).flatMap(item => item.kind === "MIX" ? (item.ingredients || []).map(entry => String(entry.productId)) : [String(item.productId)])), ...products.filter(product => product.freeSchemeEnabled && product.freeSchemeType === "DIFFERENT_PRODUCT" && mongoose.isValidObjectId(product.freeSchemeFreeProduct)).map(product => product.freeSchemeFreeProduct)],
       });
       for (const item of body.items) {
+        if (isExternalPurchase(item)) {
+          saleItems.push(buildExternalPurchase(item, item.productId ? productById.get(String(item.productId)) : null));
+          continue;
+        }
         if (item.kind === "MIX") {
           if (saleType === "WHOLESALE")
             throw new Error(
@@ -735,6 +746,8 @@ export async function POST(request) {
       const subtotal = amount(
         saleItems.reduce((sum, item) => sum + item.total, 0),
       );
+      const externalIds = saleItems.filter(isExternalPurchase).map(item => item.externalPurchaseId);
+      if (new Set(externalIds).size !== externalIds.length) throw new Error("Duplicate External Purchase line identifier");
       if (
         settings?.gst?.enabled &&
         settings.gst.requireHsn &&
@@ -940,6 +953,7 @@ export async function POST(request) {
               stateCode: settings?.store?.stateCode || "",
             },
             items: saleItems,
+            ...externalPurchaseSummary(saleItems),
             stockAllocations: stockRows.filter(row => row.allocation).map(row => row.allocation),
             subtotal,
             discount: requestedDiscount,
@@ -986,6 +1000,9 @@ export async function POST(request) {
           };
       if (originalSale) completedSale = await saveSaleEdit({ Sale, AuditLog, original: originalSale, fields: saleFields, session: dbSession, actorId: session.sub, requestKey, hash });
       else [completedSale] = await Sale.create([saleFields], { session: dbSession, ordered: true });
+      if (saleItems.some(isExternalPurchase) || originalSale?.items?.some(isExternalPurchase)) {
+        await syncExternalPurchaseExpenses({ sale: completedSale, Expense, ExpenseCategory, session: dbSession, actor: session });
+      }
       if (credit) {
         customer.set("outstandingAmount", credit.outstandingAfter);
         await customer.save({ session: dbSession });

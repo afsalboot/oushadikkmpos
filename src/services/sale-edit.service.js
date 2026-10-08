@@ -3,7 +3,10 @@ import { saleEditProblem, saleStockReturns } from "@/lib/sale-edit";
 export async function restoreSaleStock({ sale, InventoryBatch, StockTransaction, session, actorId }) {
   const rows = await StockTransaction.find({ referenceType: "SALE", referenceId: sale._id }).session(session).lean();
   const allocations = saleStockReturns(sale, rows);
-  if (!allocations.length) throw new Error("Original stock allocations are missing. This sale cannot be edited safely.");
+  if (!allocations.length) {
+    if (sale.items.every(item => item.itemSource === "external_purchase" || item.inventoryTracked === false)) return;
+    throw new Error("Original stock allocations are missing. This sale cannot be edited safely.");
+  }
   const returns = [];
   for (const allocation of allocations) {
     if (!Number.isFinite(allocation.sealedPackages) || allocation.sealedPackages < 0 || !Number.isFinite(allocation.openQuantity) || allocation.openQuantity < 0) throw new Error("Invalid original stock allocation");

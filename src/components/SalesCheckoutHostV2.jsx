@@ -1,4 +1,5 @@
 "use client";
+import { isExternalPurchase } from "@/lib/external-purchase";
 
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
@@ -362,7 +363,12 @@ export default function SalesCheckoutHostV2() {
       }
     }
     const items = cart.map((item) =>
-      item.kind === "MIX"
+      isExternalPurchase(item) ? { itemSource: item.itemSource, inventoryTracked: false, productId: item.productId || null,
+        externalPurchaseId: item.externalPurchaseId, name: item.name, packageType: item.packageType,
+        quantity: item.quantity, unitPrice: item.packageSellingPrice, purchaseCost: item.purchaseCost,
+        externalSupplierName: item.externalSupplierName, externalPurchasePaymentMethod: item.externalPurchasePaymentMethod,
+        externalPurchaseNotes: item.externalPurchaseNotes, saleWholesaleDiscountPercent: wholesaleDiscountEnabled ? item.saleWholesaleDiscountPercent || 0 : 0,
+        billedLineIndex: item.billedLineIndex } : item.kind === "MIX"
         ? {
             kind: "MIX",
             name: item.name,

@@ -14,6 +14,9 @@ export async function GET(request,{params}){
     if(parameters.get("format")==="csv"){parameters.set("page","1");parameters.set("limit","1000");}
     await connectDb();
     const report=await getReport(type,parameters);
+    if (actor.role !== "ADMIN" && !actor.permissions.includes("reports.profitability")) {
+      report.kpis = report.kpis.filter(kpi => !["External Purchase Cost", "External Purchase Profit"].includes(kpi.label));
+    }
     report.access={allowed:Object.entries(REPORT_PERMISSIONS).filter(([,action])=>action==="view"||actor.role==="ADMIN"||actor.permissions.includes(`reports.${action}`)).map(([name])=>name),canExport:actor.role==="ADMIN"||actor.permissions.includes("reports.export")};
     if(parameters.get("format")==="csv")return new Response(reportCsv(report),{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":`attachment; filename="oushadi-${type}-report.csv"`}});
     return ok(report);

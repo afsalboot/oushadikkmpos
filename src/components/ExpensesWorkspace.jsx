@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { serializedFilterEntries } from "@/lib/filter-utils";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
@@ -80,6 +81,7 @@ function Badge({ value }) {
   const tones = {
     MANUAL: "bg-emerald-50 text-emerald-700",
     PURCHASE: "bg-indigo-50 text-indigo-700",
+    EXTERNAL_PURCHASE: "bg-amber-50 text-amber-700",
     ACTIVE: "bg-emerald-50 text-emerald-700",
     VOID: "bg-slate-100 text-slate-600",
   };
@@ -87,7 +89,7 @@ function Badge({ value }) {
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-extrabold ${tones[value] || "bg-slate-100 text-slate-600"}`}
     >
-      {String(value || "—").charAt(0) +
+      {value === "EXTERNAL_PURCHASE" ? "External Purchase" : String(value || "—").charAt(0) +
         String(value || "—")
           .slice(1)
           .toLowerCase()}
@@ -160,6 +162,8 @@ function ActionMenu({ row, onView, onEdit, onDuplicate, onVoid }) {
                   `/purchases?search=${encodeURIComponent(row.purchase?.purchaseNumber || "")}`,
                 ),
               )
+            ) : row.source === "EXTERNAL_PURCHASE" ? (
+              item("View sale", ShoppingBag, () => router.push(`/sales/${row.referenceId}`))
             ) : (
               <>
                 {item("Edit expense", Pencil, onEdit)}
@@ -844,6 +848,7 @@ function ExpenseDrawer({ expense, onClose, onEdit, onDuplicate, onVoid }) {
                 <div>
                   <span className="label">Payment method</span>
                   <strong>{expense.paymentMethod}</strong>
+                  {expense.source === "EXTERNAL_PURCHASE" && <p className="mt-2 text-sm">Paid {money(expense.paidAmount || 0)} · Pending {money(expense.balanceDue || 0)}<Link className="ml-2 font-bold text-[var(--green)]" href={`/sales/${expense.referenceId}`}>View sale</Link></p>}
                 </div>
                 <div>
                   <span className="label">Description</span>
@@ -1356,6 +1361,7 @@ export default function ExpensesWorkspace() {
             ["", "All sources"],
             ["MANUAL", "Manual"],
             ["PURCHASE", "Purchase"],
+            ["EXTERNAL_PURCHASE", "External Purchase"],
           ].map(([value, label]) => (
             <button
               className={`btn !min-h-9 ${filters.source === value ? "bg-slate-100" : ""}`}
@@ -1563,7 +1569,7 @@ export default function ExpensesWorkspace() {
                       <strong className="text-base">
                         {money(row.accountAmount)}
                       </strong>
-                      {row.source === "PURCHASE" &&
+                      {["PURCHASE", "EXTERNAL_PURCHASE"].includes(row.source) &&
                         Number(row.balanceDue) > 0 && (
                           <p className="mt-1 text-xs font-bold text-amber-700">
                             {money(row.balanceDue)} due

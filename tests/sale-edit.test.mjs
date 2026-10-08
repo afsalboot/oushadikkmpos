@@ -13,6 +13,8 @@ import { buildCustomerSnapshot, normalizeDoctorName, prepareWholesaleCredit, isW
 import { money, multiplyMoney } from "../src/lib/money.js";
 import { directCheckoutPayments } from "../src/lib/direct-checkout.js";
 import { saleFreeQuantity } from "../src/lib/sale-free-quantity.js";
+import { buildExternalPurchase, isExternalPurchase, externalPurchaseSummary } from "../src/lib/external-purchase.js";
+import { syncExternalPurchaseExpenses } from "../src/services/external-purchase.service.js";
 
 const serviceSource = readFileSync(new URL("../src/services/sale-edit.service.js", import.meta.url), "utf8").replace(/^import .*;\r?\n/gm, "").replaceAll("export ", "");
 const service = new Function("saleEditProblem", "saleStockReturns", `${serviceSource}; return { restoreSaleStock, loadSaleForEdit, findSaleEditRetry, saveSaleEdit };`)(saleEditProblem, saleStockReturns);
@@ -29,6 +31,7 @@ const original = { _id: id, invoiceNumber: "INV-ORIGINAL", invoiceDate: new Date
 function harness() {
   const state = { sale: { ...original }, batches: [{ _id: batchId, productId, packageSize: 100, sealedPackages: 3, openQuantity: 0 }, { _id: addedBatchId, productId: addedProductId, packageSize: 100, sealedPackages: 4, openQuantity: 0 }], rows: [], audits: [] };
   // Preserve ObjectId values through the fake database round trips.
+  state.expenses = [];
   const query = value => ({ select() { return this; }, sort() { return this; }, session() { return this; }, lean: async () => value, then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
   const batchDoc = batch => ({ ...batch, set(next) { Object.assign(this, next); }, validateSync() { return this.sealedPackages < 0 || this.openQuantity < 0 ? new Error("Invalid stock") : null; }, async save() { batch.sealedPackages = this.sealedPackages; batch.openQuantity = this.openQuantity; } });
   const InventoryBatch = { findOne: filter => query(state.batches.find(batch => String(batch._id) === String(filter._id)) ? batchDoc(state.batches.find(batch => String(batch._id) === String(filter._id))) : null),
@@ -38,10 +41,11 @@ function harness() {
   const AuditLog = { findOne: filter => query(state.audits.find(audit => audit.metadata.requestKey === filter["metadata.requestKey"])), create: async entries => state.audits.push(...entries) };
   const Sale = function(fields) { return new SaleModel(fields); };
   Object.assign(Sale, { init: async () => {}, findOne: filter => query(state.sale.requestKey === filter.requestKey ? state.sale : null), findById: () => query(state.sale),
-    create: async () => { throw new Error("An edit must not create another sale"); },
+    create: async ([fields]) => { const sale = new SaleModel({ ...fields, createdAt: new Date(), updatedAt: new Date() }); await sale.validate(); state.sale = sale.toObject(); return [sale]; },
     collection: { updateOne: async (filter, update) => { assert.equal(String(filter._id), String(state.sale._id)); assert.equal(+new Date(filter.updatedAt), +new Date(state.sale.updatedAt)); state.sale = { ...state.sale, ...update.$set }; return { matchedCount: 1 }; } } });
   const session = { withTransaction: async callback => {
     const snapshot = { sale: state.sale, batches: state.batches.map(batch => ({ ...batch })), rows: [...state.rows], audits: [...state.audits] };
+    snapshot.expenses = structuredClone(state.expenses);
     try { await callback(); } catch (error) { Object.assign(state, snapshot); throw error; }
   }, endSession: async () => {} };
   const product = { _id: productId, name: "Oil", active: true, packageType: "Bottle", baseUnit: "ml", packageSize: 100, packageSellingPrice: 120, loosePricePerUnit: 1, allowPackageSale: true };
@@ -51,11 +55,19 @@ function harness() {
     requireSession: async permission => { if (h.staff && permission === "ADMIN") throw new Error("FORBIDDEN"); return { sub: String(actorId), role: "ADMIN", name: "Owner" }; }, connectDb: async () => {},
     ok: (data, status = 200) => ({ data, status, headers: new Map() }), fail: (error, status = 400) => ({ error, status, headers: new Map() }), apiError: error => ({ error: error.message, status: error.message === "FORBIDDEN" ? 403 : error.status || 500, headers: new Map() }),
     Sale, InventoryBatch, StockTransaction, AuditLog, FiscalGuard: { init: async () => {}, findOneAndUpdate: async () => {} }, Settings: { findOne: () => query(settings) }, Product: { find: filter => query(catalogue.filter(entry => filter._id.$in.includes(String(entry._id)))) },
-    Customer: {}, DocumentCounter: {}, createCustomer: async () => { throw new Error("Unexpected customer creation"); }, nextInvoiceNumber: async () => { throw new Error("Edit must retain invoice number"); },
+    Customer: {}, DocumentCounter: {}, createCustomer: async () => { throw new Error("Unexpected customer creation"); }, nextInvoiceNumber: async () => "INV-NEW",
+    buildExternalPurchase, isExternalPurchase, externalPurchaseSummary, syncExternalPurchaseExpenses,
+    ExpenseCategory: { findOneAndUpdate: async () => ({ _id: new mongoose.Types.ObjectId() }) },
+    Expense: { find: () => query(state.expenses), findOneAndUpdate: async (filter, update) => {
+      const prior = state.expenses.find(expense => expense.externalPurchaseId === filter.externalPurchaseId);
+      if (h.failExpense) throw new Error("Expense write failed");
+      if (prior) Object.assign(prior, update.$set);
+      else state.expenses.push({ ...update.$set, _id: new mongoose.Types.ObjectId() });
+    } },
     calculateSalePricing, createSaleStockBuffer, deductPackageStock, deductLooseStock, deductCountBasedLooseStock, getLooseUnit, isCountBasedProduct,
     assertRegistration, resolveSupply, validateFiscalLines, registrationStatus, financialYear, GST_RULE_VERSION, requestHash, assertRetryMatches, buildCustomerSnapshot, normalizeDoctorName, prepareWholesaleCredit, isWholesaleCustomer, money, multiplyMoney, directCheckoutPayments, saleFreeQuantity };
-  const h = { state, settings, staff: false, async invoke({ quantity = 3, version = new Date(state.sale.updatedAt).toISOString(), revision = Number(state.sale.editRevision || 0), key = "sale-edit-retry-key-001", price = quantity * 100, items } = {}) {
-    const body = { editSaleId: String(id), editVersion: version, editRevision: revision, items: items || [{ kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity, billedLineIndex: 0 }], customerType: "WALK_IN", payments: [{ method: "CASH", amount: price }] };
+  const h = { state, settings, staff: false, async invoke({ create = false, quantity = 3, version = new Date(state.sale.updatedAt).toISOString(), revision = Number(state.sale.editRevision || 0), key = "sale-edit-retry-key-001", price = quantity * 100, items } = {}) {
+    const body = { ...(!create ? { editSaleId: String(id), editVersion: version, editRevision: revision } : {}), items: items || [{ kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity, billedLineIndex: 0 }], customerType: "WALK_IN", payments: [{ method: "CASH", amount: price }] };
     const run = new AsyncFunction(...Object.keys(dependencies), "request", `${route}\nreturn POST(request);`);
     return run(...Object.values(dependencies), { json: async () => body, headers: { get: () => key } });
   } };
@@ -152,4 +164,72 @@ test("adding another product and removing a billed line reconcile both original 
   assert.equal(h.state.batches[0].sealedPackages, 5);
   assert.equal(h.state.batches[1].sealedPackages, 3);
   assert.equal(result.data.total, 50);
+});
+
+const externalInput = (extra = {}) => ({ itemSource: "external_purchase", inventoryTracked: true,
+  externalPurchaseId: "external-purchase-line-001", name: "Dasamoolarishtam", quantity: 2, packageType: "bottle",
+  unitPrice: 220, purchaseCost: 180, externalSupplierName: "ABC Medicals", externalPurchasePaymentMethod: "CASH", ...extra });
+
+test("checkout accepts manual external products, ignores forged tracking, and retries without duplicate expenses", async () => {
+  const h = harness(), items = [externalInput()];
+  let result = await h.invoke({ create: true, items, price: 440 });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(result.data.items[0].productId, null);
+  assert.equal(result.data.items[0].inventoryTracked, false);
+  assert.equal(result.data.externalPurchaseCost, 360);
+  assert.equal(result.data.externalPurchaseProfit, 80);
+  assert.equal(h.state.batches[0].sealedPackages, 3);
+  assert.equal(h.state.rows.length, 0);
+  assert.equal(h.state.expenses.length, 1);
+  result = await h.invoke({ create: true, items, price: 440 });
+  assert.equal(result.status, 200, result.error);
+  assert.equal(h.state.expenses.length, 1);
+});
+
+test("mixed checkout deducts only inventory lines, including an external reference to a zero-stock product", async () => {
+  const h = harness();
+  h.state.batches[1].sealedPackages = 0;
+  const items = [{ kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity: 1 }, externalInput({ productId: String(addedProductId) })];
+  const result = await h.invoke({ create: true, items, price: 560 });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(h.state.batches[0].sealedPackages, 2);
+  assert.equal(h.state.batches[1].sealedPackages, 0);
+  assert.equal(h.state.rows.length, 1);
+  assert.equal(String(h.state.rows[0].productId), String(productId));
+  assert.equal(result.data.total, 560);
+});
+
+test("completed external quantity edit updates totals and the linked expense without stock writes", async () => {
+  const h = harness();
+  let result = await h.invoke({ create: true, items: [externalInput()], price: 440 });
+  assert.equal(result.status, 201, result.error);
+  result = await h.invoke({ items: [externalInput({ quantity: 3, billedLineIndex: 0 })], price: 660, key: "sale-edit-external-key-002" });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(result.data.externalPurchaseRevenue, 660);
+  assert.equal(result.data.externalPurchaseCost, 540);
+  assert.equal(result.data.externalPurchaseProfit, 120);
+  assert.equal(h.state.rows.length, 0);
+  assert.equal(h.state.batches[0].sealedPackages, 3);
+  assert.equal(h.state.expenses.length, 1);
+  assert.equal(h.state.expenses[0].amount, 540);
+});
+
+test("supplier expense failure rolls back mixed checkout stock and invoice", async () => {
+  const h = harness(); h.failExpense = true;
+  const result = await h.invoke({ create: true, items: [{ kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity: 1 }, externalInput()], price: 560 });
+  assert.equal(result.status, 422, result.error);
+  assert.equal(h.state.batches[0].sealedPackages, 3);
+  assert.equal(h.state.rows.length, 0);
+  assert.equal(h.state.expenses.length, 0);
+  assert.equal(h.state.sale.invoiceNumber, "INV-ORIGINAL");
+});
+
+test("malformed external checkout aborts and ordinary products cannot disable stock", async () => {
+  const h = harness();
+  for (const item of [externalInput({ quantity: -1 }), externalInput({ purchaseCost: -1 }), { kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity: 1, inventoryTracked: false }]) {
+    const result = await h.invoke({ create: true, items: [item], price: 120 });
+    assert.equal(result.status, 422, result.error);
+    assert.equal(h.state.batches[0].sealedPackages, 3);
+    assert.equal(h.state.expenses.length, 0);
+  }
 });
