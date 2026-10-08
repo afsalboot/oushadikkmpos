@@ -170,6 +170,17 @@ const externalInput = (extra = {}) => ({ itemSource: "external_purchase", invent
   externalPurchaseId: "external-purchase-line-001", name: "Dasamoolarishtam", quantity: 2, packageType: "bottle",
   unitPrice: 220, purchaseCost: 180, externalSupplierName: "ABC Medicals", externalPurchasePaymentMethod: "CASH", ...extra });
 
+test("selling-price-only external checkout completes without supplier expenses or inventory changes", async () => {
+  const h = harness();
+  const result = await h.invoke({ create: true, items: [{ itemSource: "external_purchase", name: "External medicine", quantity: 2, packageType: "bottle", unitPrice: 220 }], price: 440 });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(result.data.total, 440);
+  assert.equal(result.data.externalPurchaseProfit, null);
+  assert.equal(h.state.expenses.length, 0);
+  assert.equal(h.state.rows.length, 0);
+  assert.equal(h.state.batches[0].sealedPackages, 3);
+});
+
 test("checkout accepts manual external products, ignores forged tracking, and retries without duplicate expenses", async () => {
   const h = harness(), items = [externalInput()];
   let result = await h.invoke({ create: true, items, price: 440 });

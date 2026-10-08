@@ -8,13 +8,13 @@ export const inventoryTracked = item => !isExternalPurchase(item) && item?.inven
 export function buildExternalPurchase(item, product) {
   const name = String(item.name || product?.name || "").trim();
   const unit = String(item.packageType || item.unit || product?.packageType || "").trim();
-  const quantity = Number(item.quantity), purchaseCost = Number(item.purchaseCost), unitPrice = Number(item.unitPrice);
+  const quantity = Number(item.quantity), purchaseCost = Number(item.purchaseCost ?? 0), unitPrice = Number(item.unitPrice);
   if (!name || name.length > 160) throw new Error("Product name is required and must be at most 160 characters.");
   if (!unit || unit.length > 40) throw new Error("Unit is required and must be at most 40 characters.");
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 99999999) throw new Error("Quantity must be greater than zero.");
-  if (item.purchaseCost === "" || item.purchaseCost == null || !Number.isFinite(purchaseCost) || purchaseCost < 0 || purchaseCost > 99999999) throw new Error("Purchase cost must be zero or greater.");
+  if (item.purchaseCost === "" || !Number.isFinite(purchaseCost) || purchaseCost < 0 || purchaseCost > 99999999) throw new Error("Purchase cost must be zero or greater.");
   if (item.unitPrice === "" || item.unitPrice == null || !Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 99999999) throw new Error("Selling price must be zero or greater.");
-  if (!Object.hasOwn(EXTERNAL_PURCHASE_PAYMENTS, item.externalPurchasePaymentMethod)) throw new Error("Select a purchase payment method.");
+  if (item.externalPurchasePaymentMethod != null && !Object.hasOwn(EXTERNAL_PURCHASE_PAYMENTS, item.externalPurchasePaymentMethod)) throw new Error("Select a purchase payment method.");
   if (item.kind === "MIX" || item.ingredients?.length || Number(item.freeQuantity) > 0) throw new Error("External Purchase cannot contain mixtures or free stock.");
   return { kind: "PRODUCT", productId: product?._id || null, name, packageType: unit, baseUnit: unit,
     externalPurchaseId: /^[a-zA-Z0-9-]{16,80}$/.test(item.externalPurchaseId || "") ? item.externalPurchaseId : crypto.randomUUID(),
@@ -33,7 +33,7 @@ export function externalPurchaseSummary(items = []) {
   const external = items.filter(isExternalPurchase);
   const externalPurchaseRevenue = money(external.reduce((sum, item) => sum + Number(item.total || 0), 0));
   const externalPurchaseCost = money(external.reduce((sum, item) => sum + multiplyMoney(item.quantity, item.purchaseCost), 0));
-  return { externalPurchaseRevenue, externalPurchaseCost, externalPurchaseProfit: money(externalPurchaseRevenue - externalPurchaseCost) };
+  return { externalPurchaseRevenue, externalPurchaseCost, externalPurchaseProfit: external.some(item => !item.externalPurchasePaymentMethod) ? null : money(externalPurchaseRevenue - externalPurchaseCost) };
 }
 
 export const canViewExternalCosts = actor => actor?.role === "ADMIN" || actor?.permissions?.includes("sales.create") || actor?.permissions?.includes("expenses.view");

@@ -114,7 +114,7 @@ export default function SaleSourceDetails({ id }) {
                 <tr key={`${item.productId || item.name}-${index}`}>
                   <td>
                     <strong>{item.name}</strong>
-                    {isExternalPurchase(item) && item.purchaseCost !== undefined && <div className="mt-2 space-y-1 text-xs text-[var(--muted)]">
+                    {isExternalPurchase(item) && item.externalPurchasePaymentMethod && item.purchaseCost !== undefined && <div className="mt-2 space-y-1 text-xs text-[var(--muted)]">
                       <p>Selling price {money(item.unitPrice)} · Purchase Cost {money(item.purchaseCost)} / {item.packageType}</p>
                       <p>Total cost {money(item.totalPurchaseCost)} · Profit {money(item.total - item.totalPurchaseCost)}</p>
                       <p>Supplier: {item.externalSupplierName || "—"} · Supplier Payment: {EXTERNAL_PURCHASE_PAYMENTS[item.externalPurchasePaymentMethod]}</p>

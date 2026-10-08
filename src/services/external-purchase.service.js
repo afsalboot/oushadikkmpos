@@ -3,7 +3,7 @@ import { isExternalPurchase } from "../lib/external-purchase.js";
 // Sale issuance is serialized by FiscalGuard. All expense changes share the
 // checkout transaction and its retry key; one expense per persisted sale line.
 export async function syncExternalPurchaseExpenses({ sale, Expense, ExpenseCategory, session, actor }) {
-  const lines = sale.items.map((item, index) => ({ item, index })).filter(({ item }) => isExternalPurchase(item));
+  const lines = sale.items.map((item, index) => ({ item, index })).filter(({ item }) => isExternalPurchase(item) && item.externalPurchasePaymentMethod);
   const existing = await Expense.find({ source: "EXTERNAL_PURCHASE", referenceType: "SALE", referenceId: sale._id }).session(session);
   if (!lines.length && !existing.length) return;
   const category = await ExpenseCategory.findOneAndUpdate({ name: /^External Purchase$/i },

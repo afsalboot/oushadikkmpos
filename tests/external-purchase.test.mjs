@@ -12,6 +12,16 @@ import { Sale, Expense } from "../src/models/index.js";
 import { getReport } from "../src/services/report.service.js";
 
 const input = { itemSource: "external_purchase", name: "Dasamoolarishtam", quantity: 2, packageType: "bottle", unitPrice: 220, purchaseCost: 180, externalPurchasePaymentMethod: "CASH", externalSupplierName: "ABC Medicals" };
+test("selling-price-only external items need no supplier data and create no expense", async () => {
+  const line = buildExternalPurchase({ name: "External medicine", quantity: 2, packageType: "bottle", unitPrice: 220 });
+  assert.equal(line.total, 440);
+  assert.equal(line.inventoryTracked, false);
+  assert.equal(line.externalPurchasePaymentMethod, undefined);
+  assert.equal(externalPurchaseSummary([line]).externalPurchaseProfit, null);
+  await syncExternalPurchaseExpenses({ sale: { _id: "sale", items: [line] }, session: {},
+    Expense: { find: () => ({ session: async () => [] }), findOneAndUpdate: async () => assert.fail("No expense should be created") },
+    ExpenseCategory: { findOneAndUpdate: async () => assert.fail("No expense category should be created") }, actor: { sub: "staff" } });
+});
 test("external costs and revenue use quantity and decimal money; tracking is forced off", () => {
   const line = buildExternalPurchase({ ...input, inventoryTracked: true });
   assert.equal(line.inventoryTracked, false);

@@ -804,9 +804,9 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
             String(item.productId || item._id) === String(product._id),
         );
       if (!product.allowPackageSale || available <= 0)
-        return setExternalPurchase(product);
+        return toast.error(`${product.name} has no full ${product.packageType}s available`);
       if (existing && Number(existing.quantity) >= available)
-        return setExternalPurchase(product);
+        return toast.error(`Only ${available} ${product.packageType}s available`);
       add({
         ...product,
         kind: "PRODUCT",
@@ -1047,9 +1047,9 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       ["PACKAGE", "WHOLESALE"].includes(item.saleMode) &&
       String(item.productId || item._id) === String(product._id));
     if (!product.allowPackageSale || available <= 0)
-      return setExternalPurchase(product);
+      return toast.error(`${product.name} has no full ${product.packageType}s available`);
     if (existing && Number(existing.quantity) >= available)
-      return setExternalPurchase(product);
+      return toast.error(`Only ${available} ${product.packageType}s available`);
     add({ ...product, kind: "PRODUCT", saleMode: "PACKAGE", quantity: 1,
       looseQuantity: 0, openPackageCounts: [], baseUnit: product.baseUnit });
   }
@@ -1388,7 +1388,6 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                 </span>
               </div>
               <h2 className="mt-4 text-lg font-extrabold">{p.name}</h2>
-              {mode === "PRODUCT" && <button type="button" className="btn mt-2 !min-h-8 text-xs" onClick={event => { event.stopPropagation(); setExternalPurchase(p); }}>Buy Externally &amp; Add</button>}
               <ExpiredStockWarning product={p} />
               <small className="text-[var(--muted)]">SKU {p.sku}</small>
               <div className="sales-product-badges mt-3 flex flex-wrap gap-1">
@@ -1495,7 +1494,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                           </button>
                         </div>
                         {editingSale && i.kind === "MIX" && <button type="button" className="btn mt-2" onClick={() => editMix(i)}>Edit mixture</button>}
-                        {isExternalPurchase(i) ? <div className="mt-2 text-xs text-[var(--muted)]">Cost {money(i.purchaseCost)} / {i.packageType} · Total cost {money(i.quantity * i.purchaseCost)}<button className="btn ml-2 !min-h-7 !px-2 text-xs" type="button" onClick={() => setExternalPurchase(i)}>Edit details</button></div> : <ExpiredStockWarning product={i} />}
+                        {isExternalPurchase(i) ? <button className="btn mt-2 !min-h-7 !px-2 text-xs" type="button" onClick={() => setExternalPurchase(i)}>Edit details</button> : <ExpiredStockWarning product={i} />}
                         {wholesaleDiscountEnabled && i.kind === "PRODUCT" && i.saleMode !== "WHOLESALE" && (
                           <label className="my-2 flex items-center justify-between gap-2 text-xs">
                             <span>Wholesale discount %</span>
