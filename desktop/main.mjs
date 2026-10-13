@@ -1,16 +1,26 @@
 import { app, BrowserWindow, WebContentsView, dialog, Menu, session, ipcMain } from "electron";
 import { printReceipt } from "./receipt-print.mjs";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { getStartUrl, isTrustedUrl } from "./policy.mjs";
 import { LocalBackup, backupDue } from "./local-backup.mjs";
 
 const startUrl = getStartUrl(app.isPackaged, process.argv);
+// Diagnostics use an isolated real desktop shell without scheduled backups.
+const benchmark = !app.isPackaged && process.argv.includes("--benchmark");
 const printSmoke = !app.isPackaged && process.argv.includes("--print-smoke");
 const smoke = !app.isPackaged && (process.argv.includes("--smoke") || printSmoke);
-if (smoke) app.setPath("userData", mkdtempSync(join(tmpdir(), "oushadhi-desktop-check-")));
+if (smoke || benchmark) {
+  const reuse = benchmark && process.argv.find(value => value.startsWith('--benchmark-profile='))?.slice('--benchmark-profile='.length);
+  let profile;
+  if (reuse) {
+    profile = realpathSync(reuse);
+    if (dirname(profile).toLowerCase() !== realpathSync(tmpdir()).toLowerCase() || !basename(profile).startsWith('oushadhi-desktop-check-') || !statSync(profile).isDirectory()) throw new Error('Only an isolated temporary benchmark profile can be reused');
+  }
+  app.setPath('userData', profile || mkdtempSync(join(tmpdir(), 'oushadhi-desktop-check-')));
+}
 let smokePrintCount = 0;
 const offlinePath = fileURLToPath(new URL("./offline.html", import.meta.url));
 let mainWindow;
@@ -168,7 +178,11 @@ function createWindow() {
   resizeContent();
   mainWindow.on("resize", resizeContent);
   void mainWindow.loadFile(fileURLToPath(new URL("./chrome.html", import.meta.url)));
-  mainWindow.once("ready-to-show", () => { if (!smoke) mainWindow.show(); });
+  if (benchmark) mainWindow.webContents.once('did-finish-load', () => {
+    void mainWindow.webContents.executeJavaScript("document.title='Oushadhi POS - SPEED TEST';document.querySelector('header strong').textContent='Oushadhi POS - SPEED TEST';");
+    if (process.argv.includes('--benchmark-visible')) { mainWindow.show(); mainWindow.focus(); }
+  });
+  mainWindow.once("ready-to-show", () => { if (!smoke && (!benchmark || process.argv.includes('--benchmark-visible'))) mainWindow.show(); });
   const contents = appView.webContents;
   for (const event of ["will-navigate", "will-redirect"]) {
     contents.on(event, (e, url) => {
@@ -266,7 +280,7 @@ if (!app.requestSingleInstanceLock()) {
         { role: "togglefullscreen" }, ...(!app.isPackaged ? [{ role: "toggleDevTools" }] : [])] },
     ]));
     createWindow();
-    if (!smoke) {
+    if (!smoke && !benchmark) {
       setTimeout(() => { void checkBackup(); }, 15000).unref();
       const backupTimer = setInterval(() => { void checkBackup(); }, 60000);
       backupTimer.unref();

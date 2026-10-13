@@ -3,7 +3,9 @@ import { resourceFetch } from "@/lib/resource-fetch";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { prefetchSales, configureSalesScope, refreshSalesInBackground } from '@/lib/sales-resources';
+import { SalesCacheContext } from '@/components/SalesCacheContext';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -89,8 +91,32 @@ export default function AppShell({ user, children }) {
   const router = useRouter();
   const confirmAction = useConfirm();
   const [open, setOpen] = useState(false);
+  const [salesRouteWarm, setSalesRouteWarm] = useState(false);
   const allowed = (permission) =>
     user.role === "ADMIN" || user.permissions?.includes(permission);
+  const canPrefetchSales = allowed('sales.view') && allowed('products.view') && !user.mustChangePassword;
+  useEffect(() => {
+    if (!canPrefetchSales) return;
+    const start = () => { setSalesRouteWarm(true); void prefetchSales({ scope: user.cacheScope }).catch(() => {}); };
+    // Run after the shell paints; never await this on the login/dashboard path.
+    if (window.requestIdleCallback) {
+      const task = window.requestIdleCallback(start, { timeout: 2000 });
+      return () => window.cancelIdleCallback(task);
+    }
+    const timer = setTimeout(start, 1000);
+    return () => clearTimeout(timer);
+  }, [canPrefetchSales, user.cacheScope]);
+  useLayoutEffect(() => {
+    void configureSalesScope(user.cacheScope).catch(() => {});
+  }, [user.cacheScope]);
+  useEffect(() => {
+    const changed = () => router.refresh();
+    const refresh = () => { if (canPrefetchSales && !document.hidden) void refreshSalesInBackground({ scope: user.cacheScope }).catch(() => {}); };
+    const timer = setInterval(refresh, 120000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('oushadi-session-changed', changed);
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('oushadi-session-changed', changed); };
+  }, [canPrefetchSales, user.cacheScope, router]);
 
   async function logout() {
     if (
@@ -135,6 +161,9 @@ export default function AppShell({ user, children }) {
               <Link
                 key={href}
                 href={href}
+                prefetch={href === '/sales' ? canPrefetchSales && salesRouteWarm : undefined}
+                onMouseEnter={href === '/sales' && canPrefetchSales ? () => void prefetchSales({ scope: user.cacheScope }).catch(() => {}) : undefined}
+                onFocus={href === '/sales' && canPrefetchSales ? () => void prefetchSales({ scope: user.cacheScope }).catch(() => {}) : undefined}
                 onClick={() => setOpen(false)}
                 className={`mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition ${active ? "bg-white text-[#173d29]" : "text-emerald-50/75 hover:bg-white/10 hover:text-white"}`}
               >
@@ -173,7 +202,7 @@ export default function AppShell({ user, children }) {
   );
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[244px_1fr]">
+    <SalesCacheContext.Provider key={user.cacheScope} value={user.cacheScope}><div className="min-h-screen lg:grid lg:grid-cols-[244px_1fr]">
       <aside className="app-sidebar fixed inset-y-0 hidden w-[244px] flex-col bg-[#173d29] lg:flex">
         {sidebar()}
       </aside>
@@ -204,6 +233,6 @@ export default function AppShell({ user, children }) {
         </header>
         <main className="p-4 lg:p-8">{children}</main>
       </div>
-    </div>
+    </div></SalesCacheContext.Provider>
   );
 }

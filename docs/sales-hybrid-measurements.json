@@ -1,0 +1,56 @@
+{
+  "measuredAt": "2026-10-13T18:20:01.781Z",
+  "measurements": [
+    {
+      "name": "paginated-first-page-1",
+      "ms": 1172.26,
+      "bytes": 80827,
+      "count": 50
+    },
+    {
+      "name": "paginated-first-page-2",
+      "ms": 939.21,
+      "bytes": 80827,
+      "count": 50
+    },
+    {
+      "name": "lightweight-index",
+      "ms": 6564.56,
+      "bytes": 691089,
+      "count": 2099
+    },
+    {
+      "name": "index-database-execution",
+      "ms": 41,
+      "examined": 2100,
+      "returned": 2099
+    },
+    {
+      "name": "local-search-1000-runs",
+      "medianMs": 0.1424,
+      "p95Ms": 0.1909
+    },
+    {
+      "name": "barcode-map",
+      "averageMs": 0.000034,
+      "entries": 0,
+      "scope": "missing barcode lookup; catalogue has no barcodes"
+    },
+    {
+      "name": "one-product-sale-detail",
+      "ms": 169.46,
+      "bytes": 1572
+    }
+  ],
+  "stages": {
+    "index_categories": 64.67,
+    "index_products": 6550.1,
+    "index_query": 6550.18,
+    "index_processing": 13.84,
+    "serialization": 2.88
+  },
+  "searchParityAssertions": 9,
+  "databaseWrites": 0,
+  "browserTimings": "unverified",
+  "scope": "service only; excludes HTTP auth, React render and network to browser"
+}

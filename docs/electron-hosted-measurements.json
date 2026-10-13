@@ -1,0 +1,298 @@
+{
+  "target": "hosted-production",
+  "origin": "https://oushadikkmpos.vercel.app",
+  "measuredAt": "2026-10-13T19:08:38.314Z",
+  "writesBlocked": 0,
+  "measurements": [
+    {
+      "name": "process-launch-to-page-ready",
+      "ms": 6313.02,
+      "page": "/login"
+    },
+    {
+      "name": "sales-opening-1",
+      "ms": 34859.7,
+      "cards": 50
+    },
+    {
+      "name": "search-1",
+      "ms": 3155.4,
+      "cards": 1,
+      "productHttpRequests": 1
+    },
+    {
+      "name": "sales-cycle-api-count-1",
+      "count": 3
+    },
+    {
+      "name": "sales-opening-2",
+      "ms": 2587.2,
+      "cards": 50
+    },
+    {
+      "name": "search-2",
+      "ms": 1671.5,
+      "cards": 1,
+      "productHttpRequests": 1
+    },
+    {
+      "name": "sales-cycle-api-count-2",
+      "count": 3
+    },
+    {
+      "name": "sales-opening-3",
+      "ms": 2531.8,
+      "cards": 50
+    },
+    {
+      "name": "search-3",
+      "ms": 1747,
+      "cards": 1,
+      "productHttpRequests": 1
+    },
+    {
+      "name": "sales-cycle-api-count-3",
+      "count": 3
+    },
+    {
+      "name": "sales-opening-4",
+      "ms": 2542.5,
+      "cards": 50
+    },
+    {
+      "name": "search-4",
+      "ms": 1709.5,
+      "cards": 1,
+      "productHttpRequests": 1
+    },
+    {
+      "name": "sales-cycle-api-count-4",
+      "count": 3
+    },
+    {
+      "name": "sales-opening-5",
+      "ms": 2568.5,
+      "cards": 50
+    },
+    {
+      "name": "search-5",
+      "ms": 1687.4,
+      "cards": 1,
+      "productHttpRequests": 1
+    },
+    {
+      "name": "sales-cycle-api-count-5",
+      "count": 3
+    }
+  ],
+  "engine": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.130",
+    "revision": "@3f88203f01f16bafca72d5b553df2d23160b95ff",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) oushadhi-pos-desktop/0.1.1 Chrome/152.0.7977.130 Electron/44.4.5 Safari/537.36",
+    "jsVersion": "15.2.124.28"
+  },
+  "navigation": {
+    "domContentLoadedMs": 1145.1,
+    "loadMs": 1343.1,
+    "responseStartMs": 784.7
+  },
+  "authenticated": true,
+  "apiRequests": [
+    {
+      "endpoint": "/api/auth/status",
+      "status": 200,
+      "ms": 4672.05,
+      "transferBytes": 220
+    },
+    {
+      "endpoint": "/api/auth/username-login",
+      "status": 200,
+      "ms": 2758.95,
+      "transferBytes": 761
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 2143.85,
+      "transferBytes": 4220,
+      "serverTiming": "auth;dur=497.3, connection;dur=0, alerts;dur=1283, serialization;dur=0.8, total;dur=1781.4"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 4724.26,
+      "transferBytes": 4476,
+      "serverTiming": "auth;dur=2390.7, connection;dur=0, alerts;dur=2017, serialization;dur=3.3, total;dur=4411.3"
+    },
+    {
+      "endpoint": "/api/dashboard",
+      "status": 200,
+      "ms": 9798.95,
+      "transferBytes": 1864,
+      "serverTiming": "auth;dur=4845.4, connection;dur=0, settings;dur=0.4, sale_product_ids;dur=580.1, expenses;dur=465.7, batch_aggregation;dur=489.2, purchases;dur=517.7, consultations;dur=524.6, inventory_aggregation;dur=1828.8, sales_aggregation;dur=663.5, serialization;dur=0.5, total;dur=8162.8"
+    },
+    {
+      "endpoint": "/api/categories",
+      "status": 200,
+      "ms": 765.86,
+      "transferBytes": 1286
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2314.88,
+      "transferBytes": 5251,
+      "serverTiming": "auth;dur=219.1, connection;dur=0.1, count;dur=219.1, product_query;dur=1417.6, batch_query;dur=301.5, processing;dur=3, serialization;dur=0.8, total;dur=1943.1"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ms": 6211.58,
+      "transferBytes": 2848
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 2559.98,
+      "transferBytes": 4197,
+      "serverTiming": "auth;dur=429.6, connection;dur=0, alerts;dur=1752.3, serialization;dur=0.9, total;dur=2183"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2874.36,
+      "transferBytes": 1060,
+      "serverTiming": "auth;dur=1588, connection;dur=0.1, count;dur=218.7, product_query;dur=456.9, batch_query;dur=219.1, processing;dur=0.7, serialization;dur=0.4, total;dur=2474.4"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2192.91,
+      "transferBytes": 5233,
+      "serverTiming": "auth;dur=216.3, connection;dur=0, count;dur=217.2, product_query;dur=1390.4, batch_query;dur=294.3, processing;dur=1.6, serialization;dur=1.1, total;dur=1904.3"
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 1085.99,
+      "transferBytes": 1716
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2268.37,
+      "transferBytes": 5241,
+      "serverTiming": "auth;dur=212.2, connection;dur=0, count;dur=215.9, product_query;dur=1405, batch_query;dur=298.9, processing;dur=0.7, serialization;dur=1.2, total;dur=1918.6"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 1387.71,
+      "transferBytes": 1059,
+      "serverTiming": "auth;dur=217.2, connection;dur=0, count;dur=222.3, product_query;dur=446.1, batch_query;dur=213.4, processing;dur=0.1, serialization;dur=0.4, total;dur=1089.6"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 1739.54,
+      "transferBytes": 4197,
+      "serverTiming": "auth;dur=215.5, connection;dur=0, alerts;dur=1243, serialization;dur=0.7, total;dur=1459.3"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2321.27,
+      "transferBytes": 5228,
+      "serverTiming": "auth;dur=217, connection;dur=0, count;dur=217.4, product_query;dur=1387, batch_query;dur=293.4, processing;dur=0.6, serialization;dur=2, total;dur=1900.4"
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 1121.74,
+      "transferBytes": 1669
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2204.38,
+      "transferBytes": 5245,
+      "serverTiming": "auth;dur=210, connection;dur=0, count;dur=213.3, product_query;dur=1404.2, batch_query;dur=298.4, processing;dur=0.6, serialization;dur=1, total;dur=1914.7"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 1466.61,
+      "transferBytes": 1279,
+      "serverTiming": "auth;dur=216.7, connection;dur=0, count;dur=222.2, product_query;dur=444.7, batch_query;dur=211.8, processing;dur=0.2, serialization;dur=0.4, total;dur=1087.4"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2301.17,
+      "transferBytes": 5404,
+      "serverTiming": "auth;dur=211.1, connection;dur=0, count;dur=212.1, product_query;dur=1407, batch_query;dur=298.7, processing;dur=2, serialization;dur=0.9, total;dur=1920.1"
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 1087.8,
+      "transferBytes": 1742
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2220.22,
+      "transferBytes": 5241,
+      "serverTiming": "auth;dur=215.6, connection;dur=0, count;dur=216, product_query;dur=1383.4, batch_query;dur=293.5, processing;dur=0.6, serialization;dur=0.8, total;dur=1894.3"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 1434.86,
+      "transferBytes": 1055,
+      "serverTiming": "auth;dur=210, connection;dur=0, count;dur=229.1, product_query;dur=458.7, batch_query;dur=216.7, processing;dur=0.1, serialization;dur=0.3, total;dur=1092.4"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2489.59,
+      "transferBytes": 5234,
+      "serverTiming": "auth;dur=490.4, connection;dur=0, count;dur=216.7, product_query;dur=1382.5, batch_query;dur=293.4, processing;dur=0.7, serialization;dur=0.9, total;dur=2168.2"
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 1077.27,
+      "transferBytes": 1710
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2243.49,
+      "transferBytes": 5453,
+      "serverTiming": "auth;dur=210.7, connection;dur=0, count;dur=212.1, product_query;dur=1405.7, batch_query;dur=299, processing;dur=0.6, serialization;dur=1, total;dur=1917.4"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 1405.71,
+      "transferBytes": 1231,
+      "serverTiming": "auth;dur=215.3, connection;dur=0, count;dur=221.9, product_query;dur=444.4, batch_query;dur=211.2, processing;dur=0.1, serialization;dur=0.3, total;dur=1083.1"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 1861.15,
+      "transferBytes": 4189,
+      "serverTiming": "auth;dur=210.2, connection;dur=0, alerts;dur=1241.1, serialization;dur=0.7, total;dur=1452"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 2298.57,
+      "transferBytes": 5231,
+      "serverTiming": "auth;dur=220, connection;dur=0, count;dur=219.7, product_query;dur=1405.2, batch_query;dur=298.4, processing;dur=2.2, serialization;dur=0.9, total;dur=1926.9"
+    }
+  ]
+}

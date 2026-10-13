@@ -322,6 +322,7 @@ export async function POST(request) {
     dbSession = await mongoose.startSession();
     let completedSale;
     let receiptSnapshot;
+    const affectedProductIds = new Set();
     mark("prepare");
     await dbSession.withTransaction(async () => {
       await FiscalGuard.findOneAndUpdate({key:'issuance'},{$inc:{revision:1}},{upsert:true,session:dbSession});
@@ -332,6 +333,11 @@ export async function POST(request) {
         if (retry) { completedSale = retry; return; }
       }
       const originalSale = editing ? await loadSaleForEdit({ Sale, id: body.editSaleId, version: body.editVersion, revision: body.editRevision, session: dbSession }) : null;
+      for (const allocation of originalSale?.stockAllocations || []) affectedProductIds.add(String(allocation.productId));
+      for (const item of originalSale?.items || []) {
+        if (item.productId) affectedProductIds.add(String(item.productId));
+        for (const ingredient of item.ingredients || []) affectedProductIds.add(String(ingredient.productId));
+      }
       if (originalSale && body.credit === true) throw new Error("An edited paid sale must remain fully paid.");
       let customer = null;
       if (customerType === "EXISTING") {
@@ -1018,10 +1024,11 @@ export async function POST(request) {
           { session: dbSession, ordered: true },
         );
       await stockBuffer.flush();
+      for (const row of stockRows) affectedProductIds.add(String(row.productId));
       if (!originalSale) await AuditLog.create([{actorId:session.sub,action:'INVOICE_FINALIZED',module:'sales',targetType:'Sale',targetId:completedSale._id,description:`Issued ${invoiceNumber}`,metadata:{invoiceNumber,documentType,total,tax:gstInvoice.tax,placeOfSupply,ruleVersion:GST_RULE_VERSION}}],{session:dbSession});
     });
     mark("transaction");
-    return timed(ok({ ...(completedSale.toObject?.() || completedSale), receiptSnapshot }, 201));
+    return timed(ok({ ...(completedSale.toObject?.() || completedSale), receiptSnapshot, affectedProductIds: [...affectedProductIds] }, 201));
   } catch (error) {
     // Plain validation errors abort the transaction and are safe to correct/retry.
     if(error?.constructor===Error&&!error.status)error.status=422;

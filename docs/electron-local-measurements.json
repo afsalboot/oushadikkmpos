@@ -1,0 +1,767 @@
+{
+  "client": "Electron",
+  "target": "local-production-build",
+  "origin": "http://localhost:3000",
+  "measuredAt": "2026-10-13T20:22:24.999Z",
+  "writesBlocked": 0,
+  "measurements": [
+    {
+      "name": "process-launch-to-page-ready",
+      "ms": 1381.95,
+      "page": "/dashboard"
+    },
+    {
+      "name": "sales-opening-1",
+      "ms": 81.1,
+      "domReadyMs": 78.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-1",
+      "ms": 5.1,
+      "domReadyMs": 3.4,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-1",
+      "ms": 12.9,
+      "domReadyMs": 8.6,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-1",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-2",
+      "ms": 27.5,
+      "domReadyMs": 23.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-2",
+      "ms": 5.6,
+      "domReadyMs": 4.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-2",
+      "ms": 11.7,
+      "domReadyMs": 7.3,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-2",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-3",
+      "ms": 30.3,
+      "domReadyMs": 26.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-3",
+      "ms": 4.9,
+      "domReadyMs": 3.5,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-3",
+      "ms": 13.8,
+      "domReadyMs": 8.7,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-3",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-4",
+      "ms": 25.6,
+      "domReadyMs": 22.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-4",
+      "ms": 6.5,
+      "domReadyMs": 3.1,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-4",
+      "ms": 11.7,
+      "domReadyMs": 7.5,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-4",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-5",
+      "ms": 27.2,
+      "domReadyMs": 22.3,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-5",
+      "ms": 4.8,
+      "domReadyMs": 3.3,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-5",
+      "ms": 11.8,
+      "domReadyMs": 7.3,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-5",
+      "count": 0
+    },
+    {
+      "name": "cart-detail-warmup",
+      "ms": 28.7,
+      "selectionMs": 25.5,
+      "usedDialog": false,
+      "items": 1
+    },
+    {
+      "name": "cached-cart-add-1",
+      "ms": 18,
+      "selectionMs": 13.3,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-2",
+      "ms": 17.1,
+      "selectionMs": 14.8,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-3",
+      "ms": 16.8,
+      "selectionMs": 15.2,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-4",
+      "ms": 23.4,
+      "selectionMs": 16.6,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-5",
+      "ms": 19.7,
+      "selectionMs": 16.6,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-1",
+      "ms": 8.9,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 12.5,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-2",
+      "ms": 8.5,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 8.6,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-3",
+      "ms": 7.2,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 8.2,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-4",
+      "ms": 8.3,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 8.7,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-5",
+      "ms": 7.3,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 9.5,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-1",
+      "ms": 3.4,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 6.1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-2",
+      "ms": 4.9,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 6.4,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-3",
+      "ms": 3.7,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 6.4,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-4",
+      "ms": 6.3,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 4.9,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-5",
+      "ms": 5.1,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 5.8,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "persistent-sales-reload",
+      "productHttpRequests": 0
+    }
+  ],
+  "cacheOperations": [
+    {
+      "operation": "indexeddb-restore",
+      "ms": "97",
+      "count": "2099",
+      "details": "101"
+    },
+    {
+      "operation": "index-unchanged",
+      "ms": "146.4"
+    },
+    {
+      "operation": "detail-fetch",
+      "ms": "156.3",
+      "count": "undefined"
+    },
+    {
+      "operation": "first-page-fetch",
+      "ms": "734.3",
+      "count": "50"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "cached-grid-render",
+      "ms": "50",
+      "count": "50"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "2099"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.3"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "cached-grid-render",
+      "ms": "10.1",
+      "count": "50"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "2099"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.6"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "cached-grid-render",
+      "ms": "12.3",
+      "count": "50"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "2099"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0.1",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.4"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "cached-grid-render",
+      "ms": "9.6",
+      "count": "50"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "2099"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.4"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "cached-grid-render",
+      "ms": "9.5",
+      "count": "50"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "2099"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.4"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "cached-grid-render",
+      "ms": "10.4",
+      "count": "50"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "2099"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.3"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "detail-fetch",
+      "ms": "244.8",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.2"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.7"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.3"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.3"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.2"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.3"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.2"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.3"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "detail-fetch",
+      "ms": "504.8",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.5"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.2"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.3"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.6"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.2"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.2"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.3"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0.1"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "indexeddb-restore",
+      "ms": "34.9",
+      "count": "2099",
+      "details": "101"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "2099"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "50"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "undefined"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "2099"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "50"
+    },
+    {
+      "operation": "memory-cache",
+      "ms": "0",
+      "count": "undefined"
+    },
+    {
+      "operation": "local-search",
+      "ms": "0"
+    },
+    {
+      "operation": "cold-grid-render",
+      "ms": "45.9",
+      "count": "50"
+    }
+  ],
+  "engine": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.130",
+    "revision": "@3f88203f01f16bafca72d5b553df2d23160b95ff",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) oushadhi-pos-desktop/0.1.1 Chrome/152.0.7977.130 Electron/44.4.5 Safari/537.36",
+    "jsVersion": "15.2.124.28"
+  },
+  "navigation": {
+    "domContentLoadedMs": 949.7,
+    "loadMs": 998.5,
+    "responseStartMs": 833.5
+  },
+  "authenticated": true,
+  "activeCache": "local",
+  "cartSurvivesSearch": true,
+  "persistence": {
+    "detail": 101,
+    "index-meta": 1,
+    "index-row": 2099,
+    "resource": 6
+  },
+  "browserComparisonExitCode": 0,
+  "apiRequests": [
+    {
+      "endpoint": "/api/categories",
+      "status": 200,
+      "ms": 153.57,
+      "transferBytes": 6462
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 480.5,
+      "transferBytes": 24781,
+      "serverTiming": "auth;dur=113.9, connection;dur=0, alerts;dur=329.6, serialization;dur=0.6, total;dur=444.8"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 732.39,
+      "transferBytes": 83901,
+      "serverTiming": "auth;dur=59.8, connection;dur=0, count;dur=70.2, product_query;dur=599.4, batch_query;dur=51.9, processing;dur=1.2, serialization;dur=0.6, total;dur=713.5"
+    },
+    {
+      "endpoint": "/api/dashboard",
+      "status": 200,
+      "ms": 1317.32,
+      "transferBytes": 4969,
+      "serverTiming": "auth;dur=91.7, connection;dur=0, settings;dur=0.7, sale_product_ids;dur=75.5, batch_aggregation;dur=71, purchases;dur=76, consultations;dur=88.9, expenses;dur=107.7, inventory_aggregation;dur=1011.8, sales_aggregation;dur=74.4, serialization;dur=0.2, total;dur=1301.9"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ms": 68.89,
+      "transferBytes": 7681
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 347.85,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 375.67,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 134.87,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 306.15,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 148.69,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 243.16,
+      "transferBytes": 5487,
+      "serverTiming": "auth;dur=59.7, connection;dur=0, stock_filter;dur=178.4, total;dur=238.5"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 395.75,
+      "transferBytes": 24778,
+      "serverTiming": "auth;dur=84, connection;dur=0, alerts;dur=307.8, serialization;dur=0.4, total;dur=392.2"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 503.38,
+      "transferBytes": 1247,
+      "serverTiming": "auth;dur=212.8, connection;dur=0, stock_filter;dur=285.7, total;dur=498.9"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ms": 140.87,
+      "transferBytes": 7681
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 451.69,
+      "transferBytes": 24779,
+      "serverTiming": "auth;dur=135.3, connection;dur=0, alerts;dur=306.3, serialization;dur=0.4, total;dur=442"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 453.65,
+      "transferBytes": 24779,
+      "serverTiming": "auth;dur=139.5, connection;dur=0, alerts;dur=309.1, serialization;dur=0.4, total;dur=449"
+    }
+  ]
+}

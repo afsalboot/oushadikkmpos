@@ -32,16 +32,15 @@ import CartCustomerFields from "@/components/CartCustomerFields";
 import { setCartItemWholesale } from "@/lib/wholesale";
 import { saleFreeQuantity } from "@/lib/sale-free-quantity";
 import { calculateSalePricing } from "@/services/pricing.service";
-const money = (v) =>
-    new Intl.NumberFormat("en-IN", {
+import { SALES_FIRST_PAGE, SALES_INDEX_URL, SALES_STOCK_IDS, peekSalesResource, peekSalesDetail, peekSalesDisplayDetail, loadSalesResource, loadSalesDetail, subscribeSalesCache, salesPerf } from '@/lib/sales-resources';
+import { useSalesCacheScope } from '@/components/SalesCacheContext';
+import { searchSalesIndex } from '@/lib/sales-search';
+const currencyFormatter = new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       maximumFractionDigits: 2,
-    }).format(Number(v || 0)),
-  num = (v) =>
-    new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(
-      Number(v || 0),
-    );
+    }), quantityFormatter = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
+const money = v => currencyFormatter.format(Number(v || 0)), num = v => quantityFormatter.format(Number(v || 0));
 const api = async (u, o) => {
   const r = await checkoutFetch(u, o),
     j = await r.json();
@@ -555,6 +554,7 @@ function HeldSalesModal({ sales, onClose, onResume, onRemove }) {
   );
 }
 export default function SalesWorkspaceModern({ editSaleId = null }) {
+  const cacheScope = useSalesCacheScope();
   const router = useRouter();
   const [editingSale, setEditingSale] = useState(null);
   const [editingMixIndex, setEditingMixIndex] = useState(undefined);
@@ -562,15 +562,22 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
   const [editError, setEditError] = useState("");
   const loadedEditRef = useRef(false);
   const [productReload, setProductReload] = useState(0);
-  const [productPagination, setProductPagination] = useState({ page: 1, pages: 1, total: 0 });
-  const [productLoading, setProductLoading] = useState(true);
+  const [productPagination, setProductPagination] = useState(() => peekSalesResource(SALES_FIRST_PAGE, cacheScope)?.pagination || { page: 1, pages: 1, total: 0 });
+  const [productLoading, setProductLoading] = useState(() => !peekSalesResource(SALES_FIRST_PAGE, cacheScope));
+  const [salesIndex, setSalesIndex] = useState(() => peekSalesResource(SALES_INDEX_URL, cacheScope));
+  const [stockMembership, setStockMembership] = useState({});
+  const [detailLoading, setDetailLoading] = useState(false);
+  const detailSelection = useRef(false);
+  const mountStart = useRef(performance.now());
+  const warmMount = useRef(Boolean(peekSalesResource(SALES_FIRST_PAGE, cacheScope)));
+  const browsePages = useRef(new Map());
   const [productError, setProductError] = useState('');
   const [pageSelection, setPageSelection] = useState({ key: '', page: 1 });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const confirmAction = useConfirm();
   const [mode, setMode] = useState("PRODUCT"),
-    [products, setProducts] = useState([]),
-    [categories, setCategories] = useState([]),
+    [products, setProducts] = useState(() => editSaleId ? [] : peekSalesResource(SALES_FIRST_PAGE, cacheScope)?.rows || []),
+    [categories, setCategories] = useState(() => peekSalesResource('/api/categories', cacheScope) || []),
     [settings, setSettings] = useState(null),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("All"),
@@ -592,17 +599,82 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     [customerId, setCustomerId] = useState(""),
     [payment, setPayment] = useState("CASH"),
     [saving, setSaving] = useState(false);
-  const productQueryKey = JSON.stringify([mode, filter, debouncedSearch]);
-  const productPage = pageSelection.key === productQueryKey ? pageSelection.page : 1;
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const stockFilter = mode === 'PRODUCT' && SALES_STOCK_IDS[filter];
+  const stockEntries = stockMembership[stockFilter];
+  const stockIds = useMemo(() => stockEntries ? new Set(stockEntries.ids) : undefined, [stockEntries]);
+  const localSearch = Boolean(!editSaleId && salesIndex?.complete && (!stockFilter || stockIds));
+  const localQuery = localSearch ? search.trim() : '';
+  const activeSearch = localSearch ? search.trim() : debouncedSearch;
+  const productQueryKey = JSON.stringify([mode, filter, activeSearch]);
+  const browseKey = JSON.stringify([mode, filter, '']);
+  const productPage = pageSelection.key === productQueryKey ? pageSelection.page : !activeSearch ? browsePages.current.get(browseKey) || 1 : 1;
+  const localResults = useMemo(() => {
+    if (!localSearch) return null;
+    const start = performance.now();
+    const result = searchSalesIndex(salesIndex.rows, { search, mode, filter, page: productPage, stockIds });
+    salesPerf('local-search', start, { matches: result.pagination.total });
+    return result;
+  }, [localSearch, salesIndex, search, mode, filter, productPage, stockIds]);
+  const visiblePagination = localResults?.pagination || productPagination;
+  const stockPageIds = stockFilter && localResults ? localResults.rows.map(row => row._id).join(',') : '';
+  const browsingLoading = !localSearch && productLoading;
   useEffect(() => {
     if (editSaleId) return;
+    let active = true;
+    const refresh = () => {
+      loadSalesResource(SALES_INDEX_URL, { scope: cacheScope }).then(index => { if (active) setSalesIndex(index); }).catch(error => {
+        if (active && [401, 403].includes(error.status)) { setSalesIndex(undefined); setProducts([]); setProductError(error.message); }
+      });
+    };
+    const changed = () => {
+      setSalesIndex(peekSalesResource(SALES_INDEX_URL, cacheScope));
+      setProductReload(value => value + 1);
+      const rows = peekSalesResource('/api/categories', cacheScope);
+      if (rows) setCategories(rows);
+      if (!peekSalesResource(SALES_INDEX_URL, cacheScope)) setProducts([]);
+      setStockMembership(Object.fromEntries(Object.values(SALES_STOCK_IDS).map(url => [url, peekSalesResource(url, cacheScope)])));
+    };
+    refresh();
+    const unsubscribe = subscribeSalesCache(changed);
+    return () => { active = false; unsubscribe(); };
+  }, [editSaleId, cacheScope]);
+  useEffect(() => {
+    if (editSaleId || !stockFilter || !salesIndex?.complete) return;
+    let active = true;
+    const cached = peekSalesResource(stockFilter, cacheScope);
+    if (cached) setStockMembership(current => ({ ...current, [stockFilter]: cached }));
+    loadSalesResource(stockFilter, { scope: cacheScope }).then(result => {
+      if (active) setStockMembership(current => ({ ...current, [stockFilter]: result }));
+    }).catch(error => { if (active && error.name !== 'AbortError') setProductError(error.message); });
+    return () => { active = false; };
+  }, [editSaleId, stockFilter, cacheScope, salesIndex?.complete]);
+  useEffect(() => {
+    if (editSaleId || (!products.length && !localResults?.rows.length)) return;
+    if (mountStart.current === null) return;
+    salesPerf(warmMount.current ? 'cached-grid-render' : 'cold-grid-render', mountStart.current, { count: localResults?.rows.length || products.length });
+    mountStart.current = null;
+  }, [editSaleId, products, localResults]);
+  useEffect(() => {
+    if (localSearch) { setDebouncedSearch(''); return; }
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [search, localSearch]);
+  useEffect(() => {
+    if (editSaleId) return;
+    if (stockFilter && salesIndex?.complete && !stockIds) { setProductLoading(true); return; }
+    // Local typing never fetches a page. Index rows remain selectable via one detail read.
+    if (localQuery) { setProductLoading(false); setProductError(''); return; }
+    if (stockFilter && localSearch) {
+      setProductLoading(false); setProductError('');
+      if (!stockPageIds || stockPageIds.split(',').every(id => peekSalesDisplayDetail(id, cacheScope))) return;
+      const controller = new AbortController();
+      loadSalesResource('/api/products?sales=true&ids=' + stockPageIds, { scope: cacheScope })
+        .catch(error => { if (!controller.signal.aborted && error.name !== 'AbortError') setProductError(error.message); });
+      return () => controller.abort();
+    }
     const controller = new AbortController();
     const params = new URLSearchParams({ sales: 'true', page: String(productPage), limit: '50' });
-    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (!localSearch && debouncedSearch) params.set('search', debouncedSearch);
     if (mode === 'MIX') params.set('mode', 'mix');
     else if (filter === 'Low Stock') params.set('stock', 'low');
     else if (filter === 'Opened Stock') params.set('stock', 'opened');
@@ -612,14 +684,21 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       if (!category) return;
       params.set('category', category._id);
     }
-    setProductLoading(true);
+    const url = '/api/products?' + params;
+    const cached = peekSalesResource(url, cacheScope);
+    if (cached) { setProducts(cached.rows); setProductPagination(cached.pagination); }
+    setProductLoading(!cached);
     setProductError('');
-    api('/api/products?' + params, { signal: controller.signal }).then(result => {
+    if (cached && localSearch) return;
+    loadSalesResource(url, { scope: cacheScope }).then(result => {
       if (!controller.signal.aborted) { setProducts(result.rows); setProductPagination(result.pagination); }
-    }).catch(error => { if (!controller.signal.aborted) setProductError(error.message); })
+    }).catch(error => { if (!controller.signal.aborted && error.name !== 'AbortError') {
+      setProductError(error.message);
+      if ([401, 403].includes(error.status)) { setProducts([]); setSalesIndex(undefined); }
+    } })
       .finally(() => { if (!controller.signal.aborted) setProductLoading(false); });
     return () => controller.abort();
-  }, [editSaleId, productPage, debouncedSearch, mode, filter, categories, productReload]);
+  }, [editSaleId, productPage, debouncedSearch, mode, filter, categories, productReload, localSearch, localQuery, cacheScope, stockFilter, stockIds, stockPageIds, salesIndex?.complete]);
   useEffect(() => {
     if (editSaleId) return;
     try {
@@ -704,13 +783,13 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     };
   }, [mode]);
   useEffect(() => {
-    api("/api/categories")
+    loadSalesResource("/api/categories", { scope: cacheScope })
       .then(setCategories)
       .catch((e) => toast.error(e.message));
     api("/api/settings")
       .then(setSettings)
       .catch(() => {});
-  }, [editSaleId]);
+  }, [editSaleId, cacheScope]);
   useEffect(() => {
     if (mode === "MIX") return;
     const strip = document.querySelector("#sales-category-filters");
@@ -902,7 +981,9 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       "Loose Sale",
       "Opened Stock",
     ],
-    shown = products.filter((p) => {
+    shown = (localResults ? localResults.rows.map(row => peekSalesDisplayDetail(row._id, cacheScope) || {
+      ...row, allowPackageSale: row.allowPackageSale !== false, categoryId: { _id: row.categoryId, name: row.categoryName }, _salesIndex: true,
+    }) : products).filter((p) => {
       if (!editSaleId) return true;
       if (mode === "MIX" && !p.allowMixture) return false;
       if (
@@ -919,7 +1000,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       return filter === "All" || p.categoryId?.name === filter;
     });
   const subtotal = cart.reduce((s, i) => s + total(i), 0),
-    cartPricing = calculateSalePricing({
+    cartPricing = useMemo(() => calculateSalePricing({
       consultationFeeEnabled: cartCustomer.consultationFeeEnabled === true,
       consultationFee: cartCustomer.consultationFee,
       wholesaleDiscount: wholesaleDiscountEnabled ? cart.map(item => item.saleWholesaleDiscountPercent || 0) : undefined,
@@ -935,7 +1016,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
         : cartCustomer.selected && !cartCustomer.selected.gstin && (cartCustomer.selected.customerType === "WHOLESALE") === wholesaleDiscountEnabled
           ? cartCustomer.selected.stateCode || settings?.store?.stateCode
           : settings?.store?.stateCode,
-    }),
+    }), [cart, cartCustomer, wholesaleDiscountEnabled, settings, editingSale]),
     cartGst = cartPricing.gst,
     step = settings?.roundOff?.enabled,
     grand = cartPricing.total,
@@ -1082,6 +1163,18 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       return toast.error(`Only ${available} ${product.packageType}s available`);
     add({ ...product, kind: "PRODUCT", saleMode: "PACKAGE", quantity: 1,
       looseQuantity: 0, openPackageCounts: [], baseUnit: product.baseUnit });
+  }
+  async function chooseSalesProduct(product) {
+    if (detailSelection.current) return;
+    detailSelection.current = true;
+    const cached = editSaleId ? product : peekSalesDetail(product._id, cacheScope);
+    if (!cached) setDetailLoading(true);
+    try {
+      const detailed = cached || await loadSalesDetail(product._id, { scope: cacheScope });
+      if (mode === 'PRODUCT') selectProduct(detailed);
+      else ingredient(detailed);
+    } catch (error) { toast.error(error.message); }
+    finally { detailSelection.current = false; setDetailLoading(false); }
   }
   function updateCartItem(item, enabled, quantity = item.quantity) {
     try {
@@ -1260,7 +1353,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
   if (editLoading) return <div className="card p-8" role="status">Loading billed products for editing…</div>;
   if (editError) return <div className="card p-8"><h1 className="text-xl font-extrabold">Unable to edit sale</h1><p className="mt-2">{editError}</p><Link href={`/sales/${editSaleId}`} className="btn mt-4">Back to sale</Link></div>;
   return (
-    <div>
+    <div data-sales-cache={localSearch ? 'local' : 'server'}>
       <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[var(--green)]">
@@ -1333,6 +1426,8 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
           />
         </div>
         <button className="btn" type="button" onClick={() => setExternalPurchase({})}><Plus size={16} />External Purchase</button>
+        {(browsingLoading || detailLoading) && <span className="text-xs text-[var(--muted)]" role="status">{detailLoading ? 'Loading product details…' : 'Updating products…'}</span>}
+        {productError && <span className="text-xs text-red-700" role="alert">{productError}</span>}
       </section>
       {mode !== "MIX" && (
         <div className="relative mb-4">
@@ -1405,11 +1500,11 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       )}
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
         <main className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-          {(!productLoading || editSaleId) && !productError && shown.map((p) => (
+          {shown.map((p) => (
             <article
               className={`sales-product-card card flex cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md ${p.expired ? "sales-product-expired" : ""}`}
               key={p._id}
-              onClick={() => (mode === "PRODUCT" ? selectProduct(p) : ingredient(p))}
+              onClick={() => void chooseSalesProduct(p)}
             >
               <div className="flex justify-between">
                 <Badge t="green">{p.categoryId?.name}</Badge>
@@ -1418,7 +1513,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                 </span>
               </div>
               <h2 className="mt-4 text-lg font-extrabold">{p.name}</h2>
-              <ExpiredStockWarning product={p} />
+              {!p._salesIndex && <ExpiredStockWarning product={p} />}
               <small className="text-[var(--muted)]">SKU {p.sku}</small>
               <div className="sales-product-badges mt-3 flex flex-wrap gap-1">
                 {opened(p) > 0 && (
@@ -1432,17 +1527,17 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                 {p.allowMixture && <Badge t="green">Mix enabled</Badge>}
               </div>
               <div className="pt-2">
-                <b className="text-sm text-[var(--green)]">{p.stockLabel}</b>
+                <b className="text-sm text-[var(--green)]">{p._salesIndex ? 'Select to check stock' : p.stockLabel}</b>
                 {mode === "PRODUCT" && p.allowPackageSale && (
                   <p className="mt-2 text-xl font-extrabold">
                     {money(p.packageSellingPrice)}{" "}
                     <small>/ {p.packageType}</small>
                   </p>
                 )}
-                <p className="mt-1 text-xs text-[var(--muted)]">
+                {!p._salesIndex && <p className="mt-1 text-xs text-[var(--muted)]">
                   {mode === "MIX" ? "Mix ingredient" : "Loose sale available"} ·{" "}
                   {money(p.loosePricePerUnit)} / {looseUnit(p)}
-                </p>
+                </p>}
               </div>
             </article>
           ))}
@@ -1751,11 +1846,11 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
         )}
       </div>
       {!editSaleId && <nav aria-label="Product pagination" className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm text-[var(--muted)]" role="status">{productLoading ? 'Loading products…' : productError || `${productPagination.total} products · Page ${productPagination.page} of ${productPagination.pages}`}</span>
+            <span className="text-sm text-[var(--muted)]" role="status">{`${visiblePagination.total} products · Page ${visiblePagination.page} of ${visiblePagination.pages}`}</span>
             <div className="flex gap-2">
               {productError && <button type="button" className="btn" onClick={() => setProductReload(value => value + 1)}>Retry</button>}
-              <button type="button" className="btn" disabled={productLoading || productPage <= 1} onClick={() => setPageSelection({ key: productQueryKey, page: productPage - 1 })}>Previous</button>
-              <button type="button" className="btn" disabled={productLoading || productPage >= productPagination.pages} onClick={() => setPageSelection({ key: productQueryKey, page: productPage + 1 })}>Next</button>
+              <button type="button" className="btn" disabled={browsingLoading || visiblePagination.page <= 1} onClick={() => { const page = visiblePagination.page - 1; if (!activeSearch) browsePages.current.set(browseKey, page); setPageSelection({ key: productQueryKey, page }); }}>Previous</button>
+              <button type="button" className="btn" disabled={browsingLoading || visiblePagination.page >= visiblePagination.pages} onClick={() => { const page = visiblePagination.page + 1; if (!activeSearch) browsePages.current.set(browseKey, page); setPageSelection({ key: productQueryKey, page }); }}>Next</button>
             </div>
       </nav>}
       {quick && <QuickSell p={quick} close={() => setQuick(null)} add={add} />}

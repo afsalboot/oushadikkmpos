@@ -1,0 +1,156 @@
+{
+  "measuredAt": "2026-10-13T20:11:07.217Z",
+  "measurements": [
+    {
+      "name": "catalogue-revision-check",
+      "ms": 104.83,
+      "bytes": 75
+    },
+    {
+      "name": "paginated-first-page-1",
+      "ms": 385.19,
+      "bytes": 82777,
+      "count": 50
+    },
+    {
+      "name": "paginated-first-page-2",
+      "ms": 275.1,
+      "bytes": 82777,
+      "count": 50
+    },
+    {
+      "name": "lightweight-index",
+      "ms": 315.06,
+      "bytes": 743564,
+      "count": 2099
+    },
+    {
+      "name": "index-database-execution",
+      "ms": 17,
+      "examined": 2100,
+      "returned": 2099
+    },
+    {
+      "name": "local-search-1000-runs",
+      "medianMs": 0.0911,
+      "p95Ms": 0.12
+    },
+    {
+      "name": "barcode-map",
+      "averageMs": 0.000019,
+      "entries": 0,
+      "scope": "missing barcode lookup; catalogue has no barcodes"
+    },
+    {
+      "name": "one-product-sale-detail",
+      "ms": 170.16,
+      "bytes": 1611
+    }
+  ],
+  "stages": {
+    "index_categories": 44.92,
+    "index_products": 309.41,
+    "index_query": 309.44,
+    "index_processing": 5.39,
+    "serialization": 1.85
+  },
+  "databaseIndexes": [
+    {
+      "collection": "products",
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          }
+        },
+        {
+          "name": "sku_1",
+          "key": {
+            "sku": 1
+          },
+          "unique": true
+        },
+        {
+          "name": "barcode_1",
+          "key": {
+            "barcode": 1
+          },
+          "unique": true,
+          "sparse": true
+        },
+        {
+          "name": "wholesaleEnabled_1",
+          "key": {
+            "wholesaleEnabled": 1
+          }
+        },
+        {
+          "name": "name_1",
+          "key": {
+            "name": 1
+          }
+        },
+        {
+          "name": "active_1_categoryId_1_name_1",
+          "key": {
+            "active": 1,
+            "categoryId": 1,
+            "name": 1
+          }
+        },
+        {
+          "name": "duplicateKey_1",
+          "key": {
+            "duplicateKey": 1
+          },
+          "unique": true,
+          "sparse": true
+        },
+        {
+          "name": "active_1_name_1",
+          "key": {
+            "active": 1,
+            "name": 1
+          }
+        },
+        {
+          "name": "categoryId_1_name_1",
+          "key": {
+            "categoryId": 1,
+            "name": 1
+          }
+        }
+      ]
+    },
+    {
+      "collection": "inventorybatches",
+      "indexes": [
+        {
+          "name": "_id_",
+          "key": {
+            "_id": 1
+          }
+        },
+        {
+          "name": "productId_1",
+          "key": {
+            "productId": 1
+          }
+        },
+        {
+          "name": "productId_1_expiryDate_1_createdAt_1",
+          "key": {
+            "productId": 1,
+            "expiryDate": 1,
+            "createdAt": 1
+          }
+        }
+      ]
+    }
+  ],
+  "searchParityAssertions": 9,
+  "databaseWrites": 0,
+  "browserTimings": "see Electron and browser native UI reports",
+  "scope": "service only; excludes HTTP auth, React render and network to browser"
+}

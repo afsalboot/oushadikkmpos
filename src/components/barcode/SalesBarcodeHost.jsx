@@ -8,9 +8,12 @@ import BarcodeScannerListener from "@/components/barcode/BarcodeScannerListener"
 import CameraBarcodeScanner from "@/components/barcode/CameraBarcodeScanner";
 import ScannerStatus from "@/components/barcode/ScannerStatus";
 import UnknownBarcodeModal from "@/components/barcode/UnknownBarcodeModal";
-import { looksLikeBarcode, normalizeBarcode } from "@/lib/barcode";
+import { looksLikeBarcode, normalizeBarcode, validateBarcode } from "@/lib/barcode";
+import { loadSalesBarcode } from '@/lib/sales-resources';
+import { useSalesCacheScope } from '@/components/SalesCacheContext';
 
 export default function SalesBarcodeHost() {
+  const cacheScope = useSalesCacheScope();
   const [target, setTarget] = useState(null),
     [cameraOpen, setCameraOpen] = useState(false),
     [status, setStatus] = useState({ status: "ready", message: "" }),
@@ -22,21 +25,17 @@ export default function SalesBarcodeHost() {
     scanning.current = true;
     setStatus({ status: "scanning", message: "Scanning…" });
     try {
-      const response = await fetch(
-          `/api/products/barcode/${encodeURIComponent(barcode)}?context=sale`,
-        ),
-        result = await response.json();
-      if (!response.ok) {
-        if (response.status === 404) setUnknown(barcode);
-        throw new Error(
-          result.error || "Unable to scan barcode. Please try again.",
-        );
-      }
+      const errors = validateBarcode(barcode);
+      if (errors.length) throw new Error(errors[0]);
+      let product;
+      try { product = await loadSalesBarcode(barcode, { scope: cacheScope }); }
+      catch (error) { if (error.status === 404) setUnknown(barcode); throw error; }
+      if (!product.stock?.hasStock) throw new Error(`${product.name} is out of stock`);
       window.dispatchEvent(
-        new CustomEvent("oushadi-barcode-product", { detail: result.data }),
+        new CustomEvent("oushadi-barcode-product", { detail: product }),
       );
       setCameraOpen(false);
-      setStatus({ status: "found", message: `${result.data.name} found` });
+      setStatus({ status: "found", message: `${product.name} found` });
       window.setTimeout(
         () => setStatus({ status: "ready", message: "" }),
         1600,
@@ -52,7 +51,7 @@ export default function SalesBarcodeHost() {
     } finally {
       scanning.current = false;
     }
-  }, []);
+  }, [cacheScope]);
 
   useEffect(() => {
     let input, parent, headerButton;

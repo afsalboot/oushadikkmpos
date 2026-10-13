@@ -7,13 +7,20 @@ import { createProduct, getProducts, updateProduct } from "@/services/product.se
 import { requestTiming } from "@/lib/performance";
 import { productStockFilterPipeline } from "@/lib/product-stock-query";
 import { getProductCatalogue } from "@/services/product-catalogue.service";
+import { salesCacheResponse } from '@/lib/sales-cache-scope';
 
 export async function GET(request) {
   const timing = requestTiming('products');
   try {
-    await timing.measure('auth', () => requireSession("products.view"));
+    const session = await timing.measure('auth', () => requireSession("products.view"));
     await timing.measure('connection', () => connectDb());
     const parameters = new URL(request.url).searchParams;
+    if (parameters.get('view') === 'sales-stock-ids') {
+      const stock = parameters.get('stock');
+      if (!['low', 'opened'].includes(stock)) return timing.finish(fail('Invalid stock filter', 422));
+      const rows = await timing.measure('stock_filter', () => Product.aggregate(productStockFilterPipeline({ active: true, visibleInSales: { $ne: false } }, stock)));
+      return timing.finish(salesCacheResponse(ok({ ids: rows.map(row => String(row._id)) }), session));
+    }
     if(parameters.get('view')==='catalogue') {
       if(parameters.has('category')&&parameters.get('category')!=='ALL'&&!mongoose.isValidObjectId(parameters.get('category')))return timing.finish(fail('Invalid category',422));
       const catalogue=await getProductCatalogue(parameters,timing);
@@ -58,7 +65,7 @@ export async function GET(request) {
       paginated ? timing.measure('count', () => Product.countDocuments(filter)) : null,
     ]);
     const response = await timing.measure('serialization', () => ok(paginated ? { rows, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } } : rows));
-    return timing.finish(response);
+    return timing.finish(salesOnly ? salesCacheResponse(response, session) : response);
   } catch (error) {
     return timing.finish(apiError(error));
   }
