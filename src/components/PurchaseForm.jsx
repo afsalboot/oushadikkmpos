@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -52,7 +53,7 @@ const blankItem = (product) => ({
   gstPriceMode: "INCLUSIVE",
 });
 async function api(url, options) {
-  const response = await fetch(url, options);
+  const response = await resourceFetch(url, options);
   const json = await response.json();
   if (!response.ok) throw new Error(json.error || "Something went wrong");
   return json.data;
@@ -505,6 +506,33 @@ export default function PurchaseForm({
     [addSupplierOpen, setAddSupplierOpen] = useState(false),
     [saving, setSaving] = useState(false),
     [settings, setSettings] = useState(null);
+  const [picker, setPicker] = useState({ rows: products || [], pagination: { page: 1, pages: 1, total: 0 } });
+  const [pickerPage, setPickerPage] = useState(1);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  useEffect(() => {
+    if (!productOpen) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setPickerLoading(true);
+      try {
+        const params = new URLSearchParams({ page: String(pickerPage), limit: '30', q: productQuery });
+        const result = await api('/api/products?' + params, { signal: controller.signal });
+        if (!controller.signal.aborted) setPicker(result);
+      } catch (error) { if (!controller.signal.aborted) toast.error(error.message); }
+      finally { if (!controller.signal.aborted) setPickerLoading(false); }
+    }, 200);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [productOpen, productQuery, pickerPage]);
+  useEffect(() => {
+    const ids = [...new Set((initial?.items || []).map(item => item.productId?._id || item.productId).filter(Boolean).map(String))];
+    if (!ids.length) return;
+    const controller = new AbortController();
+    api('/api/products?ids=' + ids.join(','), { signal: controller.signal }).then(rows => {
+      const byId = new Map(rows.map(product => [String(product._id), product]));
+      if (!controller.signal.aborted) setForm(current => ({ ...current, items: current.items.map(item => ({ ...item, product: byId.get(String(item.productId?._id || item.productId)) || item.product })) }));
+    }).catch(error => { if (!controller.signal.aborted) toast.error(error.message); });
+    return () => controller.abort();
+  }, [initial]);
   useEffect(() => {
     api("/api/settings")
       .then(setSettings)
@@ -533,6 +561,7 @@ export default function PurchaseForm({
         };
       });
       setProductQuery("");
+      setPickerPage(1);
     };
     window.addEventListener("oushadi-purchase-barcode-product", scanned);
     return () =>
@@ -560,14 +589,14 @@ export default function PurchaseForm({
   );
   const productResults = useMemo(
     () =>
-      products
+      picker.rows
         .filter((p) =>
           `${p.name} ${p.sku} ${p.barcode || ""}`
             .toLowerCase()
             .includes(productQuery.toLowerCase()),
         )
         .slice(0, 30),
-    [products, productQuery],
+    [picker.rows, productQuery],
   );
   const totals = useMemo(() => {
     try {
@@ -1179,12 +1208,13 @@ export default function PurchaseForm({
                   autoFocus
                   className="field !pl-10"
                   value={productQuery}
-                  onChange={(e) => setProductQuery(e.target.value)}
+                  onChange={(e) => { setProductQuery(e.target.value); setPickerPage(1); }}
                   placeholder="Search product, SKU or scan barcode..."
                 />
               </div>
               <div className="mt-3 max-h-[55vh] overflow-auto">
-                {productResults.map((product) => (
+                {pickerLoading && <p className="p-3 text-sm" role="status">Loading products…</p>}
+                {!pickerLoading && productResults.map((product) => (
                   <button
                     type="button"
                     className="flex w-full justify-between rounded-xl p-3 text-left hover:bg-[#f3f6f1]"
@@ -1205,6 +1235,13 @@ export default function PurchaseForm({
                     <strong className="text-xs">{product.stockLabel}</strong>
                   </button>
                 ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-2 border-t pt-3">
+                <span className="text-xs">Page {picker.pagination.page} of {picker.pagination.pages}</span>
+                <div className="flex gap-2">
+                  <button type="button" className="btn" disabled={pickerLoading || pickerPage <= 1} onClick={() => setPickerPage(page => page - 1)}>Previous</button>
+                  <button type="button" className="btn" disabled={pickerLoading || pickerPage >= picker.pagination.pages} onClick={() => setPickerPage(page => page + 1)}>Next</button>
+                </div>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import {connectDb} from "@/lib/db";import {requireSession} from "@/lib/auth";import {ok,fail,apiError} from "@/lib/api";import {Category,Product} from "@/models";
 const slugify=(v)=>String(v).trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
-export async function GET(){try{await requireSession("products.view");await connectDb();const rows=await Category.aggregate([{$sort:{name:1}},{$lookup:{from:"products",localField:"_id",foreignField:"categoryId",as:"products"}},{$project:{name:1,slug:1,description:1,isSystem:1,active:1,productCount:{$size:"$products"}}}]);return ok(rows);}catch(e){return apiError(e);}}
+export async function GET(){try{await requireSession("products.view");await connectDb();const [categories,counts]=await Promise.all([Category.find().select('name slug description isSystem active').sort({name:1}).lean(),Product.aggregate([{$group:{_id:'$categoryId',count:{$sum:1}}}])]);const byCategory=new Map(counts.map(row=>[String(row._id),row.count]));return ok(categories.map(row=>({...row,productCount:byCategory.get(String(row._id))||0})));}catch(e){return apiError(e);}}
 export async function POST(request){try{await requireSession("products.create");await connectDb();const{name,description=""}=await request.json();if(!String(name||"").trim())return fail("Category name is required");return ok(await Category.create({name:String(name).trim(),slug:slugify(name),description}),201);}catch(e){return apiError(e);}}
 export async function PUT(request) {
   try {

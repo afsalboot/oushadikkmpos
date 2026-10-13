@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -61,8 +62,8 @@ const emptyFilters = {
   order: "desc",
 };
 
-async function api(url) {
-  const response = await fetch(url);
+async function api(url, options) {
+  const response = await resourceFetch(url, options);
   const json = await response.json();
   if (!response.ok) throw new Error(json.error || "Unable to load Accounts");
   return json.data;

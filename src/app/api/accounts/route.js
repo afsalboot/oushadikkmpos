@@ -1,27 +1,20 @@
 import { connectDb } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { ok, apiError } from "@/lib/api";
-import {Consultation,Expense,Purchase,Sale,Settings} from "@/models";
-import { buildAccountLedger } from "@/services/accounting.service";
+import { getAccountData } from "@/services/account-data.service";
 import {queryValues} from "@/lib/filter-utils";
+import { requestTiming } from "@/lib/performance";
 
 export async function GET(request){
+  const timing=requestTiming('accounts');
   try{
-    await requireSession("accounts");
-    await connectDb();
+    await timing.measure('auth',()=>requireSession("accounts"));
+    await timing.measure('connection',()=>connectDb());
     const parameters=new URL(request.url).searchParams;
-    const [sales,expenses,purchases,settings]=await Promise.all([
-      Sale.find().populate("actorId","name role").sort({createdAt:1}).lean(),
-      Expense.find().populate("actorId","name role").populate("staffId","name email role").sort({expenseDate:1}).lean(),
-      Purchase.find().select("purchaseNumber supplierSnapshot supplierInvoiceNumber total amountPaid balanceDue paymentReference").lean(),
-      Settings.findOne({key:"global"}).select("payments").lean(),
-    ]);
     const optionNames=["search","direction","transactionType","paymentMethod","source","dateFrom","dateTo","sort","order","page","limit"];
     const multiValueNames=new Set(["transactionType","paymentMethod","source"]);
     const options=Object.fromEntries(optionNames.map((name)=>[name,multiValueNames.has(name)?queryValues(parameters,name):parameters.get(name)||""]));
-    options.purchases=purchases;
-    options.consultations=await Consultation.find().lean();
-    options.enabledMethods=settings?.payments?.enabledMethods?.length?settings.payments.enabledMethods:["CASH","UPI","BANK"];
-    return ok(buildAccountLedger(sales,expenses,options));
-  }catch(error){return apiError(error);}
+    const data=await getAccountData(options,timing);
+    return timing.finish(await timing.measure('serialization',()=>ok(data)));
+  }catch(error){return timing.finish(apiError(error));}
 }

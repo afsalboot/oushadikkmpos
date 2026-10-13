@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 import { useState } from "react";
 import { toast } from "sonner";
 import PasswordInput from "@/components/PasswordInput";
@@ -14,7 +15,7 @@ export default function LoginPinForm({ enabled }) {
     const body = { ...Object.fromEntries(new FormData(form)), remove };
     setSaving(true);
     try {
-      const response = await fetch("/api/auth/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const response = await resourceFetch("/api/auth/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not save PIN");
       setActive(!remove);

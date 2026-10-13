@@ -2,23 +2,65 @@ import mongoose from "mongoose";
 import { connectDb } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { ok, fail, apiError } from "@/lib/api";
-import { Product, InventoryBatch, AuditLog } from "@/models";
+import { Product, InventoryBatch, AuditLog, Category } from "@/models";
 import { createProduct, getProducts, updateProduct } from "@/services/product.service";
+import { requestTiming } from "@/lib/performance";
+import { productStockFilterPipeline } from "@/lib/product-stock-query";
+import { getProductCatalogue } from "@/services/product-catalogue.service";
 
 export async function GET(request) {
+  const timing = requestTiming('products');
   try {
-    await requireSession("products.view");
-    await connectDb();
+    await timing.measure('auth', () => requireSession("products.view"));
+    await timing.measure('connection', () => connectDb());
     const parameters = new URL(request.url).searchParams;
-    const query = parameters.get("q")?.trim();
+    if(parameters.get('view')==='catalogue') {
+      if(parameters.has('category')&&parameters.get('category')!=='ALL'&&!mongoose.isValidObjectId(parameters.get('category')))return timing.finish(fail('Invalid category',422));
+      const catalogue=await getProductCatalogue(parameters,timing);
+      return timing.finish(await timing.measure('serialization',()=>ok(catalogue)));
+    }
+    if(parameters.get('view')==='options') {
+      return timing.finish(ok(await Product.find().select('name sku active packageType packageSize baseUnit batchNumber batchTracking expiryTracking taxable gstExempt gstRate useDefaultGstRate gstPriceMode packageSellingPrice').sort({name:1}).lean()));
+    }
+    const search = (parameters.get("q") || parameters.get("search") || '').trim();
+    if (search.length > 100) return timing.finish(fail('Search is too long', 422));
+    const query = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const salesOnly = parameters.get("sales") === "true";
     const filter = query
       ? { $or: [{ name: { $regex: query, $options: "i" } }, { sku: { $regex: query, $options: "i" } }, { barcode: { $regex: query, $options: "i" } }, { manufacturer: { $regex: query, $options: "i" } }] }
       : {};
     if (salesOnly) Object.assign(filter, { active: true, visibleInSales: { $ne: false } });
-    return ok(await getProducts(filter));
+    if (query && salesOnly) {
+      const matchingCategories = await Category.find({ name: { $regex: query, $options: 'i' } }).select('_id').lean();
+      if (matchingCategories.length) filter.$or.push({ categoryId: { $in: matchingCategories.map(row => row._id) } });
+    }
+    if (parameters.get('mode') === 'mix') filter.allowMixture = true;
+    if (parameters.get('loose') === 'true') filter.allowLooseSale = true;
+    if (parameters.has('barcode')) filter.barcode = parameters.get('barcode');
+    if(parameters.has('ids')) {
+      const ids=parameters.get('ids').split(',').filter(Boolean);
+      if(!ids.length||ids.length>200||ids.some(id=>!mongoose.isValidObjectId(id)))return timing.finish(fail('Invalid product selection',422));
+      filter._id={$in:ids.map(id=>new mongoose.Types.ObjectId(id))};
+    }
+    if (parameters.has('category')) {
+      if (!mongoose.isValidObjectId(parameters.get('category'))) return timing.finish(fail('Invalid category', 422));
+      filter.categoryId = new mongoose.Types.ObjectId(parameters.get('category'));
+    }
+    if (['low', 'opened'].includes(parameters.get('stock'))) {
+      const ids = await timing.measure('stock_filter', () => Product.aggregate(productStockFilterPipeline(filter, parameters.get('stock'))));
+      filter._id = { $in: ids.map(row => row._id) };
+    }
+    const paginated = parameters.has('page') || parameters.has('limit');
+    const page = paginated ? Math.max(1, Math.floor(Number(parameters.get('page')) || 1)) : undefined;
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(parameters.get('limit')) || 50)));
+    const [rows, total] = await Promise.all([
+      getProducts(filter, { salesOnly, page, limit, timing }),
+      paginated ? timing.measure('count', () => Product.countDocuments(filter)) : null,
+    ]);
+    const response = await timing.measure('serialization', () => ok(paginated ? { rows, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } } : rows));
+    return timing.finish(response);
   } catch (error) {
-    return apiError(error);
+    return timing.finish(apiError(error));
   }
 }
 

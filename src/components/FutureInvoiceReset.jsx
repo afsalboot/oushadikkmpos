@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useState } from "react";
 import { RotateCcw } from "lucide-react";
@@ -6,7 +7,7 @@ import { toast } from "sonner";
 import { useConfirm } from "./ConfirmDialog";
 
 async function request(options) {
-  const response = await fetch("/api/settings/invoice-reset", { cache: "no-store", ...options });
+  const response = await resourceFetch("/api/settings/invoice-reset", { cache: "no-store", ...options });
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || "Unable to reset invoice numbering");
   return body.data;

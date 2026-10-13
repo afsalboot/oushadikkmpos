@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 import BackupStorageSettings from "./BackupStorageSettings";
 import FutureInvoiceReset from "./FutureInvoiceReset";
 import DoctorSettings from "./DoctorSettings";
@@ -218,7 +219,7 @@ const set = (object, path, value) => {
 };
 const gstStateCodes = new Set(GST_STATES.map(([code]) => code));
 async function api(url, options) {
-  const response = await fetch(url, options),
+  const response = await resourceFetch(url, options),
     body = await response.json();
   if (!response.ok) {
     const details = body.details || {},

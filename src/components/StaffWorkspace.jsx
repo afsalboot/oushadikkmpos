@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -103,7 +104,7 @@ const emptyForm = () => ({
   permissionOverrides: {},
 });
 async function api(url, options) {
-  const response = await fetch(url, options);
+  const response = await resourceFetch(url, options);
   const json = await response.json();
   if (!response.ok) throw new Error(json.error || "Something went wrong");
   return json.data;

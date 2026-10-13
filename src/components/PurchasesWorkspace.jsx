@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -85,7 +86,7 @@ const date = (value, withTime = false) =>
 const plural = (value, singular) =>
   `${value} ${singular}${Number(value) === 1 ? "" : "s"}`;
 async function api(url, options) {
-  const response = await fetch(url, options);
+  const response = await resourceFetch(url, options);
   const json = await response.json();
   if (!response.ok) throw new Error(json.error || "Something went wrong");
   return json.data;
@@ -1593,7 +1594,7 @@ export default function PurchasesWorkspace() {
   const confirmAction = useConfirm();
   const [data, setData] = useState(null),
     [suppliers, setSuppliers] = useState([]),
-    [products, setProducts] = useState([]),
+    [products] = useState([]),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [search, setSearch] = useState(""),
@@ -1648,11 +1649,7 @@ export default function PurchasesWorkspace() {
     };
   }, [debouncedSearch, filters, page]);
   useEffect(() => {
-    Promise.all([api("/api/suppliers"), api("/api/products")])
-      .then(([supplierRows, productRows]) => {
-        setSuppliers(supplierRows);
-        setProducts(productRows);
-      })
+    api("/api/suppliers").then(setSuppliers)
       .catch((failure) => toast.error(failure.message));
   }, []);
   function reload() {
@@ -1695,7 +1692,7 @@ export default function PurchasesWorkspace() {
         const product = products.find(
           (entry) =>
             String(entry._id) === String(item.productId?._id || item.productId),
-        );
+        ) || (item.productId?._id ? { ...item.productSnapshot, ...item.productId } : item.productSnapshot ? { ...item.productSnapshot, _id: item.productId } : null);
         return product
           ? {
               ...blankItem(product),
@@ -1726,7 +1723,7 @@ export default function PurchasesWorkspace() {
         const product = products.find(
           (entry) =>
             String(entry._id) === String(item.productId?._id || item.productId),
-        );
+        ) || (item.productId?._id ? { ...item.productSnapshot, ...item.productId } : item.productSnapshot ? { ...item.productSnapshot, _id: item.productId } : null);
         return product
           ? {
               ...item,

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { resourceFetch } from "@/lib/resource-fetch";
 import Link from "next/link";
 import { dashboardToday } from "@/lib/dashboard-dates";
 import {
@@ -41,7 +42,7 @@ const num = (v) =>
 const fmt = (v, o = { dateStyle: "medium" }) =>
   new Intl.DateTimeFormat("en-IN", o).format(new Date(v));
 async function api(url, signal) {
-  const r = await fetch(url, { cache: "no-store", signal }),
+  const r = await resourceFetch(url, { cache: "no-store", signal }),
     j = await r.json();
   if (!r.ok) throw new Error(j.error);
   return j.data;
@@ -100,9 +101,11 @@ export default function DashboardWorkspace() {
   useEffect(() => {
     let active = true;
     let controller;
+    let pending = false;
+    let needsRefresh = false;
     const refresh = () => {
-      if (document.hidden) return;
-      controller?.abort();
+      if (document.hidden || pending) return;
+      pending = true;
       const request = new AbortController();
       controller = request;
       const params = new URLSearchParams({ range });
@@ -110,17 +113,24 @@ export default function DashboardWorkspace() {
       api(`/api/dashboard?${params}`, request.signal)
         .then((v) => { if (active && !request.signal.aborted) { setData(v); setError(""); } })
         .catch((e) => { if (active && !request.signal.aborted) setError(e.message); })
-        .finally(() => { if (active && !request.signal.aborted) setLoading(false); });
+        .finally(() => {
+          pending = false;
+          if (active && !request.signal.aborted) setLoading(false);
+          if (active && needsRefresh) { needsRefresh = false; refresh(); }
+        });
     };
+    const changed = () => { if (pending) needsRefresh = true; else refresh(); };
     refresh();
     const timer = setInterval(refresh, 30000);
     window.addEventListener("focus", refresh);
+    window.addEventListener("oushadi-data-changed", changed);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       active = false;
       controller?.abort();
       clearInterval(timer);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("oushadi-data-changed", changed);
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [range, refreshKey, customDates]);

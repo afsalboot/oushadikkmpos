@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useState } from "react";
 import {
@@ -33,7 +34,7 @@ const date = (value) =>
       )
     : "—";
 async function api(url, options) {
-  const response = await fetch(url, options);
+  const response = await resourceFetch(url, options);
   const result = await response.json();
   if (!response.ok) throw new Error(result.error);
   return result.data;

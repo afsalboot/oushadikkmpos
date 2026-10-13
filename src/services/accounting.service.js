@@ -6,7 +6,8 @@ const text=(value)=>String(value??"").trim();
 const validDate=(value)=>{const date=new Date(value);return Number.isNaN(date.getTime())?null:date;};
 const startOfDay=(value)=>{if(/^\d{4}-\d{2}-\d{2}$/.test(String(value||"")))return new Date(`${value}T00:00:00+05:30`);const date=validDate(value);if(!date)return null;date.setHours(0,0,0,0);return date;};
 const endOfDay=(value)=>{if(/^\d{4}-\d{2}-\d{2}$/.test(String(value||"")))return new Date(`${value}T23:59:59.999+05:30`);const date=validDate(value);if(!date)return null;date.setHours(23,59,59,999);return date;};
-const storeDateKey=(value)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(value));
+const storeDateFormatter=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"});
+const storeDateKey=(value)=>storeDateFormatter.format(new Date(value));
 const movementAmount=(movement)=>movement.direction===ACCOUNT_DIRECTIONS.IN?movement.amount:-movement.amount;
 
 function normalizeSale(sale){
@@ -22,7 +23,7 @@ function normalizeSale(sale){
   const amount=money(paymentBreakdown.reduce((sum,payment)=>sum+payment.amount,0));
   if(!amount)return null;
   const methods=[...new Set(paymentBreakdown.map((payment)=>payment.method))];
-  return{id:`sale-${sale._id}`,sourceId:String(sale._id),date:paymentBreakdown[0]?.paidAt||sale.createdAt,direction:ACCOUNT_DIRECTIONS.IN,type:ACCOUNT_TRANSACTION_TYPES.SALE,source:"SALES",reference:sale.invoiceNumber,party:sale.customerSnapshot?.name||"Walk-in Customer",description:"Sale invoice",category:"",method:methods.join(" + "),paymentReference:paymentBreakdown.map((payment)=>payment.reference).filter(Boolean).join(", "),paymentBreakdown,amount,createdBy:sale.actorId?.name||sale.cashierSnapshot?.name||"Cashier",status:"POSTED",sourcePath:`/sales/${sale._id}`,sourceDetails:{invoiceNumber:sale.invoiceNumber,customer:sale.customerSnapshot?.name||"Walk-in Customer",itemCount:sale.items?.length||0}};
+  return{id:`sale-${sale._id}`,sourceId:String(sale._id),date:paymentBreakdown[0]?.paidAt||sale.createdAt,direction:ACCOUNT_DIRECTIONS.IN,type:ACCOUNT_TRANSACTION_TYPES.SALE,source:"SALES",reference:sale.invoiceNumber,party:sale.customerSnapshot?.name||"Walk-in Customer",description:"Sale invoice",category:"",method:methods.join(" + "),paymentReference:paymentBreakdown.map((payment)=>payment.reference).filter(Boolean).join(", "),paymentBreakdown,amount,createdBy:sale.actorId?.name||sale.cashierSnapshot?.name||"Cashier",status:"POSTED",sourcePath:`/sales/${sale._id}`,sourceDetails:{invoiceNumber:sale.invoiceNumber,customer:sale.customerSnapshot?.name||"Walk-in Customer",itemCount:sale.itemCount??sale.items?.length??0}};
 }
 
 function normalizeExpense(expense,purchases){

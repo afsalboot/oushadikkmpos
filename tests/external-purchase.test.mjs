@@ -117,7 +117,7 @@ test("rendered thermal invoice includes external selling information and no supp
 test("sales and profit reports include external margins without claiming unavailable inventory COGS", async () => {
   const originalFind = Sale.find;
   const sales = [{ _id: "sale", createdAt: "2026-10-08T08:00:00Z", total: 940, items: [{ itemSource: "inventory", total: 500 }, buildExternalPurchase(input)], payments: [{ method: "CASH", amount: 940 }] }];
-  Sale.find = () => ({ populate() { return this; }, sort() { return this; }, lean: async () => sales });
+  Sale.find = () => ({ select() { return this; }, populate() { return this; }, sort() { return this; }, lean: async () => sales });
   try {
     for (const type of ["sales", "gross-profit"]) {
       const report = await getReport(type, new URLSearchParams());

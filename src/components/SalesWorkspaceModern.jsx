@@ -561,6 +561,12 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
   const [editLoading, setEditLoading] = useState(Boolean(editSaleId));
   const [editError, setEditError] = useState("");
   const loadedEditRef = useRef(false);
+  const [productReload, setProductReload] = useState(0);
+  const [productPagination, setProductPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [productLoading, setProductLoading] = useState(true);
+  const [productError, setProductError] = useState('');
+  const [pageSelection, setPageSelection] = useState({ key: '', page: 1 });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const confirmAction = useConfirm();
   const [mode, setMode] = useState("PRODUCT"),
     [products, setProducts] = useState([]),
@@ -586,6 +592,34 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     [customerId, setCustomerId] = useState(""),
     [payment, setPayment] = useState("CASH"),
     [saving, setSaving] = useState(false);
+  const productQueryKey = JSON.stringify([mode, filter, debouncedSearch]);
+  const productPage = pageSelection.key === productQueryKey ? pageSelection.page : 1;
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    if (editSaleId) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ sales: 'true', page: String(productPage), limit: '50' });
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (mode === 'MIX') params.set('mode', 'mix');
+    else if (filter === 'Low Stock') params.set('stock', 'low');
+    else if (filter === 'Opened Stock') params.set('stock', 'opened');
+    else if (filter === 'Loose Sale') params.set('loose', 'true');
+    else if (filter !== 'All') {
+      const category = categories.find(row => row.name === filter);
+      if (!category) return;
+      params.set('category', category._id);
+    }
+    setProductLoading(true);
+    setProductError('');
+    api('/api/products?' + params, { signal: controller.signal }).then(result => {
+      if (!controller.signal.aborted) { setProducts(result.rows); setProductPagination(result.pagination); }
+    }).catch(error => { if (!controller.signal.aborted) setProductError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setProductLoading(false); });
+    return () => controller.abort();
+  }, [editSaleId, productPage, debouncedSearch, mode, filter, categories, productReload]);
   useEffect(() => {
     if (editSaleId) return;
     try {
@@ -670,9 +704,6 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     };
   }, [mode]);
   useEffect(() => {
-    if (!editSaleId) api("/api/products?sales=true")
-      .then(setProducts)
-      .catch((e) => toast.error(e.message));
     api("/api/categories")
       .then(setCategories)
       .catch((e) => toast.error(e.message));
@@ -776,9 +807,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       setWholesaleDiscountEnabled(false);
       setEditingSale(null);
       if (event.detail?.edited) router.replace("/sales");
-      api("/api/products?sales=true")
-        .then(setProducts)
-        .catch(() => {});
+      setProductReload(value => value + 1);
     };
     window.addEventListener("oushadi-sale-complete", completed);
     return () => window.removeEventListener("oushadi-sale-complete", completed);
@@ -874,6 +903,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       "Opened Stock",
     ],
     shown = products.filter((p) => {
+      if (!editSaleId) return true;
       if (mode === "MIX" && !p.allowMixture) return false;
       if (
         search &&
@@ -1220,7 +1250,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       setCart([]);
       setWholesaleDiscountEnabled(false);
       setCheckout(false);
-      setProducts(await api("/api/products?sales=true"));
+      setProductReload(value => value + 1);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -1346,7 +1376,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
         <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {(mode === "PRODUCT"
             ? [
-                ["Products shown", shown.length],
+                ["Products on page", shown.length],
                 ["Loose sale", shown.filter((p) => p.allowLooseSale).length],
                 ["Opened stock", shown.filter((p) => opened(p) > 0).length],
                 [
@@ -1375,7 +1405,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       )}
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
         <main className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-          {shown.map((p) => (
+          {(!productLoading || editSaleId) && !productError && shown.map((p) => (
             <article
               className={`sales-product-card card flex cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md ${p.expired ? "sales-product-expired" : ""}`}
               key={p._id}
@@ -1720,6 +1750,14 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
           </aside>
         )}
       </div>
+      {!editSaleId && <nav aria-label="Product pagination" className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-[var(--muted)]" role="status">{productLoading ? 'Loading products…' : productError || `${productPagination.total} products · Page ${productPagination.page} of ${productPagination.pages}`}</span>
+            <div className="flex gap-2">
+              {productError && <button type="button" className="btn" onClick={() => setProductReload(value => value + 1)}>Retry</button>}
+              <button type="button" className="btn" disabled={productLoading || productPage <= 1} onClick={() => setPageSelection({ key: productQueryKey, page: productPage - 1 })}>Previous</button>
+              <button type="button" className="btn" disabled={productLoading || productPage >= productPagination.pages} onClick={() => setPageSelection({ key: productQueryKey, page: productPage + 1 })}>Next</button>
+            </div>
+      </nav>}
       {quick && <QuickSell p={quick} close={() => setQuick(null)} add={add} />}
       {externalPurchase && <ExternalPurchaseModal key={externalPurchase._id || "new-external"} products={products} initial={externalPurchase} onClose={() => setExternalPurchase(null)} onSave={line => setCart(current => {
         const existing = current.find(item => item._id === line._id && isExternalPurchase(item));

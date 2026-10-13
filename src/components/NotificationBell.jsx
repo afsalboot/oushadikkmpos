@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { resourceFetch } from "@/lib/resource-fetch";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, ChevronRight } from "lucide-react";
 import {
@@ -45,7 +46,7 @@ export default function NotificationBell({ enabled = true, onNavigate }) {
       return;
     }
     try {
-      const response = await fetch("/api/notifications", { cache: "no-store" });
+      const response = await resourceFetch("/api/notifications", { cache: "no-store" });
       const result = await response.json();
       if (response.ok && version === requestVersion.current) {
         const unreadIds = new Set(

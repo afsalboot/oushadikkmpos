@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, ShieldCheck } from "lucide-react";
@@ -15,7 +16,7 @@ export default function LoginForm() {
   const [pinLogin, setPinLogin] = useState(false);
   const usePin = pinLogin && !bootstrap && !setupUsername;
   useEffect(() => {
-    fetch("/api/auth/status")
+    resourceFetch("/api/auth/status")
       .then((r) => r.json())
       .then(({ data }) => setBootstrap(data.needsBootstrap))
       .catch(() => toast.error("Could not connect to the application database"))
@@ -28,7 +29,7 @@ export default function LoginForm() {
     try {
       const body = Object.fromEntries(new FormData(e.currentTarget));
       if (!bootstrap && setupUsername) body.setupUsername = true;
-      const response = await fetch(
+      const response = await resourceFetch(
         bootstrap ? "/api/auth/bootstrap" : usePin ? "/api/auth/pin-login" : "/api/auth/username-login",
         {
           method: "POST",
@@ -40,7 +41,6 @@ export default function LoginForm() {
       if (!response.ok) return toast.error(result.error);
       toast.success(bootstrap ? "Admin account created" : "Welcome back");
       router.replace(result.data?.user?.mustChangePassword ? "/change-password" : "/dashboard");
-      router.refresh();
     } catch {
       toast.error("Could not sign in. Check your connection and try again.");
     } finally {

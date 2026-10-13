@@ -1,6 +1,7 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Papa from "papaparse";
 import { importProductsWithProgress } from "@/lib/product-import-progress";
@@ -89,7 +90,7 @@ const plural = (word, count) =>
         : `${word}s`;
 
 async function api(url, options) {
-  const response = await fetch(url, options);
+  const response = await resourceFetch(url, options);
   const result = await response.json();
   if (!response.ok) {
     const error = new Error(result.error || "Request failed");
@@ -2680,6 +2681,9 @@ function DuplicateProducts({ onClose, onMerged }) {
 
 export default function ProductCatalogue() {
   const pageSize = 20;
+  const [catalogue, setCatalogue] = useState({ pagination: { total: 0, pages: 1 }, selectionIds: [], brandOptions: [], metrics: { total: 0, low: 0, opened: 0, expiring: 0, inactive: 0, sellingValue: 0 } });
+  const [catalogueReload, setCatalogueReload] = useState(0);
+  const [productChoices, setProductChoices] = useState([]);
   const confirmAction = useConfirm();
   const [products, setProducts] = useState([]),
     [categories, setCategories] = useState([]),
@@ -2713,14 +2717,11 @@ export default function ProductCatalogue() {
     window.history.replaceState({}, "", window.location.pathname);
     return () => window.clearTimeout(timer);
   }, []);
-  function replaceProducts(rows) {
-    setProducts(rows);
-    setPage(1);
-    const available = new Set(rows.map((product) => String(product._id)));
-    setSelected(
-      (current) => new Set([...current].filter((id) => available.has(id))),
-    );
-  }
+  const replaceProducts = useCallback(result => {
+    setProducts(result.rows);
+    setCatalogue(result);
+    setPage(current => Math.min(current, result.pagination.pages));
+  }, []);
   function openEditor(product, mode = null) {
     setEditorMode(mode);
     setEditor(product);
@@ -2728,39 +2729,43 @@ export default function ProductCatalogue() {
   function openDrawer(productId, initialSection = null) {
     setDrawer({ productId, initialSection });
   }
-  async function load(search = query) {
-    setLoading(true);
-    try {
-      replaceProducts(
-        await api(
-          `/api/products${search ? `?q=${encodeURIComponent(search)}` : ""}`,
-        ),
-      );
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const catalogueQuery = useMemo(() => {
+    const params = new URLSearchParams({ view: 'catalogue', q: query, category, page: String(page), limit: String(pageSize) });
+    for (const [key, values] of [['brand', brands], ['stock', stockFilter], ['capability', capability], ['visibility', visibility], ['more', more]]) for (const value of values) params.append(key, value);
+    return params.toString();
+  }, [query, category, page, brands, stockFilter, capability, visibility, more]);
+  const selectedRef = useRef(selected);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+  async function load() { setCatalogueReload(value => value + 1); }
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
+      setLoading(true);
       try {
-        const rows = await api(
-          `/api/products${query ? `?q=${encodeURIComponent(query)}` : ""}`,
-        );
-        if (active) replaceProducts(rows);
+        const params = new URLSearchParams(catalogueQuery);
+        const submittedSelection = [...selectedRef.current];
+        for (const id of submittedSelection) params.append('selected', id);
+        const result = await api('/api/products?' + params, { signal: controller.signal });
+        if (!controller.signal.aborted) {
+          replaceProducts(result);
+          const available = new Set(result.availableSelectionIds);
+          const submitted = new Set(submittedSelection);
+          setSelected(current => new Set([...current].filter(id => !submitted.has(id) || available.has(id))));
+        }
       } catch (error) {
-        if (active) toast.error(error.message);
+        if (!controller.signal.aborted) toast.error(error.message);
       } finally {
-        if (active) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }, 300);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [query]);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [catalogueQuery, catalogueReload, replaceProducts]);
+  useEffect(() => {
+    if (!bulkUpdateOpen && !editor) return;
+    let active = true;
+    api('/api/products?view=options').then(rows => { if (active) setProductChoices(rows); }).catch(error => { if (active) toast.error(error.message); });
+    return () => { active = false; };
+  }, [bulkUpdateOpen, editor]);
   useEffect(() => {
     api("/api/categories")
       .then(setCategories)
@@ -2772,91 +2777,20 @@ export default function ProductCatalogue() {
       .then(setSettings)
       .catch(() => {});
   }, []);
-  const filtered = useMemo(
-    () =>
-      products.filter((product) => {
-        const brand = String(product.manufacturer || "").trim().replace(/\s+/g, " ").toLowerCase();
-        if (brands.length && !brands.includes(brand || "__unbranded__")) return false;
-        if (category !== "ALL" && String(product.categoryId?._id) !== category)
-          return false;
-        if (
-          stockFilter.length &&
-          !stockFilter.some(
-            (value) =>
-              ({
-                IN:
-                  product.stock.hasStock ?? product.stock.totalBaseQuantity > 0,
-                LOW: product.lowStock,
-                OUT: !(
-                  product.stock.hasStock ?? product.stock.totalBaseQuantity > 0
-                ),
-                OPEN: product.stock.openQuantity > 0,
-              })[value],
-          )
-        )
-          return false;
-        if (
-          capability.length &&
-          !capability.some(
-            (value) =>
-              ({
-                PACKAGE: product.allowPackageSale,
-                LOOSE: product.allowLooseSale,
-                MIX: product.allowMixture,
-              })[value],
-          )
-        )
-          return false;
-        if (
-          visibility.length &&
-          !visibility.some(
-            (value) =>
-              ({
-                VISIBLE: product.visibleInSales !== false,
-                HIDDEN: product.visibleInSales === false,
-              })[value],
-          )
-        )
-          return false;
-        if (
-          more.length &&
-          !more.some(
-            (value) =>
-              ({
-                ACTIVE: product.active !== false,
-                INACTIVE: product.active === false,
-                EXPIRING: product.expiringSoon,
-                EXPIRED: product.expired,
-                MULTI: product.activeBatchCount >= 2,
-              })[value],
-          )
-        )
-          return false;
-        return true;
-      }),
-    [products, category, brands, stockFilter, capability, visibility, more],
-  );
+  const filtered = products;
+  const hasFilters = Boolean(query || category !== 'ALL' || brands.length || stockFilter.length || capability.length || visibility.length || more.length);
   const brandOptions = useMemo(() => {
-    const options = new Map(brands.map(brand => [brand, brand === "__unbranded__" ? "No brand" : brand]));
-    for (const product of products) {
-      const brand = String(product.manufacturer || "").trim().replace(/\s+/g, " ");
-      options.set(brand.toLowerCase() || "__unbranded__", brand || "No brand");
-    }
+    const options = new Map(brands.map(brand => [brand, brand === '__unbranded__' ? 'No brand' : brand]));
+    for (const option of catalogue.brandOptions) options.set(option.value, option.label);
     return [...options].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
-  }, [products, brands]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  }, [catalogue.brandOptions, brands]);
+  const totalPages = catalogue.pagination.pages;
   const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
+  const paginated = products;
   const selectedIds = [...selected];
-  const allFilteredSelected =
-    filtered.length > 0 &&
-    filtered.every((product) => selected.has(String(product._id)));
-  const allPageSelected =
-    paginated.length > 0 &&
-    paginated.every((product) => selected.has(String(product._id)));
+  const filteredIds = catalogue.selectionIds;
+  const allFilteredSelected = catalogue.pagination.total > 0 && catalogue.pagination.total <= selected.size && filteredIds.every(id => selected.has(id));
+  const allPageSelected = paginated.length > 0 && paginated.every(product => selected.has(String(product._id)));
   function toggleProduct(productId) {
     const id = String(productId);
     setSelected((current) => {
@@ -2871,14 +2805,14 @@ export default function ProductCatalogue() {
     setSelected((current) => {
       const next = new Set(current);
       if (allFilteredSelected) {
-        for (const product of filtered) next.delete(String(product._id));
+        for (const id of filteredIds) next.delete(id);
       } else {
-        for (const product of filtered) {
-          if (next.has(String(product._id))) continue;
+        for (const id of filteredIds) {
+          if (next.has(id)) continue;
           if (next.size >= 200) break;
-          next.add(String(product._id));
+          next.add(id);
         }
-        if (filtered.some((product) => !next.has(String(product._id))))
+        if (filteredIds.some(id => !next.has(id)))
           toast.error("Only the first 200 products can be selected at once.");
       }
       return next;
@@ -2957,12 +2891,7 @@ export default function ProductCatalogue() {
     }
   }
   const metrics = {
-    total: products.length,
-    low: products.filter((p) => p.lowStock).length,
-    opened: products.filter((p) => p.stock.openQuantity > 0).length,
-    expiring: products.filter((p) => p.expiringSoon).length,
-    inactive: products.filter((p) => p.active === false).length,
-    sellingValue: products.reduce((sum, p) => sum + Number(p.valuation?.sellingValue || 0), 0),
+    ...catalogue.metrics,
   };
   const reset = () => {
     setPage(1);
@@ -3000,6 +2929,7 @@ export default function ProductCatalogue() {
       return;
     try {
       await api(`/api/products?id=${product._id}`, { method: "DELETE" });
+      setSelected(current => new Set([...current].filter(id => id !== String(product._id))));
       toast.success("Product deleted successfully.");
       load();
     } catch (error) {
@@ -3210,7 +3140,7 @@ export default function ProductCatalogue() {
           </button>
           <span className="ml-auto self-center text-sm font-extrabold">
             {filtered.length
-              ? `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length} Products`
+              ? `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, catalogue.pagination.total)} of ${catalogue.pagination.total} Products`
               : "0 Products"}
           </span>
         </div>
@@ -3361,15 +3291,15 @@ export default function ProductCatalogue() {
               <Package />
             </span>
             <h2 className="mt-4 text-lg font-extrabold">
-              {products.length ? "No products found" : "No products yet"}
+              {hasFilters || catalogue.metrics.total ? "No products found" : "No products yet"}
             </h2>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              {products.length
+              {hasFilters || catalogue.metrics.total
                 ? "Try another search or change your filters."
                 : "Add your first Ayurvedic product or import your catalogue using CSV."}
             </p>
             <div className="mt-5 flex justify-center gap-2">
-              {products.length ? (
+              {hasFilters || catalogue.metrics.total ? (
                 <button className="btn" onClick={reset}>
                   Clear filters
                 </button>
@@ -3396,7 +3326,7 @@ export default function ProductCatalogue() {
         <ProductEditor
           product={Object.keys(editor).length ? editor : null}
           mode={editorMode}
-          products={products}
+          products={productChoices.length ? productChoices : products}
           categories={categories}
           suppliers={suppliers}
           settings={settings}
@@ -3452,7 +3382,7 @@ export default function ProductCatalogue() {
       {bulkUpdateOpen && (
         <BulkUpdateModal
           categories={categories}
-          products={products}
+          products={productChoices.length ? productChoices : products}
           count={selected.size}
           onClose={() => setBulkUpdateOpen(false)}
           onApply={applyBulkUpdate}

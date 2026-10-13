@@ -727,6 +727,12 @@ if (!User.schema.path("dismissedNotificationIds"))
 export const StaffRole = model("StaffRole", staffRoleSchema);
 export const AuditLog = model("AuditLog", auditLogSchema);
 export const Category = model("Category", categorySchema);
+// Read paths: POS name ordering, category counts/filters, and date-range analytics.
+productSchema.index({ active: 1, name: 1 });
+productSchema.index({ categoryId: 1, name: 1 });
+batchSchema.index({ productId: 1, expiryDate: 1, createdAt: 1 });
+saleSchema.index({ createdAt: -1 });
+purchaseSchema.index({ purchaseStatus: 1, purchasedAt: -1 });
 export const Product = model("Product", productSchema);
 if (!Product.schema.path("barcodeType"))
   Product.schema.add({
@@ -761,6 +767,14 @@ Customer.schema.add({
   defaultDiscount: { type: Number, min: 0, max: 100, default: 0 },
   notes: { type: String, trim: true, default: "" },
 });
+// Register on the new schema so reloads do not append indexes to a cached model.
+saleSchema.index(
+  { requestKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { requestKey: { $type: "string" } },
+  },
+);
 export const Sale = model("Sale", saleSchema);
 Sale.schema.add({
   customerType: {
@@ -936,13 +950,6 @@ Sale.schema.add({
   cancelledBy: { type: Schema.Types.ObjectId, ref: "User" },
   cancellationReason: String,
 });
-Sale.schema.index(
-  { requestKey: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { requestKey: { $type: "string" } },
-  },
-);
 Sale.schema.path("taxType").enum("CGST_UTGST");
 Sale.schema
   .path("items")

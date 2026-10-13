@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-location-assign-relative-destination */
 
@@ -112,7 +113,7 @@ const payment = (bill) =>
   "—";
 async function api(url, options) {
   if (url === "/api/customers/") return null;
-  const response = await fetch(url, options),
+  const response = await resourceFetch(url, options),
     json = await response.json();
   if (!response.ok) throw new Error(json.error || "Request failed");
   if (

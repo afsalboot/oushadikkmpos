@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Plus, X, RefreshCw, RotateCcw } from "lucide-react";
@@ -10,7 +11,7 @@ import { consultationTokenNumber } from "@/lib/consultation";
 
 const money = value => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value || 0);
 const dateTime = value => new Intl.DateTimeFormat("en-IN", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(value));
-async function api(url, options) { const response = await fetch(url, { cache: "no-store", ...options }); const result = await response.json(); if (!response.ok) throw new Error(result.error || "Request failed"); return result.data; }
+async function api(url, options) { const response = await resourceFetch(url, { cache: "no-store", ...options }); const result = await response.json(); if (!response.ok) throw new Error(result.error || "Request failed"); return result.data; }
 const post = body => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 function Dialog({ title, children, close, busy = false }) {
   const ref = useRef(null);

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { resourceFetch } from "@/lib/resource-fetch";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bell,
@@ -39,7 +40,7 @@ export default function NotificationsWorkspace() {
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
     try {
-      const response = await fetch("/api/notifications", { cache: "no-store" });
+      const response = await resourceFetch("/api/notifications", { cache: "no-store" });
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.error || "Unable to load notifications");
@@ -53,7 +54,7 @@ export default function NotificationsWorkspace() {
 
   useEffect(() => {
     const firstLoad = window.setTimeout(load, 0);
-    const timer = window.setInterval(load, 30_000);
+    const timer = window.setInterval(() => { if (!document.hidden) load(); }, 30_000);
     const refresh = () => document.visibilityState === "visible" && load();
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
@@ -69,7 +70,7 @@ export default function NotificationsWorkspace() {
     requestVersion.current += 1;
     setBusy(key);
     try {
-      const response = await fetch("/api/notifications", {
+      const response = await resourceFetch("/api/notifications", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

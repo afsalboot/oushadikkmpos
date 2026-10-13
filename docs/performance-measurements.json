@@ -1,0 +1,247 @@
+{
+  "date": "2026-10-13",
+  "scope": "Read-only live service measurements; excludes HTTP authentication and response serialization. The live dataset changed during the runs.",
+  "before": [
+    {
+      "name": "connection",
+      "ms": 596,
+      "bytes": 4
+    },
+    {
+      "name": "products-1",
+      "ms": 27793,
+      "bytes": 3373466,
+      "rows": 2099
+    },
+    {
+      "name": "dashboard-1",
+      "ms": 26731,
+      "bytes": 23866
+    },
+    {
+      "name": "notifications-1",
+      "ms": 4333,
+      "bytes": 40233
+    },
+    {
+      "name": "products-2",
+      "ms": 27524,
+      "bytes": 3373466,
+      "rows": 2099
+    },
+    {
+      "name": "dashboard-2",
+      "ms": 26528,
+      "bytes": 23866
+    },
+    {
+      "name": "notifications-2",
+      "ms": 4359,
+      "bytes": 40233
+    }
+  ],
+  "after": [
+    {
+      "name": "connection",
+      "ms": 939,
+      "bytes": 4
+    },
+    {
+      "name": "products-page-1",
+      "ms": 1395,
+      "bytes": 80819
+    },
+    {
+      "name": "dashboard-1",
+      "ms": 2574,
+      "bytes": 26814
+    },
+    {
+      "name": "notifications-1",
+      "ms": 792,
+      "bytes": 40233
+    },
+    {
+      "name": "categories-1",
+      "ms": 100,
+      "bytes": 5501,
+      "rows": 41
+    },
+    {
+      "name": "settings-cold-1",
+      "ms": 125,
+      "bytes": 6655
+    },
+    {
+      "name": "settings-cached-1",
+      "ms": 0,
+      "bytes": 6655
+    },
+    {
+      "name": "products-page-2",
+      "ms": 911,
+      "bytes": 80819
+    },
+    {
+      "name": "dashboard-2",
+      "ms": 2301,
+      "bytes": 26814
+    },
+    {
+      "name": "notifications-2",
+      "ms": 776,
+      "bytes": 40233
+    },
+    {
+      "name": "categories-2",
+      "ms": 88,
+      "bytes": 5501,
+      "rows": 41
+    },
+    {
+      "name": "settings-cold-2",
+      "ms": 114,
+      "bytes": 6655
+    },
+    {
+      "name": "settings-cached-2",
+      "ms": 0,
+      "bytes": 6655
+    }
+  ],
+  "transport": [
+    {
+      "compression": []
+    },
+    {
+      "command": "find",
+      "durationMs": 118,
+      "rows": 101
+    },
+    {
+      "command": "getMore",
+      "durationMs": 1350,
+      "rows": 1999
+    },
+    {
+      "name": "native-small",
+      "ms": 1477,
+      "rows": 2100,
+      "bytes": 131292
+    },
+    {
+      "command": "find",
+      "durationMs": 1458,
+      "rows": 101
+    },
+    {
+      "command": "getMore",
+      "durationMs": 26399,
+      "rows": 1999
+    },
+    {
+      "name": "native-full",
+      "ms": 27931,
+      "rows": 2100,
+      "bytes": 2841666
+    },
+    {
+      "command": "aggregate",
+      "durationMs": 1462,
+      "rows": 101
+    },
+    {
+      "command": "getMore",
+      "durationMs": 26733,
+      "rows": 1999
+    },
+    {
+      "name": "aggregate-full",
+      "ms": 28267,
+      "rows": 2100,
+      "bytes": 2841666
+    }
+  ],
+  "workspaceFollowup": {
+    "date": "2026-10-13",
+    "scope": "Read-only service timings on the existing database, excluding HTTP authentication, proxy execution, route serialization and browser rendering. No database writes or index creation.",
+    "before": [
+      {
+        "name": "accounts",
+        "ms": 20409,
+        "bytes": 18011
+      },
+      {
+        "name": "reports-overview",
+        "ms": 29127,
+        "bytes": 2715
+      }
+    ],
+    "after": [
+      {
+        "name": "accounts-run-1",
+        "ms": 2267,
+        "bytes": 18011
+      },
+      {
+        "name": "accounts-run-2",
+        "ms": 2306,
+        "bytes": 18011
+      },
+      {
+        "name": "reports-overview-run-1",
+        "ms": 1971,
+        "bytes": 2715
+      },
+      {
+        "name": "reports-overview-run-2",
+        "ms": 2006,
+        "bytes": 2715
+      },
+      {
+        "name": "catalogue-first-20-run-1",
+        "ms": 1634,
+        "bytes": 44615
+      },
+      {
+        "name": "catalogue-first-20-run-2",
+        "ms": 1606,
+        "bytes": 44615
+      }
+    ],
+    "liveParity": {
+      "result": "PASS",
+      "fullResponses": [
+        "accounts",
+        "reports-overview"
+      ],
+      "beforeMs": {
+        "accounts": 19564,
+        "overview": 27117
+      },
+      "afterMs": {
+        "accounts": [
+          2145,
+          2022
+        ],
+        "overview": [
+          2062,
+          2219
+        ],
+        "catalogue": [
+          1670,
+          1579
+        ]
+      }
+    },
+    "verification": {
+      "unitTests": 320,
+      "workspaceAggregationAssertions": 98,
+      "lintErrors": 0,
+      "existingLintWarnings": 3,
+      "productionBuild": "PASS",
+      "browserVerification": "NOT RUN",
+      "databaseWrites": 0
+    }
+  }
+}

@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -19,7 +20,7 @@ export default function ChangePasswordForm({ embedded = false }) {
     event.preventDefault();
     setSaving(true);
     try {
-      const response = await fetch("/api/auth/change-password", {
+      const response = await resourceFetch("/api/auth/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

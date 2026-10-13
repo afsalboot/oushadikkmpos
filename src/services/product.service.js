@@ -115,16 +115,24 @@ export async function updateProduct(id, input, actor) {
   return existing;
 }
 
-export async function getProducts(filter = {}) {
-  const products = await Product.find(filter).populate("categoryId", "name slug active").sort({ name: 1 }).lean();
+export const POS_PRODUCT_FIELDS = 'name sku barcode manufacturer categoryId hsnCode taxable useDefaultGstRate gstRate gstExempt gstPriceMode baseUnit packageUnit packageType packageSize stockPackType unitsPerStockPack allowPackageSale allowLooseSale allowMixture visibleInSales packageSellingPrice loosePricingMethod looseUnit loosePricePerUnit looseConversionType unitsPerPackage priceTiers reorderLevel batchTracking expiryTracking wholesaleEnabled wholesalePrice wholesaleMinQty wholesaleUnit unitsPerWholesalePack wholesalePriceTiers allowWholesaleLooseSale freeSchemeEnabled freeSchemeType freeSchemeBuyQty freeSchemeFreeQty freeSchemeFreeProduct active batchNumber wholesalePricingMethod wholesaleDiscountPercent wholesaleSaleUnit wholesalePackEnabled wholesalePackPrice wholesaleLoosePrice';
+
+export async function getProducts(filter = {}, { salesOnly = false, page, limit, timing } = {}) {
+  const measure = (name, work) => timing ? timing.measure(name, work) : work();
+  let query = Product.find(filter).populate("categoryId", "name slug active").sort({ name: 1 });
+  if (salesOnly) query = query.select(POS_PRODUCT_FIELDS);
+  if (page) query = query.skip((page - 1) * limit).limit(limit);
+  const products = await measure('product_query', () => query.lean());
   const productIds = products.map((product) => product._id);
-  const batches = productIds.length ? await InventoryBatch.find({ productId: { $in: productIds } }).sort({ expiryDate: 1, createdAt: 1 }).lean() : [];
+  const batchFilter = { productId: { $in: productIds }, ...(salesOnly ? { $or: [{ sealedPackages: { $gt: 0 } }, { openQuantity: { $gt: 0 } }] } : {}) };
+  const batches = productIds.length ? await measure('batch_query', () => InventoryBatch.find(batchFilter).select('productId batchNumber sealedPackages openQuantity packageSize expiryDate purchasePrice sellingPrice createdAt').sort({ productId: 1, expiryDate: 1, createdAt: 1 }).lean()) : [];
   const byProduct = new Map();
   for (const batch of batches) {
     const key = String(batch.productId);
-    byProduct.set(key, [...(byProduct.get(key) || []), batch]);
+    if (!byProduct.has(key)) byProduct.set(key, []);
+    byProduct.get(key).push(batch);
   }
-  return products.map((product) => {
+  return measure('processing', () => products.map((product) => {
     const productBatches = byProduct.get(String(product._id)) || [];
     const normalizedProduct={...product,packageUnit:product.packageUnit||product.baseUnit,looseUnit:product.looseUnit||(isCountBasedProduct(product)?"tablet":product.baseUnit)};
     const stock = calculatePhysicalStock(productBatches,normalizedProduct);
@@ -134,7 +142,7 @@ export async function getProducts(filter = {}) {
     return {
       ...normalizedProduct,
       stock,
-      valuation: inventoryValue(productBatches, normalizedProduct),
+      ...(salesOnly ? {} : { valuation: inventoryValue(productBatches, normalizedProduct) }),
       stockLabel: formatPhysicalStock(stock, normalizedProduct),
       lowStock: isLowStock(stock, normalizedProduct),
       activeBatchCount: activeBatches.length,
@@ -143,7 +151,7 @@ export async function getProducts(filter = {}) {
       ...expirySummary,
       batches: productBatches.map((batch)=>({ _id:batch._id, batchNumber:batch.batchNumber, sealedPackages:batch.sealedPackages, openQuantity:batch.openQuantity, expiryDate:batch.expiryDate })),
     };
-  });
+  }));
 }
 
 export async function getProductDetails(id) {

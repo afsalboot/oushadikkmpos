@@ -2,6 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildAccountLedger } from "../src/services/accounting.service.js";
 
+test('compact sale reads preserve item counts, split receipts and filtered running balances', () => {
+  const sales = [
+    { _id: 'early', invoiceNumber: 'INV-1', createdAt: '2026-10-01', total: 100, items: [{ name: 'One' }, { name: 'Two' }], payments: [{ method: 'CASH', amount: 100 }] },
+    { _id: 'later', invoiceNumber: 'INV-2', createdAt: '2026-10-13', total: 250, customerSnapshot: { name: 'Customer' }, cashierSnapshot: { name: 'Cashier' }, items: [{ name: 'Three' }], payments: [{ method: 'CASH', amount: 50 }, { method: 'UPI', amount: 200, reference: 'REF' }] },
+  ];
+  const compact = sales.map(({ items, ...sale }) => ({ ...sale, itemCount: items.length }));
+  const options = { dateFrom: '2026-10-13', paymentMethod: ['UPI'], enabledMethods: ['CASH', 'UPI'], limit: 1 };
+  const full = buildAccountLedger(sales, [], options);
+  assert.deepEqual(buildAccountLedger(compact, [], options), full);
+  assert.equal(full.movements[0].sourceDetails.itemCount, 1);
+  assert.equal(full.movements[0].runningBalance, 350);
+  assert.equal(full.summary.moneyIn, 250);
+});
+
 test("accounts include sale receipts and purchase-linked expenses once", () => { const result = buildAccountLedger([{ _id:"s1", invoiceNumber:"INV-1", total:500, createdAt:"2026-08-15", customerSnapshot:{name:"Customer"}, payments:[{method:"CASH",amount:500,paidAt:"2026-08-15"}] }], [{ _id:"e1", source:"PURCHASE", category:"Purchase", description:"Inventory purchase PUR-1", amount:200, paymentMethod:"CASH", expenseDate:"2026-08-15" }],{enabledMethods:["CASH"]}); assert.equal(result.summary.moneyIn,500);assert.equal(result.summary.moneyOut,200);assert.equal(result.summary.netCashFlow,300);assert.equal(result.movements.length,2); });
 test("sale payments are capped at the bill total", () => { const result=buildAccountLedger([{_id:"s",invoiceNumber:"INV",total:100,createdAt:"2026-08-15",payments:[{method:"UPI",amount:80},{method:"UPI",amount:80}]}],[]); assert.equal(result.summary.moneyIn,100); });
 test("wholesale credit invoices do not create cash movements before payment",()=>{const result=buildAccountLedger([{_id:"credit-1",invoiceNumber:"WSI-1",total:500,paymentStatus:"UNPAID",amountPaid:0,balanceDue:500,payments:[]}],[]);assert.equal(result.summary.moneyIn,0);assert.equal(result.movements.length,0);});

@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -102,7 +103,7 @@ export default function AppShell({ user, children }) {
       }))
     )
       return;
-    await fetch("/api/auth/logout", { method: "POST" });
+    await resourceFetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
   }
@@ -146,7 +147,7 @@ export default function AppShell({ user, children }) {
       </nav>
       <div className="flex flex-col border-t border-white/10 p-4">
         <NotificationBell
-          enabled={allowed("products.view")}
+          enabled={allowed("products.view") && (mobile || !open)}
           onNavigate={() => mobile && setOpen(false)}
         />
         <div className="mb-2 mt-1 flex items-center gap-3">

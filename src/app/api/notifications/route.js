@@ -3,26 +3,31 @@ import { connectDb } from "@/lib/db";
 import { apiError, ok } from "@/lib/api";
 import { User } from "@/models";
 import { getNotifications } from "@/services/notification.service";
+import mongoose from "mongoose";
+import { requestTiming } from "@/lib/performance";
+import { notificationIdUpdate } from "@/lib/notification-state";
 
 async function findNotificationUser(userId) {
-  const identity = await User.findById(userId).select("_id").lean();
-  if (!identity) return null;
   return User.collection.findOne(
-    { _id: identity._id },
+    { _id: new mongoose.Types.ObjectId(userId) },
     { projection: { readNotificationIds: 1, dismissedNotificationIds: 1 } },
   );
 }
 
 async function notificationState(session) {
-  const notifications = await getNotifications(session);
-  const user = await findNotificationUser(session.sub);
+  const [notifications, user] = await Promise.all([getNotifications(session), findNotificationUser(session.sub)]);
   const activeIds = new Set(notifications.items.map((item) => item.id));
   const savedReadIds = Array.isArray(user?.readNotificationIds) ? user.readNotificationIds : [];
   const savedDismissedIds = Array.isArray(user?.dismissedNotificationIds) ? user.dismissedNotificationIds : [];
   const readIds = savedReadIds.filter((id) => activeIds.has(id));
   const dismissedIds = savedDismissedIds.filter((id) => activeIds.has(id));
-  if (user && (readIds.length !== savedReadIds.length || dismissedIds.length !== savedDismissedIds.length)) await User.collection.updateOne({ _id: user._id }, { $set: { readNotificationIds: readIds, dismissedNotificationIds: dismissedIds } });
   return { notifications, readIds, dismissedIds, user };
+}
+
+async function updateNotificationIds(state, field, ids) {
+  const activeIds = state.notifications.items.map(item => item.id);
+  // Prune old alert IDs on explicit writes while preserving concurrent updates.
+  return User.collection.updateOne({ _id: state.user._id }, notificationIdUpdate(activeIds, field, ids));
 }
 
 function stateWithUser(state, user) {
@@ -50,12 +55,14 @@ function notificationPayload({ notifications, readIds, dismissedIds }) {
 }
 
 export async function GET() {
+  const timing = requestTiming('notifications');
   try {
-    const session = await requireSession("products.view");
-    await connectDb();
-    return ok(notificationPayload(await notificationState(session)));
+    const session = await timing.measure('auth', () => requireSession("products.view"));
+    await timing.measure('connection', () => connectDb());
+    const state = await timing.measure('alerts', () => notificationState(session));
+    return timing.finish(await timing.measure('serialization', () => ok(notificationPayload(state))));
   } catch (error) {
-    return apiError(error);
+    return timing.finish(apiError(error));
   }
 }
 
@@ -70,7 +77,7 @@ export async function PATCH(request) {
     const ids = body.all ? visibleIds : visibleIds.includes(String(body.id || "")) ? [String(body.id)] : [];
     let refreshed = state;
     if (ids.length && state.user) {
-      const result = await User.collection.updateOne({ _id: state.user._id }, { $addToSet: { readNotificationIds: { $each: ids } } });
+      const result = await updateNotificationIds(state, 'readNotificationIds', ids);
       if (!result.matchedCount) throw new Error("Notification user was not found");
       const user = await findNotificationUser(session.sub);
       refreshed = stateWithUser(state, user);
@@ -92,7 +99,7 @@ export async function DELETE(request) {
     const ids = body.all ? visibleIds : visibleIds.includes(String(body.id || "")) ? [String(body.id)] : [];
     let refreshed = state;
     if (ids.length && state.user) {
-      const result = await User.collection.updateOne({ _id: state.user._id }, { $addToSet: { dismissedNotificationIds: { $each: ids } } });
+      const result = await updateNotificationIds(state, 'dismissedNotificationIds', ids);
       if (!result.matchedCount) throw new Error("Notification user was not found");
       const user = await findNotificationUser(session.sub);
       refreshed = stateWithUser(state, user);

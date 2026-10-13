@@ -1,4 +1,5 @@
 "use client";
+import { resourceFetch } from "@/lib/resource-fetch";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState } from "react";
@@ -226,8 +227,8 @@ const reportGroups = [
 ];
 const allReports = reportGroups.flatMap((group) => group.items);
 
-async function api(url) {
-  const response = await fetch(url);
+async function api(url, options) {
+  const response = await resourceFetch(url, options);
   const json = await response.json();
   if (!response.ok) throw new Error(json.error || "Unable to load report");
   return json.data;

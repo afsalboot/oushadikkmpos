@@ -21,7 +21,8 @@ export function dashboardStock(products, batches) {
   const byProduct = new Map();
   for (const batch of currentBatches) {
     const key = String(batch.productId?._id || batch.productId);
-    byProduct.set(key, [...(byProduct.get(key) || []), batch]);
+    if (!byProduct.has(key)) byProduct.set(key, []);
+    byProduct.get(key).push(batch);
   }
   const lowStock = [];
   const groups = {};
