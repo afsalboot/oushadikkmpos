@@ -1,6 +1,7 @@
-// Browsing metadata only. Never pass an index row into pricing or inventory code.
+// Compact browsing data and stock labels only. Never pass an index row into pricing or inventory code.
 export const SALES_INDEX_LIMIT = 10000;
-export const SALES_INDEX_FIELDS = 'name sku barcode manufacturer categoryId packageSellingPrice baseUnit packageType allowPackageSale allowLooseSale allowMixture loosePricingMethod updatedAt';
+export const SALES_INDEX_SCHEMA_VERSION = 2;
+export const SALES_INDEX_FIELDS = 'name sku barcode manufacturer categoryId packageSellingPrice baseUnit packageType stockPackType unitsPerStockPack looseUnit allowPackageSale allowLooseSale allowMixture loosePricingMethod updatedAt';
 export const normalizeSalesSearch = (value = '') => String(value).normalize('NFKC').toLowerCase().trim().replace(/\s+/g, ' ');
 
 export function salesIndexRow(product, categoryName = '') {
@@ -10,6 +11,7 @@ export function salesIndexRow(product, categoryName = '') {
     categoryId: product.categoryId ? String(product.categoryId) : '', categoryName,
     searchText: [product.name, product.sku, product.barcode, product.manufacturer, categoryName].map(value => normalizeSalesSearch(value || '')).join('\u001f'),
     packageSellingPrice: product.packageSellingPrice, baseUnit: product.baseUnit, packageType: product.packageType,
+    stockLabel: product.stockLabel,
     // Omit default values on the wire, with explicit defaults in the UI adapter.
     allowPackageSale: product.allowPackageSale === false ? false : undefined,
     allowLooseSale: product.allowLooseSale || undefined,

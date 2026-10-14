@@ -15,15 +15,18 @@ import { toast } from "sonner";
 import { calculateSalePricing } from "@/services/pricing.service";
 import { GST_STATES } from "@/lib/gst-states";
 import { isWholesaleCustomer } from "@/lib/sale-customer";
-import {checkoutFetch} from "@/lib/checkout-request";
+import {checkoutFetch, pendingCheckoutBody} from "@/lib/checkout-request";
 import { resolveCheckoutCustomer } from "@/lib/checkout-customer";
+import { acquireCheckoutSubmit } from "@/lib/checkout-submit";
+import { checkoutPaymentOptions, checkoutPayments, validateSalePayments } from "@/lib/checkout-payment";
+import { useSalesCacheScope } from "@/components/SalesCacheContext";
 
-const money = (value) =>
-  new Intl.NumberFormat("en-IN", {
+const moneyFormatter = new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 2,
-  }).format(Number(value || 0));
+  });
+const money = (value) => moneyFormatter.format(Number(value || 0));
 const amount = (value) =>
   Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 const lineTotal = (item) =>
@@ -42,6 +45,7 @@ async function api(url, options) {
 }
 
 export default function SalesCheckoutHostV2() {
+  const cacheScope = useSalesCacheScope();
   const [cart, setCart] = useState([]),
     [open, setOpen] = useState(false),
     [customerType, setCustomerType] = useState("WALK_IN"),
@@ -68,6 +72,13 @@ export default function SalesCheckoutHostV2() {
   const [cartCustomer, setCartCustomer] = useState(null);
   const [editingSale, setEditingSale] = useState(null);
   const openingRef = useRef(false);
+  const submitRef = useRef(false);
+  const lifetimeRef = useRef({active:true});
+  useEffect(() => {
+    const lifetime = lifetimeRef.current;
+    lifetime.active = true;
+    return () => { lifetime.active = false; };
+  }, []);
   const [preparing, setPreparing] = useState(false);
   const [directPending, setDirectPending] = useState(false);
   const submitDirect = useEffectEvent(async () => {
@@ -89,7 +100,7 @@ export default function SalesCheckoutHostV2() {
       const checkoutCart = event.detail?.cart || [];
       if (event.detail?.source !== "PROCEED_PAYMENT" || !checkoutCart.length)
         return;
-      if (openingRef.current) return;
+      if (openingRef.current || submitRef.current) return;
       openingRef.current = true;
       setPreparing(true);
       let preselected = null;
@@ -150,6 +161,7 @@ export default function SalesCheckoutHostV2() {
       }
       (event.detail?.settings ? Promise.resolve(event.detail.settings) : api("/api/settings"))
         .then((value) => {
+          if (!lifetimeRef.current.active) return;
           setSettings(value);
           setDiscountType(
             wholesaleDiscount || customerDiscount > 0
@@ -164,6 +176,8 @@ export default function SalesCheckoutHostV2() {
             setOpen(false);
             setDirectPending(true);
           } else {
+            const enabled = checkoutPaymentOptions(value, nextSaleType === "WHOLESALE" && !original);
+            setPayment(original && enabled.includes(originalMethod) ? originalMethod : enabled.includes("CASH") ? "CASH" : enabled[0] || "CASH");
             openingRef.current = false;
             setPreparing(false);
             setOpen(true);
@@ -175,7 +189,7 @@ export default function SalesCheckoutHostV2() {
     return () => window.removeEventListener("oushadi-open-checkout", handle);
   }, []);
   useEffect(() => {
-    if (saleType !== "WHOLESALE") return;
+    if (!open || saleType !== "WHOLESALE") return;
     if (customerType !== "EXISTING" || query.trim().length < 2) {
       queueMicrotask(() => {
         setResults([]);
@@ -196,19 +210,20 @@ export default function SalesCheckoutHostV2() {
             `/api/customers/search?q=${encodeURIComponent(query.trim())}${customerFilter}`,
             { signal: controller.signal },
           );
+          if (controller.signal.aborted) return;
           setResults(found);
           setSearched(true);
         } catch (error) {
-          if (error.name !== "AbortError") toast.error(error.message);
+          if (!controller.signal.aborted) toast.error(error.message);
         } finally {
-          setSearching(false);
+          if (!controller.signal.aborted) setSearching(false);
         }
       }, 300);
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [customerType, query, saleType]);
+  }, [open, customerType, query, saleType]);
   const searchRetailCustomers = useCallback(async (name, phone, signal) => {
     const terms = [...new Set([name.trim(), phone.trim()].filter((term) => term.length >= 2))];
     const groups = await Promise.all(terms.map((term) => api(
@@ -254,14 +269,14 @@ export default function SalesCheckoutHostV2() {
     const value = Number(item.saleWholesaleDiscountPercent || 0);
     return Number.isFinite(value) && value >= 0 && value <= 100;
   });
-  const pricing=calculateSalePricing({
+  const pricing=useMemo(() => calculateSalePricing({
     consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
     consultationFee: cartCustomer?.consultationFee,
     wholesaleDiscount: wholesaleDiscountEnabled ? cart.map(item => item.saleWholesaleDiscountPercent || 0) : undefined,
     items:cart.map(item=>({...item,amount:lineTotal(item),gstRate:item.kind==="MIX"?settings?.gst?.defaultRate:item.gstRate,useDefaultGstRate:item.kind==="MIX"?true:item.useDefaultGstRate})),
     discount:{type:editingSale?.discountSummary?.discountType || "PERCENTAGE",value:editingSale?.discountSummary?.discountValue || 0,reason:discountReason},
     settings,currentUser:{role:settings?._capabilities?.role||"STAFF"},paymentMethod:payment,placeOfSupply
-  });
+  }), [cart, cartCustomer, wholesaleDiscountEnabled, editingSale, discountReason, settings, payment, placeOfSupply]);
   const discount=pricing.totalDiscount,gstInvoice=pricing.gst,total=pricing.total,roundOff=pricing.roundOff,
     change = amount(Number(cashReceived || 0) - total),
     splitRemaining = amount(
@@ -293,17 +308,16 @@ export default function SalesCheckoutHostV2() {
       creditLimit > 0 &&
       total > 0 &&
       total <= availableCredit;
-  const paymentValid =
-    discountValid &&
-    (payment === "CASH"
-      ? Number(cashReceived) >= total
-      : ["UPI", "BANK", "CARD"].includes(payment)
-        ? true
-        : payment === "CREDIT"
-          ? creditValid
-        : Math.abs(splitRemaining) < 0.01 &&
-          Number(splitCash) >= 0 &&
-          Number(splitUpi) >= 0);
+  const paymentOptions = checkoutPaymentOptions(settings, saleType === "WHOLESALE" && !editingSale);
+  let paymentError = "";
+  try {
+    if (!paymentOptions.includes(payment)) throw new Error("Select an enabled payment method");
+    validateSalePayments(settings, checkoutPayments(payment, total, {splitCash, splitUpi, reference}), total, payment === "CREDIT");
+  } catch (error) { paymentError = error.message; }
+  const paymentValid = discountValid && !paymentError && (payment === "CASH"
+    ? Number.isFinite(Number(cashReceived)) && Number(cashReceived) >= total
+    : payment === "CREDIT" ? creditValid : true);
+  const referenceRequired = settings?.payments?.[payment === "SPLIT" ? "upi" : payment.toLowerCase()]?.requireReference === true;
   async function findDuplicate(form) {
     const phone = String(form.phone || "").trim(),
       email = String(form.email || "")
@@ -325,7 +339,10 @@ export default function SalesCheckoutHostV2() {
   }
   async function complete(event, direct = false) {
     event?.preventDefault();
-    if (saving) return;
+    const release = acquireCheckoutSubmit(submitRef);
+    if (!release) return;
+    setSaving(true);
+    try {
     if (customerType === "EXISTING" && !selected)
       return toast.error("Select an existing customer");
     if (directoryType === "RETAIL" && isWholesaleCustomer(selected)) {
@@ -334,13 +351,13 @@ export default function SalesCheckoutHostV2() {
     }
     if (!paymentValid && !direct)
       return toast.error(
-        payment === "CASH"
+        paymentError || (payment === "CASH"
           ? "Cash received cannot be less than the total"
           : payment === "CREDIT"
             ? creditLimit <= 0
               ? "Set a customer credit limit before using credit"
               : `Credit limit exceeded. Available credit is ${money(availableCredit)}`
-          : "Split payment must equal the total",
+          : "Split payment must equal the total"),
       );
     if (
       saleType === "WHOLESALE" &&
@@ -355,13 +372,6 @@ export default function SalesCheckoutHostV2() {
     const form = event ? Object.fromEntries(new FormData(event.currentTarget)) : {};
     if(pricing.validationErrors.length)return toast.error(pricing.validationErrors[0]);
     if(fulfilment==="DELIVERY"&&(!deliveryAddress.trim()||!deliveryStateCode))return toast.error("Enter delivery address and state");
-    if (saleType === "WHOLESALE" && customerType === "NEW") {
-      const match = await findDuplicate(form);
-      if (match) {
-        setDuplicate(match);
-        return;
-      }
-    }
     const items = cart.map((item) =>
       isExternalPurchase(item) ? { itemSource: item.itemSource, inventoryTracked: false, productId: item.productId || null,
         externalPurchaseId: item.externalPurchaseId, name: item.name, packageType: item.packageType,
@@ -404,21 +414,7 @@ export default function SalesCheckoutHostV2() {
               billedLineIndex: item.billedLineIndex,
             },
     );
-    const payments =
-      payment === "CREDIT"
-        ? []
-        : payment === "SPLIT"
-        ? [
-            { method: "CASH", amount: Number(splitCash) },
-            { method: "UPI", amount: Number(splitUpi), reference },
-          ]
-        : [
-            {
-              method: payment,
-              amount: total,
-              reference: ["UPI", "BANK"].includes(payment) ? reference : "",
-            },
-          ];
+    const payments = checkoutPayments(payment, total, {splitCash, splitUpi, reference});
     const newCustomer =
       customerType === "NEW"
         ? saleType === "WHOLESALE"
@@ -446,36 +442,45 @@ export default function SalesCheckoutHostV2() {
               gstin:form.retailGstin,stateCode:recipientStateCode,
             }
         : undefined;
-    setSaving(true);
-    try {
+      const saleRequest = {
+        items,
+        ...(editingSale ? { editSaleId: editingSale._id, editVersion: editingSale.updatedAt, editRevision: Number(editingSale.editRevision || 0) } : {}),
+        saleType, skipCheckout: direct,
+        doctorName: cartCustomer ? cartCustomer.doctorName : form.doctorName,
+        discountType: editingSale?.discountSummary?.discountType || discountType,
+        discountValue: editingSale?.discountSummary?.discountValue || 0,
+        wholesaleDiscountEnabled,
+        consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
+        consultationFee: cartCustomer?.consultationFee,
+        supplyContext:{fulfilment,deliveryAddress,deliveryStateCode},
+        discountReason, payments, credit: payment === "CREDIT",
+      };
+      const intent = JSON.stringify({ ...saleRequest, cacheScope, customerType, customerId: selected?._id, customer: newCustomer, customerName, customerPhone });
+      // A committed-but-interrupted NEW customer may now exist. Retry the exact
+      // original request before looking it up again or changing its body/key.
+      const retryBody = pendingCheckoutBody(intent);
+      if (!retryBody && saleType === "WHOLESALE" && customerType === "NEW") {
+        const match = await findDuplicate(form);
+        if (match) { setDuplicate(match); return; }
+      }
+      let requestBody = retryBody;
+      if (!requestBody) {
       const matches = saleType !== "WHOLESALE" && !selected
         ? await searchRetailCustomers(customerName, customerPhone) : [];
       if (saleType !== "WHOLESALE") setResults(matches);
       const customerDetails = saleType === "WHOLESALE"
         ? { customerType, customerId: selected?._id, customer: newCustomer }
         : resolveCheckoutCustomer(customerName, customerPhone, matches, selected, directoryType);
+      requestBody = JSON.stringify({ ...saleRequest, ...customerDetails });
+      }
+      if (!lifetimeRef.current.active) return;
       const completed = await api("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items,
-          ...(editingSale ? { editSaleId: editingSale._id, editVersion: editingSale.updatedAt, editRevision: Number(editingSale.editRevision || 0) } : {}),
-          saleType,
-          skipCheckout: direct,
-          ...customerDetails,
-          doctorName: cartCustomer ? cartCustomer.doctorName : form.doctorName,
-          discountType: editingSale?.discountSummary?.discountType || discountType,
-          discountValue: editingSale?.discountSummary?.discountValue || 0,
-          wholesaleDiscountEnabled,
-          consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
-          consultationFee: cartCustomer?.consultationFee,
-
-          supplyContext:{fulfilment,deliveryAddress,deliveryStateCode},
-          discountReason,
-          payments,
-          credit: payment === "CREDIT",
-        }),
+        body: requestBody,
+        checkoutIntent: intent,
       });
+      if (!lifetimeRef.current.active) return;
       sessionStorage.removeItem("oushadi-preselected-customer");
       setOpen(false);
       window.dispatchEvent(new CustomEvent("oushadi-sale-complete", { detail: { edited: Boolean(editingSale) } }));
@@ -488,6 +493,7 @@ export default function SalesCheckoutHostV2() {
     } catch (error) {
       toast.error(error.message);
     } finally {
+      release();
       setSaving(false);
     }
   }
@@ -530,6 +536,7 @@ export default function SalesCheckoutHostV2() {
             aria-modal="true"
             aria-labelledby="checkout-title"
           >
+            <fieldset disabled={saving} className="contents">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[.16em] text-[var(--green)]">
@@ -1004,18 +1011,11 @@ export default function SalesCheckoutHostV2() {
                 <div
                   className={`grid ${saleType === "WHOLESALE" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"} gap-2`}
                 >
-                  {[
-                    ["CASH", "Cash"],
-                    ["UPI", "UPI"],
-                    ["SPLIT", "Split"],
-                    ...(editingSale && ["BANK", "CARD"].includes(payment) ? [[payment, payment === "BANK" ? "Bank" : "Card"]] : []),
-                    ...(saleType === "WHOLESALE" && !editingSale
-                      ? [["CREDIT", "Credit"]]
-                      : []),
-                  ].map(([value, label]) => (
+                  {paymentOptions.map(value => [value, {CASH:"Cash",UPI:"UPI",BANK:"Bank",CARD:"Card",SPLIT:"Split",CREDIT:"Credit"}[value]]).map(([value, label]) => (
                     <button
                       type="button"
                       key={value}
+                      disabled={saving}
                       onClick={() => setPayment(value)}
                       className={`rounded-xl border px-2 py-3 text-sm font-extrabold ${payment === value ? "border-[var(--green)] bg-[var(--green-soft)] text-[var(--green)]" : "border-[var(--line)]"}`}
                     >
@@ -1066,11 +1066,12 @@ export default function SalesCheckoutHostV2() {
                     </div>
                     <label className="mt-4 block">
                       <span className="label">
-                        Transaction / reference ID (optional)
+                        Transaction / reference ID ({referenceRequired ? "required" : "optional"})
                       </span>
                       <input
                         className="field"
                         value={reference}
+                        required={referenceRequired}
                         onChange={(event) => setReference(event.target.value)}
                       />
                     </label>
@@ -1107,10 +1108,11 @@ export default function SalesCheckoutHostV2() {
                       </label>
                     </div>
                     <label className="mt-3 block">
-                      <span className="label">UPI reference (optional)</span>
+                      <span className="label">UPI reference ({referenceRequired ? "required" : "optional"})</span>
                       <input
                         className="field"
                         value={reference}
+                        required={referenceRequired}
                         onChange={(event) => setReference(event.target.value)}
                       />
                     </label>
@@ -1176,6 +1178,7 @@ export default function SalesCheckoutHostV2() {
                 </button>
               </section>
             </div>
+            </fieldset>
           </form>
         </div>
       )}

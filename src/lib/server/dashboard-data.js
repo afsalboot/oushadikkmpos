@@ -4,6 +4,7 @@ import { dashboardSalesPipeline, applyDashboardCostRounding } from "@/lib/dashbo
 import { dashboardInventoryPipeline, dashboardBatchPipeline, dashboardProductIdsPipeline } from "@/lib/dashboard-inventory-pipeline";
 import { getSettings } from "@/services/settings.service";
 import { getLooseUnit } from "@/services/inventory.service";
+import {historicalSalesAggregate} from '@/services/sale-history.service';
 
 const amount = value => Number(Number(value || 0).toFixed(2));
 const comparison = (current, previous) => previous ? amount(((current - previous) / previous) * 100) : null;
@@ -14,7 +15,7 @@ export async function getDashboardData(range = 'today', from, to, { timing } = {
   const measure = (name, work) => timing ? timing.measure(name, work) : work();
   const settings = await measure('settings', () => getSettings());
   const windows = dashboardChartWindows(dates);
-  const neededIds = await measure('sale_product_ids', () => Sale.aggregate(dashboardProductIdsPipeline(dates)));
+  const neededIds = await measure('sale_product_ids', () => historicalSalesAggregate(dashboardProductIdsPipeline(dates)));
   const [inventoryFacets, batchFacets, expenseGroups, purchaseFacets, consultationGroups, customerCount, supplierCount, staffCount] = await Promise.all([
     measure('inventory_aggregation', () => Product.aggregate(dashboardInventoryPipeline(neededIds.map(row => row._id)))),
     measure('batch_aggregation', () => InventoryBatch.aggregate(dashboardBatchPipeline(new Date(), Number(settings.batchExpiry?.firstWarningDays || 90)))),
@@ -35,7 +36,7 @@ export async function getDashboardData(range = 'today', from, to, { timing } = {
   const unitCost = new Map(products.map(product => [String(product._id), product.unitCost || 0]));
   const sellingValue = amount(inventoryTotals.sellingValue);
   const lowStockCount = inventory.lowCount?.[0]?.count || 0, expiredCount = batchSummary.expiredCount?.[0]?.count || 0;
-  const [salesResult] = await measure('sales_aggregation', () => Sale.aggregate(dashboardSalesPipeline(dates, windows, products, unitCost)));
+  const [salesResult] = await measure('sales_aggregation', () => historicalSalesAggregate(dashboardSalesPipeline(dates, windows, products, unitCost)));
   const sales = applyDashboardCostRounding(salesResult || {});
   const current = sales.summary?.find(row => row._id === 'current') || {}, previous = sales.summary?.find(row => row._id === 'previous') || {};
   const currentRevenue = amount(current.revenue), previousRevenue = amount(previous.revenue), currentProfit = amount(current.profit), previousProfit = amount(previous.profit);
@@ -74,7 +75,7 @@ export async function getDashboardData(range = 'today', from, to, { timing } = {
     expired: batchSummary.expired || [], expiredCount: expiredCount, expiryWarningDays: Number(settings.batchExpiry?.firstWarningDays || 90), blockExpiredSales: settings.batchExpiry?.blockExpiredSales !== false,
     range, rangeLabel: { today: 'Today', yesterday: 'Yesterday', '7d': 'Last 7 Days', week: 'This Week', month: 'This Month', custom: 'Custom Date' }[range] || 'Today', generatedAt: new Date(),
     kpis: { sales: currentRevenue, orders: current.orders || 0, profit: currentProfit, averageOrderValue: average(current), transactions: current.transactions || 0, lowStock: lowStockCount, comparisons: { sales: comparison(currentRevenue, previousRevenue), orders: comparison(current.orders || 0, previous.orders || 0), profit: comparison(currentProfit, previousProfit), averageOrderValue: comparison(current.orders ? currentRevenue / current.orders : 0, previous.orders ? previousRevenue / previous.orders : 0), transactions: comparison(current.transactions || 0, previous.transactions || 0) } },
-    salesOverview: { current: currentRevenue, previous: previousRevenue, chart }, topProducts: productSales.sort((a, b) => b.revenue - a.revenue).slice(0, 5), recentTransactions: sales.recent || [],
+    salesOverview: { current: currentRevenue, previous: previousRevenue, chart }, topProducts: productSales.sort((a, b) => b.revenue - a.revenue).slice(0, 5), recentTransactions: (sales.recent || []).filter(row=>!row.historyOnly),
     inventory: { groups: Object.fromEntries((inventory.groups || []).map(row => [row._id, amount(row.quantity)])), value: amount(inventoryTotals.value), sellingValue, missingCostBatches: inventoryTotals.missingCostBatches || 0 },
     expiring: batchSummary.expiring || [], lowStock: inventory.lowStock || [], opened: batchSummary.opened || [], loose, mixtures, wholesale,
     payments: payments.map(row => ({ ...row, percent: paymentTotal ? amount(row.amount / paymentTotal * 100) : 0 })),

@@ -1,6 +1,7 @@
 import { Sale, Expense, Purchase, InventoryBatch } from '../models/index.js';
 import { reportOverviewPipeline, reportInventoryUnitsPipeline } from '../lib/report-overview-pipeline.js';
 import { getAccountData } from './account-data.service.js';
+import {historicalSalesAggregate} from './sale-history.service.js';
 
 const round=value=>Math.round((Number(value||0)+Number.EPSILON)*100)/100;
 const dateFilter = (parameters, field) => {
@@ -11,7 +12,7 @@ export async function getReportOverview(parameters) {
   const options=Object.fromEntries(['dateFrom','dateTo','search','paymentMethod','sort','order','page','limit'].map(key=>[key,parameters.get(key)||'']));
   options.inferPaymentMethods=true;
   const [sales,purchases,expenses,ledger,units]=await Promise.all([
-    Sale.aggregate(reportOverviewPipeline({ documentStatus: { $ne:'CANCELLED' }, ...dateFilter(parameters,'createdAt') })),
+    historicalSalesAggregate(reportOverviewPipeline({ documentStatus: { $ne:'CANCELLED' }, ...dateFilter(parameters,'createdAt') })),
     Purchase.aggregate([{ $match:{purchaseStatus:'RECEIVED',...dateFilter(parameters,'purchasedAt')} },{$group:{_id:null,total:{$sum:'$total'}}}]),
     Expense.aggregate([{ $match:{status:{$ne:'VOID'},source:'MANUAL',...dateFilter(parameters,'expenseDate')} },{$group:{_id:null,total:{$sum:'$amount'}}}]),
     getAccountData(options), InventoryBatch.aggregate(reportInventoryUnitsPipeline()),

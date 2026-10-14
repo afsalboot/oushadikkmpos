@@ -1,5 +1,5 @@
 import { resourceFetch, onResourceInvalidated, clearResourceCache } from './resource-fetch.js';
-import { salesIndexRow, normalizeSalesSearch } from './sales-search.js';
+import { salesIndexRow, normalizeSalesSearch, SALES_INDEX_SCHEMA_VERSION } from './sales-search.js';
 import { SALES_CACHE_SCHEMA, readSalesCache, writeSalesCache, purgeSalesCache } from './sales-indexed-db.js';
 
 export const SALES_FIRST_PAGE = '/api/products?sales=true&page=1&limit=50';
@@ -108,7 +108,7 @@ function storeIndex(data) {
   const metadata = { ...data, rows: undefined, count: data.rows.length };
   void persist([record('index-meta', 'current', { data: metadata, at, fullAt: at }), ...data.rows.map(row => record('index-row', row._id, { data: row, at }))], [...oldIds].filter(id => !byId.has(id)).map(id => ['index-row', id]), scope, true);
   // A changed metadata revision invalidates selling details, not the active cart.
-  for (const [id, entry] of details) if (data.complete && (!byId.has(id) || (byId.get(id).revision && byId.get(id).revision !== Number(new Date(entry.data.updatedAt))) || byId.get(id).categoryName !== (entry.data.categoryId?.name || ''))) {
+  for (const [id, entry] of details) if (data.complete && (!byId.has(id) || (byId.get(id).revision && byId.get(id).revision !== Number(new Date(entry.data.updatedAt))) || byId.get(id).categoryName !== (entry.data.categoryId?.name || '') || (byId.get(id).stockLabel !== undefined && entry.data.stockLabel !== undefined && byId.get(id).stockLabel !== entry.data.stockLabel))) {
     details.delete(id); void persist([], [['detail', id]]);
   }
   if (data.complete) for (const [url, entry] of entries) {
@@ -135,13 +135,14 @@ async function readiness(requested) {
 export async function loadSalesResource(url, { scope: requested, force = false, unconditional = false } = {}) {
   await readiness(requested);
   const cached = peek(entries, url, true, requested);
-  if (cached && !force) { salesPerf('memory-cache', performance.now(), { count: cached.rows?.length }); return cached; }
+  const legacyIndex = url === SALES_INDEX_URL && cached?.schemaVersion !== undefined && cached.schemaVersion < SALES_INDEX_SCHEMA_VERSION;
+  if (cached && !force && !legacyIndex) { salesPerf('memory-cache', performance.now(), { count: cached.rows?.length }); return cached; }
   if (pending.has(url)) return pending.get(url);
   const version = epoch, currentScope = scope, start = performance.now();
   const promise = (async () => {
     const previous = peekSalesResource(url, requested), fullAt = entries.get(url)?.fullAt || entries.get(url)?.at;
     // A periodic full refresh also catches timestamp-preserving restores/external edits.
-    const etag = url === SALES_INDEX_URL && !unconditional && Date.now() - fullAt < 900000 ? previous?.etag : undefined;
+    const etag = url === SALES_INDEX_URL && !unconditional && !legacyIndex && Date.now() - fullAt < 900000 ? previous?.etag : undefined;
     const response = await resourceFetch(url, etag ? { headers: { 'If-None-Match': etag } } : undefined);
     if (epoch !== version || scope !== currentScope) throw new DOMException('Sales data changed', 'AbortError');
     verifyScope(response, requested, url);
@@ -160,7 +161,11 @@ export async function loadSalesResource(url, { scope: requested, force = false, 
     if (url === SALES_INDEX_URL) storeIndex({ ...data, etag: response.headers.get('ETag') || undefined });
     else {
       if (!url.startsWith('/api/products/') && !url.includes('ids=')) put(entries, url, data, 40, 'resource');
-      if (url.startsWith('/api/products')) for (const row of Array.isArray(data) ? data : data.rows || (data._id ? [data] : [])) put(details, String(row._id), row, 1000, 'detail');
+      if (url.startsWith('/api/products')) {
+        const rows = Array.isArray(data) ? data : data.rows || (data._id ? [data] : []);
+        updateStockLabels(rows);
+        for (const row of rows) put(details, String(row._id), row, 1000, 'detail');
+      }
       emit();
     }
     salesPerf(url === SALES_INDEX_URL ? 'index-fetch' : url === SALES_FIRST_PAGE ? 'first-page-fetch' : 'detail-fetch', start, { count: data.rows?.length, bytes: new TextEncoder().encode(JSON.stringify(result)).byteLength });
@@ -210,6 +215,23 @@ export async function prefetchSales(options = {}) {
   await readiness(options.scope);
   return Promise.allSettled([SALES_INDEX_URL, SALES_FIRST_PAGE, '/api/categories'].map(url => loadSalesResource(url, options)));
 }
+function updateStockLabels(products) {
+  const changed = [];
+  for (const product of products) {
+    const row = byId.get(String(product._id));
+    if (!row || typeof product.stockLabel !== 'string' || row.stockLabel === product.stockLabel) continue;
+    row.stockLabel = product.stockLabel;
+    changed.push(record('index-row', row._id, { data: row, at: Date.now() }));
+  }
+  if (changed.length) {
+    const index = entries.get(SALES_INDEX_URL);
+    if (index) {
+      index.data.etag = undefined; index.data.version = undefined;
+      changed.push(record('index-meta', 'current', { data: { ...index.data, rows: undefined, count: index.data.rows.length }, at: index.at, fullAt: index.fullAt }));
+    }
+    void persist(changed);
+  }
+}
 function patchIndex(rows, removed) {
   const index = peekSalesResource(SALES_INDEX_URL);
   if (!index) return;
@@ -258,6 +280,18 @@ async function applyMutation(mutation, data, version) {
     const ids = mutation.ids.length ? cachedIds : [...details.keys()].slice(-50);
     for (const id of mutation.ids.length ? cachedIds : [...details.keys()]) { const entry = details.get(id); entry.at = 0; void persist([record('detail', id, entry)]); }
     emit(); if (ids.length) await refreshDetails(ids, currentScope);
+    // Cards may have a stock label without a full selling detail. Refresh their
+    // bounded compact rows too after an authoritative stock write.
+    const uncached = mutation.ids.filter(id => byId.has(id) && !cachedIds.includes(id));
+    for (let offset = 0; offset < uncached.length; offset += 200) {
+      const response = await resourceFetch(SALES_INDEX_URL + '?ids=' + uncached.slice(offset, offset + 200).join(','));
+      if (scope !== currentScope || epoch !== version) return;
+      verifyScope(response, currentScope, SALES_INDEX_URL);
+      const result = await response.json();
+      if (scope !== currentScope || epoch !== version) return;
+      if (!response.ok) throw Object.assign(new Error(result.error), { status: response.status });
+      patchIndex(result.data.rows, result.data.removedIds || []);
+    }
   } else if (mutation.kind === 'products') {
     const removed = [...(mutation.removed || [])], rows = [];
     if (data?._id && mutation.ids.includes(String(data._id))) {

@@ -1,0 +1,678 @@
+{
+  "measuredAt": "2026-10-14T05:59:31.253Z",
+  "scope": "Local production builds; authenticated live read-only Sales and isolated 30-line checkout UI fixtures. No live transaction timing.",
+  "clients": {
+    "electron": {
+      "engine": "Chrome/152.0.7977.130",
+      "cacheSource": "local",
+      "actions": {
+        "sales-opening": {
+          "scope": "authenticated live read-only UI",
+          "beforeSamplesMs": [
+            81.7,
+            34,
+            34.6,
+            62.9,
+            27.6
+          ],
+          "beforeMedianMs": 34.6,
+          "afterSamplesMs": [
+            74.8,
+            34.6,
+            27.8,
+            27.5,
+            27.3
+          ],
+          "afterMedianMs": 27.8,
+          "afterReadinessSamplesMs": [
+            74.4,
+            29.3,
+            22.3,
+            22.7,
+            24.2
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "search": {
+          "scope": "authenticated live read-only UI",
+          "beforeSamplesMs": [
+            5.8,
+            5.1,
+            5.5,
+            6.2,
+            5.9
+          ],
+          "beforeMedianMs": 5.8,
+          "afterSamplesMs": [
+            4.6,
+            6.1,
+            5.5,
+            5.8,
+            5.7
+          ],
+          "afterMedianMs": 5.7,
+          "afterReadinessSamplesMs": [
+            3.7,
+            4.8,
+            4.4,
+            3.5,
+            3.7
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "clear": {
+          "scope": "authenticated live read-only UI",
+          "beforeSamplesMs": [
+            10.7,
+            14.7,
+            28.2,
+            12.4,
+            10.8
+          ],
+          "beforeMedianMs": 12.4,
+          "afterSamplesMs": [
+            11,
+            11.2,
+            11.8,
+            10.7,
+            10.2
+          ],
+          "afterMedianMs": 11,
+          "afterReadinessSamplesMs": [
+            7.6,
+            7.9,
+            8.9,
+            7.3,
+            7.1
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "cached-cart-add": {
+          "scope": "authenticated live read-only UI",
+          "beforeSamplesMs": [
+            17.9,
+            16.7,
+            23.3,
+            18.3,
+            18.9
+          ],
+          "beforeMedianMs": 18.3,
+          "afterSamplesMs": [
+            17.4,
+            17.4,
+            15.6,
+            18.1,
+            23.1
+          ],
+          "afterMedianMs": 17.4,
+          "afterReadinessSamplesMs": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-checkout-opening": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            17.9,
+            13,
+            13.3,
+            13.3,
+            13.3
+          ],
+          "beforeMedianMs": 13.3,
+          "afterSamplesMs": [
+            16.6,
+            13,
+            13.1,
+            13,
+            13.2
+          ],
+          "afterMedianMs": 13.1,
+          "afterReadinessSamplesMs": [
+            14.8,
+            1.6,
+            1.5,
+            1.3,
+            1.2
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-checkout-cancel": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            12.2,
+            12.9,
+            12.2,
+            13.1,
+            13.1
+          ],
+          "beforeMedianMs": 12.9,
+          "afterSamplesMs": [
+            13.4,
+            12.8,
+            13.1,
+            12.8,
+            13.4
+          ],
+          "afterMedianMs": 13.1,
+          "afterReadinessSamplesMs": [
+            0.5,
+            0.6,
+            0.4,
+            0.5,
+            0.5
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-cash-entry": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            13.2,
+            13.4,
+            12.8,
+            12.3,
+            12.9
+          ],
+          "beforeMedianMs": 12.9,
+          "afterSamplesMs": [
+            12.3,
+            13.2,
+            13.4,
+            13.4,
+            13.6
+          ],
+          "afterMedianMs": 13.4,
+          "afterReadinessSamplesMs": [
+            1.5,
+            0.4,
+            0.6,
+            0.5,
+            0.6
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-reference-entry": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            13.3,
+            13.1,
+            13,
+            12.9,
+            13
+          ],
+          "beforeMedianMs": 13,
+          "afterSamplesMs": [
+            13.4,
+            13.3,
+            13.3,
+            13.3,
+            13.4
+          ],
+          "afterMedianMs": 13.3,
+          "afterReadinessSamplesMs": [
+            0.6,
+            0.4,
+            0.5,
+            0.4,
+            0.4
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-switch-upi": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            12.4,
+            13.1,
+            13.3,
+            12.7,
+            12.7
+          ],
+          "beforeMedianMs": 12.7,
+          "afterSamplesMs": [
+            12.9,
+            12.9,
+            12.7,
+            13,
+            12.7
+          ],
+          "afterMedianMs": 12.9,
+          "afterReadinessSamplesMs": [
+            1.4,
+            1.4,
+            1.1,
+            1.2,
+            1.3
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-switch-cash": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            13.6,
+            12.9,
+            12.6,
+            13,
+            12.6
+          ],
+          "beforeMedianMs": 12.9,
+          "afterSamplesMs": [
+            12.5,
+            13.1,
+            12.8,
+            13.2,
+            12.9
+          ],
+          "afterMedianMs": 12.9,
+          "afterReadinessSamplesMs": [
+            1.3,
+            1.2,
+            1.3,
+            1,
+            1.4
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        }
+      },
+      "profilesRemoved": true,
+      "financialRequestStarts": 0,
+      "persistence": {
+        "detail": 101,
+        "index-meta": 1,
+        "index-row": 2099,
+        "resource": 4
+      },
+      "repeatedReturnMedianMs": 27.65,
+      "totalApiRequestStarts": 18,
+      "checkoutConfiguration": {
+        "liveCheckoutEnabled": false,
+        "fixtureLines": 30
+      }
+    },
+    "browser": {
+      "engine": "Chrome/155.0.8059.40",
+      "cacheSource": "local",
+      "actions": {
+        "sales-opening": {
+          "scope": "authenticated live read-only UI",
+          "beforeSamplesMs": [
+            125.3,
+            23.5,
+            22.3,
+            21.5,
+            24.3
+          ],
+          "beforeMedianMs": 23.5,
+          "afterSamplesMs": [
+            124.5,
+            49.4,
+            45.6,
+            52.3,
+            57.8
+          ],
+          "afterMedianMs": 52.3,
+          "afterReadinessSamplesMs": [
+            115.3,
+            39.9,
+            38.9,
+            45.3,
+            47.3
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "search": {
+          "scope": "authenticated live read-only UI",
+          "beforeSamplesMs": [
+            8.5,
+            6,
+            4.7,
+            3.8,
+            5.8
+          ],
+          "beforeMedianMs": 5.8,
+          "afterSamplesMs": [
+            9,
+            7.7,
+            8.5,
+            9.4,
+            9.2
+          ],
+          "afterMedianMs": 9,
+          "afterReadinessSamplesMs": [
+            7.3,
+            6,
+            6.2,
+            6.9,
+            6.7
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "clear": {
+          "scope": "authenticated live read-only UI",
+          "beforeSamplesMs": [
+            29.5,
+            10.9,
+            8.6,
+            9.1,
+            8.5
+          ],
+          "beforeMedianMs": 9.1,
+          "afterSamplesMs": [
+            28.6,
+            24.4,
+            29.2,
+            25.2,
+            24.4
+          ],
+          "afterMedianMs": 25.2,
+          "afterReadinessSamplesMs": [
+            20.9,
+            18,
+            22.1,
+            18.9,
+            18.2
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "cached-cart-add": {
+          "scope": "authenticated live read-only UI",
+          "beforeSamplesMs": [
+            13.3,
+            17.3,
+            13.9,
+            21.4,
+            18.6
+          ],
+          "beforeMedianMs": 17.3,
+          "afterSamplesMs": [
+            31.9,
+            37.5,
+            37,
+            36.5,
+            38
+          ],
+          "afterMedianMs": 37,
+          "afterReadinessSamplesMs": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-checkout-opening": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            11.8,
+            12.6,
+            13,
+            13.1,
+            12.7
+          ],
+          "beforeMedianMs": 12.7,
+          "afterSamplesMs": [
+            24.7,
+            14.6,
+            13.6,
+            12.8,
+            10.6
+          ],
+          "afterMedianMs": 13.6,
+          "afterReadinessSamplesMs": [
+            6.9,
+            3.2,
+            2.3,
+            2.1,
+            2.5
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-checkout-cancel": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            12.8,
+            12.3,
+            12.5,
+            12.9,
+            13.3
+          ],
+          "beforeMedianMs": 12.8,
+          "afterSamplesMs": [
+            15,
+            14.6,
+            15.6,
+            16.2,
+            12.2
+          ],
+          "afterMedianMs": 15,
+          "afterReadinessSamplesMs": [
+            0.9,
+            0.9,
+            0.8,
+            0.7,
+            1
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-cash-entry": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            9.7,
+            13.2,
+            13,
+            12.8,
+            13.1
+          ],
+          "beforeMedianMs": 13,
+          "afterSamplesMs": [
+            5,
+            13,
+            8.6,
+            7.8,
+            10.8
+          ],
+          "afterMedianMs": 8.6,
+          "afterReadinessSamplesMs": [
+            1,
+            0.9,
+            0.5,
+            1,
+            1.1
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-reference-entry": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            12.5,
+            12.8,
+            12.7,
+            12.9,
+            13.1
+          ],
+          "beforeMedianMs": 12.8,
+          "afterSamplesMs": [
+            12.4,
+            9.8,
+            8.8,
+            10.5,
+            10.7
+          ],
+          "afterMedianMs": 10.5,
+          "afterReadinessSamplesMs": [
+            1,
+            0.8,
+            1.1,
+            1.4,
+            0.5
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-switch-upi": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            12.9,
+            11.9,
+            13.2,
+            12.8,
+            12.9
+          ],
+          "beforeMedianMs": 12.9,
+          "afterSamplesMs": [
+            12.7,
+            15,
+            20.8,
+            14.2,
+            14.7
+          ],
+          "afterMedianMs": 14.7,
+          "afterReadinessSamplesMs": [
+            2.9,
+            3.1,
+            2.8,
+            2.8,
+            3.3
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        },
+        "fixture-switch-cash": {
+          "scope": "isolated checkout UI fixture",
+          "beforeSamplesMs": [
+            11.9,
+            12.9,
+            12.9,
+            12.8,
+            12.1
+          ],
+          "beforeMedianMs": 12.8,
+          "afterSamplesMs": [
+            15.2,
+            14.2,
+            13.9,
+            13.8,
+            15.5
+          ],
+          "afterMedianMs": 14.2,
+          "afterReadinessSamplesMs": [
+            1.9,
+            2.8,
+            2.8,
+            2,
+            2.7
+          ],
+          "afterProductRequestStarts": 0,
+          "allPainted": true,
+          "allReady": true
+        }
+      },
+      "profilesRemoved": true,
+      "financialRequestStarts": 0,
+      "persistence": {
+        "detail": 50,
+        "index-meta": 1,
+        "index-row": 2099,
+        "resource": 2
+      },
+      "repeatedReturnMedianMs": 50.849999999999994,
+      "totalApiRequestStarts": 19,
+      "checkoutConfiguration": {
+        "liveCheckoutEnabled": false,
+        "fixtureLines": 30
+      }
+    }
+  },
+  "fingerprints": {
+    "measuredAt": "2026-10-14T05:56:34.329Z",
+    "method": "MongoDB snapshot session; sorted raw BSON SHA256 including all persisted fields",
+    "collections": {
+      "sales": {
+        "count": 551,
+        "bytes": 1842763,
+        "sha256": "90ae5b10dd5291645d20faac8372914e7dbeaed3d114af16e753222872657c43"
+      },
+      "inventorybatches": {
+        "count": 1590,
+        "bytes": 368910,
+        "sha256": "d4bd42c96ba45b4efc76bc783968b380956fb97720e469d42a70bb59cf51b055"
+      },
+      "stocktransactions": {
+        "count": 3003,
+        "bytes": 1151067,
+        "sha256": "52e486ceb9b3a5178c62c1604fa8fdb3ef8f2a5e83a7b3453116f1241ce18a21"
+      },
+      "products": {
+        "count": 2101,
+        "bytes": 2502624,
+        "sha256": "60d388463183e6fe18c740cb74cf1dc62b31352e3835421f5a66ac1d81347c4e"
+      }
+    },
+    "databaseWrites": 0,
+    "identity": {
+      "databaseHash": "95775df5d524c74ae3f744752ce95de9c3c4987ba0883d5e89c7daaa9632799f",
+      "databaseIdentityVersion": 2,
+      "storeHash": "0e9bf4d234e28ffcf1656262bdecf923b08bb87f09cd2c55896dc15e82aa7608",
+      "storeName": "Oushadi Kunnamkulam",
+      "checkoutEnabled": false,
+      "paymentMethods": [
+        "CASH",
+        "UPI",
+        "BANK"
+      ],
+      "splitPayment": true,
+      "upiReferenceRequired": false,
+      "bankReferenceRequired": true
+    },
+    "barcodeCount": 0,
+    "identityComparison": "Original before identifier verified against permutations of the same SRV host set and database; before report preserved",
+    "sameIdentity": true,
+    "matches": {
+      "sales": true,
+      "inventorybatches": true,
+      "stocktransactions": true,
+      "products": true
+    },
+    "matchExactly": true
+  }
+}

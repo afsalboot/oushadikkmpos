@@ -1,0 +1,781 @@
+{
+  "measuredAt": "2026-10-14T05:54:51.345Z",
+  "databaseWrites": 0,
+  "indexes": {
+    "products": [
+      {
+        "name": "_id_",
+        "key": {
+          "_id": 1
+        }
+      },
+      {
+        "name": "sku_1",
+        "key": {
+          "sku": 1
+        },
+        "unique": true
+      },
+      {
+        "name": "barcode_1",
+        "key": {
+          "barcode": 1
+        },
+        "unique": true,
+        "sparse": true
+      },
+      {
+        "name": "wholesaleEnabled_1",
+        "key": {
+          "wholesaleEnabled": 1
+        }
+      },
+      {
+        "name": "name_1",
+        "key": {
+          "name": 1
+        }
+      },
+      {
+        "name": "active_1_categoryId_1_name_1",
+        "key": {
+          "active": 1,
+          "categoryId": 1,
+          "name": 1
+        }
+      },
+      {
+        "name": "duplicateKey_1",
+        "key": {
+          "duplicateKey": 1
+        },
+        "unique": true,
+        "sparse": true
+      },
+      {
+        "name": "active_1_name_1",
+        "key": {
+          "active": 1,
+          "name": 1
+        }
+      },
+      {
+        "name": "categoryId_1_name_1",
+        "key": {
+          "categoryId": 1,
+          "name": 1
+        }
+      }
+    ],
+    "inventorybatches": [
+      {
+        "name": "_id_",
+        "key": {
+          "_id": 1
+        }
+      },
+      {
+        "name": "productId_1",
+        "key": {
+          "productId": 1
+        }
+      },
+      {
+        "name": "productId_1_expiryDate_1_createdAt_1",
+        "key": {
+          "productId": 1,
+          "expiryDate": 1,
+          "createdAt": 1
+        }
+      }
+    ],
+    "sales": [
+      {
+        "name": "_id_",
+        "key": {
+          "_id": 1
+        }
+      },
+      {
+        "name": "invoiceNumber_1",
+        "key": {
+          "invoiceNumber": 1
+        },
+        "unique": true
+      },
+      {
+        "name": "customerType_1",
+        "key": {
+          "customerType": 1
+        }
+      },
+      {
+        "name": "customerId_1",
+        "key": {
+          "customerId": 1
+        }
+      },
+      {
+        "name": "saleType_1",
+        "key": {
+          "saleType": 1
+        }
+      },
+      {
+        "name": "paymentStatus_1",
+        "key": {
+          "paymentStatus": 1
+        }
+      },
+      {
+        "name": "createdAt_-1",
+        "key": {
+          "createdAt": -1
+        }
+      },
+      {
+        "name": "paymentMethod_1_createdAt_-1",
+        "key": {
+          "paymentMethod": 1,
+          "createdAt": -1
+        }
+      },
+      {
+        "name": "daySessionId_1_status_1",
+        "key": {
+          "daySessionId": 1,
+          "status": 1
+        }
+      },
+      {
+        "name": "statusChangedSessionId_1",
+        "key": {
+          "statusChangedSessionId": 1
+        }
+      },
+      {
+        "name": "documentStatus_1",
+        "key": {
+          "documentStatus": 1
+        }
+      },
+      {
+        "name": "requestKey_1",
+        "key": {
+          "requestKey": 1
+        },
+        "unique": true,
+        "partialFilterExpression": {
+          "requestKey": {
+            "$type": "string"
+          }
+        }
+      }
+    ],
+    "customers": [
+      {
+        "name": "_id_",
+        "key": {
+          "_id": 1
+        }
+      },
+      {
+        "name": "name_1",
+        "key": {
+          "name": 1
+        }
+      },
+      {
+        "name": "normalizedPhone_1",
+        "key": {
+          "normalizedPhone": 1
+        }
+      },
+      {
+        "name": "email_1",
+        "key": {
+          "email": 1
+        }
+      },
+      {
+        "name": "status_1",
+        "key": {
+          "status": 1
+        }
+      },
+      {
+        "name": "customerType_1",
+        "key": {
+          "customerType": 1
+        }
+      }
+    ]
+  },
+  "plans": [
+    {
+      "name": "lightweight-index",
+      "samples": [
+        {
+          "requestMs": 58.94,
+          "queryMs": 14,
+          "returned": 2099,
+          "documentsExamined": 2100,
+          "keysExamined": 2100,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 61.51,
+          "queryMs": 15,
+          "returned": 2099,
+          "documentsExamined": 2100,
+          "keysExamined": 2100,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 55.9,
+          "queryMs": 13,
+          "returned": 2099,
+          "documentsExamined": 2100,
+          "keysExamined": 2100,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 56.47,
+          "queryMs": 16,
+          "returned": 2099,
+          "documentsExamined": 2100,
+          "keysExamined": 2100,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 68.37,
+          "queryMs": 14,
+          "returned": 2099,
+          "documentsExamined": 2100,
+          "keysExamined": 2100,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bounded-selling-page",
+      "samples": [
+        {
+          "requestMs": 47.64,
+          "queryMs": 0,
+          "returned": 50,
+          "documentsExamined": 50,
+          "keysExamined": 50,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 42.67,
+          "queryMs": 0,
+          "returned": 50,
+          "documentsExamined": 50,
+          "keysExamined": 50,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 37.34,
+          "queryMs": 0,
+          "returned": 50,
+          "documentsExamined": 50,
+          "keysExamined": 50,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 43.38,
+          "queryMs": 0,
+          "returned": 50,
+          "documentsExamined": 50,
+          "keysExamined": 50,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 47.11,
+          "queryMs": 0,
+          "returned": 50,
+          "documentsExamined": 50,
+          "keysExamined": 50,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "active_1_name_1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bounded-selling-batches",
+      "samples": [
+        {
+          "requestMs": 87.72,
+          "queryMs": 0,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1_expiryDate_1_createdAt_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 41,
+          "queryMs": 0,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1_expiryDate_1_createdAt_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 50.27,
+          "queryMs": 0,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1_expiryDate_1_createdAt_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 47.35,
+          "queryMs": 0,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1_expiryDate_1_createdAt_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 42.27,
+          "queryMs": 0,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1_expiryDate_1_createdAt_1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "checkout-valid-batches",
+      "samples": [
+        {
+          "requestMs": 41.47,
+          "queryMs": 1,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 43.21,
+          "queryMs": 1,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 44.16,
+          "queryMs": 1,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 45.11,
+          "queryMs": 1,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 44.72,
+          "queryMs": 1,
+          "returned": 40,
+          "documentsExamined": 44,
+          "keysExamined": 83,
+          "stages": [
+            {
+              "stage": "SORT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "productId_1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "checkout-retry-key-before",
+      "samples": [
+        {
+          "requestMs": 45.12,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 515,
+          "keysExamined": 0,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "COLLSCAN"
+            }
+          ]
+        },
+        {
+          "requestMs": 38.54,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 515,
+          "keysExamined": 0,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "COLLSCAN"
+            }
+          ]
+        },
+        {
+          "requestMs": 157.53,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 515,
+          "keysExamined": 0,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "COLLSCAN"
+            }
+          ]
+        },
+        {
+          "requestMs": 38.02,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 515,
+          "keysExamined": 0,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "COLLSCAN"
+            }
+          ]
+        },
+        {
+          "requestMs": 40.49,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 515,
+          "keysExamined": 0,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "COLLSCAN"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "checkout-retry-key-typed",
+      "samples": [
+        {
+          "requestMs": 37.61,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 1,
+          "keysExamined": 1,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "requestKey_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 42.53,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 1,
+          "keysExamined": 1,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "requestKey_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 37.11,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 1,
+          "keysExamined": 1,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "requestKey_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 39.17,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 1,
+          "keysExamined": 1,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "requestKey_1"
+            }
+          ]
+        },
+        {
+          "requestMs": 47.67,
+          "queryMs": 0,
+          "returned": 1,
+          "documentsExamined": 1,
+          "keysExamined": 1,
+          "stages": [
+            {
+              "stage": "LIMIT"
+            },
+            {
+              "stage": "FETCH"
+            },
+            {
+              "stage": "IXSCAN",
+              "indexName": "requestKey_1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

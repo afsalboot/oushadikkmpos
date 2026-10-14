@@ -31,7 +31,7 @@ export function dashboardSalesPipeline(dates, windows, products, unitCost) {
     { $match: { createdAt: { $gte: dates.previousStart, $lte: dates.end } } },
     { $set: {
       period: { $cond: [{ $gte: ['$createdAt', dates.start] }, 'current', 'previous'] },
-      rawCost: { $sum: { $map: { input: { $ifNull: ['$items', []] }, as: 'item', in: itemCost } } },
+      rawCost: { $ifNull: ['$retentionEstimatedCost', { $sum: { $map: { input: { $ifNull: ['$items', []] }, as: 'item', in: itemCost } } }] },
     } },
     { $set: { estimatedCost: { $round: ['$rawCost', 2] } } },
     { $facet: {

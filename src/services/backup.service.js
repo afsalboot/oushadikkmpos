@@ -10,6 +10,7 @@ import {Consultation,Doctor,AuditLog,Category,Customer,DocumentCounter,Expense,E
 import {getSettings,invalidateSettingsCache} from "./settings.service.js";
 
 import {assertRestorePreservesDocuments} from "../lib/fiscal-integrity.js";
+import {prepareRetentionRestore} from "./sale-history.service.js";
 
 const FORMAT="oushadi-pos-backup";
 const VERSION=1;
@@ -46,6 +47,7 @@ export async function readBackup(name){const file=safeName(name);if(usesDatabase
 
 export async function restoreBackup(archive,actor){if(global.oushadiRestoreInProgress)throw new Error("Another database restore is already running");global.oushadiRestoreInProgress=true;let session;try{await connectDb();const payload=decryptArchive(archive),safetyBackup=await createBackup({type:"manual",actor});session=await mongoose.startSession();await session.withTransaction(async()=>{
 await FiscalGuard.findOneAndUpdate({key:"issuance"},{$inc:{revision:1}},{upsert:true,session});
+await prepareRetentionRestore(payload,session);
 const currentSales=await Sale.find({}).session(session).lean();
 assertRestorePreservesDocuments(currentSales,payload.database.sales);
 // Never roll back audit history or counter high-water marks.

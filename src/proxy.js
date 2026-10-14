@@ -1,10 +1,14 @@
 import { jwtVerify } from "jose";
 import { NextResponse } from "next/server";
+import { benchmarkWriteBlocked } from "./lib/benchmark-safety.js";
 
 const AUTH_COOKIE = "oushadi_session";
 const unsafeRegex = /[.*+?^${}()|[\]\\]/;
 
 export async function proxy(request) {
+  if (benchmarkWriteBlocked(process.env.POS_BENCHMARK_READ_ONLY === '1', request.method, request.nextUrl.pathname)) {
+    return NextResponse.json({ error: "Writes are blocked in this read-only benchmark" }, { status: 403 });
+  }
   if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
     const fetchSite = request.headers.get("sec-fetch-site");
     const origin = request.headers.get("origin");

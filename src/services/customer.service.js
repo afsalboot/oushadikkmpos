@@ -1,5 +1,5 @@
 import {gstinError,validState} from "../lib/gst-compliance.js";
-import {Customer} from "@/models";
+import {Customer} from "../models/index.js";
 
 const clean=(value)=>String(value||"").trim();
 export const normalizePhone=(value)=>{const digits=clean(value).replace(/\D/g,"");if(!digits)return"";if(digits.length>10&&(digits.startsWith("91")||digits.startsWith("0")))return digits.slice(-10);return digits};

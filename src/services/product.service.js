@@ -5,6 +5,7 @@ import { Category, InventoryBatch, Product, Purchase, Sale, Settings, StockTrans
 import { calculatePhysicalStock, formatPhysicalStock, getLooseUnit, isCountBasedProduct, isLowStock } from "@/services/inventory.service";
 import { normalizeProductInput, validateProductInput } from "@/lib/product-validation";
 import { productCreationKey } from "@/lib/product-duplicates";
+import {historicalProductExists} from "./sale-history.service.js";
 
 const daysFromNow = (date) => date ? Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000) : null;
 
@@ -171,5 +172,5 @@ export async function productHasHistory(productId) {
     Purchase.exists({ "items.productId": productId }),
     StockTransaction.exists({ productId }),
   ]);
-  return Boolean(sales || purchases || stockTransactions);
+  return Boolean(sales || purchases || stockTransactions || await historicalProductExists(productId));
 }

@@ -1,0 +1,993 @@
+{
+  "client": "Electron",
+  "target": "local-production-build",
+  "phase": "before",
+  "profileDirectory": "C:\\Users\\User\\AppData\\Local\\Temp\\oushadhi-desktop-check-iB3wrK",
+  "origin": "http://localhost:3000",
+  "measuredAt": "2026-10-14T05:40:51.818Z",
+  "writesBlocked": 0,
+  "measurements": [
+    {
+      "name": "process-launch-to-page-ready",
+      "ms": 1646.51,
+      "page": "/login"
+    },
+    {
+      "name": "sales-opening-1",
+      "ms": 81.7,
+      "domReadyMs": 75.1,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-1",
+      "ms": 5.8,
+      "domReadyMs": 2.8,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-1",
+      "ms": 10.7,
+      "domReadyMs": 7.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-1",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-2",
+      "ms": 34,
+      "domReadyMs": 25.4,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-2",
+      "ms": 5.1,
+      "domReadyMs": 3.1,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-2",
+      "ms": 14.7,
+      "domReadyMs": 9.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-2",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-3",
+      "ms": 34.6,
+      "domReadyMs": 27.4,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-3",
+      "ms": 5.5,
+      "domReadyMs": 3.8,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-3",
+      "ms": 28.2,
+      "domReadyMs": 21.9,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-3",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-4",
+      "ms": 62.9,
+      "domReadyMs": 46.4,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-4",
+      "ms": 6.2,
+      "domReadyMs": 3.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-4",
+      "ms": 12.4,
+      "domReadyMs": 7.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-4",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-5",
+      "ms": 27.6,
+      "domReadyMs": 21.7,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-5",
+      "ms": 5.9,
+      "domReadyMs": 3,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-5",
+      "ms": 10.8,
+      "domReadyMs": 6.6,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-5",
+      "count": 0
+    },
+    {
+      "name": "cart-detail-warmup",
+      "ms": 29.3,
+      "selectionMs": 20.4,
+      "usedDialog": false,
+      "items": 1
+    },
+    {
+      "name": "cached-cart-add-1",
+      "ms": 17.9,
+      "selectionMs": 13,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-2",
+      "ms": 16.7,
+      "selectionMs": 11.5,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-3",
+      "ms": 23.3,
+      "selectionMs": 17.3,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-4",
+      "ms": 18.3,
+      "selectionMs": 11.4,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-5",
+      "ms": 18.9,
+      "selectionMs": 12.1,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-1",
+      "ms": 11.6,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 7.9,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-2",
+      "ms": 8.9,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 8.8,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-3",
+      "ms": 7.7,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 7.6,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-4",
+      "ms": 8,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 9,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-5",
+      "ms": 7.8,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 9.2,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-1",
+      "ms": 8.4,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 3,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-2",
+      "ms": 5.7,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 2.2,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-3",
+      "ms": 5.5,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 8.2,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-4",
+      "ms": 2.4,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 4,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-5",
+      "ms": 6.3,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 7.2,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-opening-1",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 17.9,
+      "domReadyMs": 15,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-cash-entry-1",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.2,
+      "domReadyMs": 1.2,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-upi-1",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.4,
+      "domReadyMs": 1.5,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-reference-entry-1",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.3,
+      "domReadyMs": 1.6,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-cash-1",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.6,
+      "domReadyMs": 1.4,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-cancel-1",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.2,
+      "domReadyMs": 0.9,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-opening-2",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13,
+      "domReadyMs": 1.3,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-cash-entry-2",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.4,
+      "domReadyMs": 1.1,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-upi-2",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.1,
+      "domReadyMs": 1.3,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-reference-entry-2",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.1,
+      "domReadyMs": 1.3,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-cash-2",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.9,
+      "domReadyMs": 1.4,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-cancel-2",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.9,
+      "domReadyMs": 1.5,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-opening-3",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.3,
+      "domReadyMs": 1.3,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-cash-entry-3",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.8,
+      "domReadyMs": 1.2,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-upi-3",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.3,
+      "domReadyMs": 1.3,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-reference-entry-3",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13,
+      "domReadyMs": 1,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-cash-3",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.6,
+      "domReadyMs": 1.3,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-cancel-3",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.2,
+      "domReadyMs": 0.9,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-opening-4",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.3,
+      "domReadyMs": 1.2,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-cash-entry-4",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.3,
+      "domReadyMs": 1.2,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-upi-4",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.7,
+      "domReadyMs": 1.2,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-reference-entry-4",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.9,
+      "domReadyMs": 0.9,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-cash-4",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13,
+      "domReadyMs": 1.3,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-cancel-4",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.1,
+      "domReadyMs": 0.7,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-opening-5",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.3,
+      "domReadyMs": 1.1,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-cash-entry-5",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.9,
+      "domReadyMs": 1,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-upi-5",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.7,
+      "domReadyMs": 1.1,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-reference-entry-5",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13,
+      "domReadyMs": 0.8,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-switch-cash-5",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 12.6,
+      "domReadyMs": 1.4,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "fixture-checkout-cancel-5",
+      "scope": "isolated checkout UI fixture; live Settings and cart are not changed",
+      "ms": 13.1,
+      "domReadyMs": 0.9,
+      "painted": true,
+      "hidden": false,
+      "ready": true,
+      "apiRequestStarts": 0,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "persistent-sales-reload",
+      "productHttpRequests": 0
+    }
+  ],
+  "cacheOperations": [],
+  "engine": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.130",
+    "revision": "@3f88203f01f16bafca72d5b553df2d23160b95ff",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) oushadhi-pos-desktop/0.1.1 Chrome/152.0.7977.130 Electron/44.4.5 Safari/537.36",
+    "jsVersion": "15.2.124.28"
+  },
+  "navigation": {
+    "domContentLoadedMs": 828.9,
+    "loadMs": 937.9,
+    "responseStartMs": 769
+  },
+  "authenticated": true,
+  "activeCache": "local",
+  "cartSurvivesSearch": true,
+  "persistence": {
+    "detail": 50,
+    "index-meta": 1,
+    "index-row": 2099,
+    "resource": 2
+  },
+  "checkoutConfiguration": {
+    "liveCheckoutEnabled": false,
+    "fixtureLines": 30
+  },
+  "browserComparisonExitCode": 0,
+  "apiRequests": [
+    {
+      "endpoint": "/api/auth/status",
+      "status": 200,
+      "ms": 99.67,
+      "transferBytes": 896
+    },
+    {
+      "endpoint": "/api/auth/username-login",
+      "status": 200,
+      "ms": 661.36,
+      "transferBytes": 1385
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 521.08,
+      "transferBytes": 83903,
+      "serverTiming": "auth;dur=52.3, connection;dur=0.1, count;dur=131.8, product_query;dur=337, batch_query;dur=102.4, processing;dur=1.4, serialization;dur=1.5, total;dur=495.6"
+    },
+    {
+      "endpoint": "/api/categories",
+      "status": 200,
+      "ms": 595.68,
+      "transferBytes": 6462
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 739.49,
+      "transferBytes": 24786,
+      "serverTiming": "auth;dur=399.4, connection;dur=0, alerts;dur=301.3, serialization;dur=0.8, total;dur=701.5"
+    },
+    {
+      "endpoint": "/api/products/sales-index",
+      "status": 200,
+      "ms": 794.47,
+      "transferBytes": 744944,
+      "serverTiming": "auth;dur=403.4, connection;dur=0, index_revision;dur=136.8, index_categories;dur=56, index_products;dur=225.1, index_query;dur=225.2, index_processing;dur=6.6, serialization;dur=4.5, total;dur=777.1"
+    },
+    {
+      "endpoint": "/api/dashboard",
+      "status": 200,
+      "ms": 1841.07,
+      "transferBytes": 27713,
+      "serverTiming": "auth;dur=99.1, connection;dur=0, settings;dur=0.1, sale_product_ids;dur=635.2, purchases;dur=51.4, expenses;dur=59.3, batch_aggregation;dur=60.4, consultations;dur=325.7, inventory_aggregation;dur=917, sales_aggregation;dur=118.5, serialization;dur=0.6, total;dur=1827.9"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ms": 357.09,
+      "transferBytes": 7681
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 761.8,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 207.69,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 149.44,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 164.51,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 349.28,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 456.09,
+      "transferBytes": 5515,
+      "serverTiming": "auth;dur=150.9, connection;dur=0, stock_filter;dur=300.5, total;dur=451.7"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 420.42,
+      "transferBytes": 83728,
+      "serverTiming": "auth;dur=45.2, connection;dur=0, product_query;dur=295.2, batch_query;dur=72, processing;dur=0.9, serialization;dur=0.7, total;dur=415.1"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 434.45,
+      "transferBytes": 1244,
+      "serverTiming": "auth;dur=47.1, connection;dur=0, stock_filter;dur=383, total;dur=430.4"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 349.86,
+      "transferBytes": 12899,
+      "serverTiming": "auth;dur=48.8, connection;dur=0, product_query;dur=192.9, batch_query;dur=103.2, processing;dur=0.1, serialization;dur=0.2, total;dur=345.5"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 1526.15,
+      "transferBytes": 24788,
+      "serverTiming": "auth;dur=1023.3, connection;dur=0, alerts;dur=306.9, serialization;dur=0.4, total;dur=1330.6"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ms": 58.27,
+      "transferBytes": 7681
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ms": 61.72,
+      "transferBytes": 7681
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 438.99,
+      "transferBytes": 24783,
+      "serverTiming": "auth;dur=56.5, connection;dur=0, alerts;dur=376, serialization;dur=0.6, total;dur=433.1"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 903.68,
+      "transferBytes": 24786,
+      "serverTiming": "auth;dur=624.6, connection;dur=0, alerts;dur=271.5, serialization;dur=0.4, total;dur=896.8"
+    }
+  ],
+  "apiRequestStarts": [
+    {
+      "endpoint": "/api/auth/status",
+      "start": 32657.110748,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/auth/username-login",
+      "start": 32671.374679,
+      "method": "POST",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/dashboard",
+      "start": 32672.267825,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=99.1, connection;dur=0, settings;dur=0.1, sale_product_ids;dur=635.2, purchases;dur=51.4, expenses;dur=59.3, batch_aggregation;dur=60.4, consultations;dur=325.7, inventory_aggregation;dur=917, sales_aggregation;dur=118.5, serialization;dur=0.6, total;dur=1827.9"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "start": 32672.275996,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=399.4, connection;dur=0, alerts;dur=301.3, serialization;dur=0.8, total;dur=701.5"
+    },
+    {
+      "endpoint": "/api/products/sales-index",
+      "start": 32672.343423,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=403.4, connection;dur=0, index_revision;dur=136.8, index_categories;dur=56, index_products;dur=225.1, index_query;dur=225.2, index_processing;dur=6.6, serialization;dur=4.5, total;dur=777.1"
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 32672.343522,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=52.3, connection;dur=0.1, count;dur=131.8, product_query;dur=337, batch_query;dur=102.4, processing;dur=1.4, serialization;dur=1.5, total;dur=495.6"
+    },
+    {
+      "endpoint": "/api/categories",
+      "start": 32672.343579,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/settings",
+      "start": 32684.322045,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 32686.658395,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 32689.52608,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 32692.392557,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 32695.284565,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 32698.127987,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 32699.549921,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=150.9, connection;dur=0, stock_filter;dur=300.5, total;dur=451.7"
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 32700.019283,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": true,
+      "status": 200,
+      "serverTiming": "auth;dur=45.2, connection;dur=0, product_query;dur=295.2, batch_query;dur=72, processing;dur=0.9, serialization;dur=0.7, total;dur=415.1"
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 32701.678818,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=47.1, connection;dur=0, stock_filter;dur=383, total;dur=430.4"
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 32702.121302,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": true,
+      "status": 200,
+      "serverTiming": "auth;dur=48.8, connection;dur=0, product_query;dur=192.9, batch_query;dur=103.2, processing;dur=0.1, serialization;dur=0.2, total;dur=345.5"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "start": 32702.278145,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=1023.3, connection;dur=0, alerts;dur=306.9, serialization;dur=0.4, total;dur=1330.6"
+    },
+    {
+      "endpoint": "/api/settings",
+      "start": 32705.338423,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/notifications",
+      "start": 32706.027407,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=56.5, connection;dur=0, alerts;dur=376, serialization;dur=0.6, total;dur=433.1"
+    },
+    {
+      "endpoint": "/api/settings",
+      "start": 32706.031013,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/notifications",
+      "start": 32736.036648,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=624.6, connection;dur=0, alerts;dur=271.5, serialization;dur=0.4, total;dur=896.8"
+    }
+  ]
+}

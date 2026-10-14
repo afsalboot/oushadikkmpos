@@ -1,0 +1,14 @@
+{
+  "before": "2026-10-14T06:26:03.762Z",
+  "after": "2026-10-14T06:34:17.360Z",
+  "newSales": 1,
+  "newStockTransactions": 1,
+  "stockTransactionsLinkedToNewSales": 1,
+  "saleTimes": [
+    "2026-10-14T06:32:33.070Z"
+  ],
+  "stockTimes": [
+    "2026-10-14T06:32:33.276Z"
+  ],
+  "originatingClient": "not independently identified; benchmark request logs contain no financial writes"
+}

@@ -1,0 +1,55 @@
+{
+  "window": {
+    "start": "2026-10-14T07:20:03.293Z",
+    "end": "2026-10-14T09:13:30.538Z"
+  },
+  "databaseWritesByThisCheck": 0,
+  "matchExactly": false,
+  "collectionActivity": {
+    "sales": {
+      "beforeCount": 559,
+      "afterCount": 572,
+      "countDelta": 13,
+      "createdInWindow": 13,
+      "firstCreated": "2026-10-14T07:34:46.743Z",
+      "lastCreated": "2026-10-14T09:08:58.889Z",
+      "updatedInWindow": 13
+    },
+    "inventorybatches": {
+      "beforeCount": 1590,
+      "afterCount": 1595,
+      "countDelta": 5,
+      "createdInWindow": 5,
+      "firstCreated": "2026-10-14T07:25:07.290Z",
+      "lastCreated": "2026-10-14T09:13:22.463Z",
+      "updatedInWindow": 25
+    },
+    "stocktransactions": {
+      "beforeCount": 3017,
+      "afterCount": 3045,
+      "countDelta": 28,
+      "createdInWindow": 28,
+      "firstCreated": "2026-10-14T07:25:07.719Z",
+      "lastCreated": "2026-10-14T09:13:22.902Z",
+      "updatedInWindow": 28
+    },
+    "products": {
+      "beforeCount": 2101,
+      "afterCount": 2104,
+      "countDelta": 3,
+      "createdInWindow": 3,
+      "firstCreated": "2026-10-14T07:49:08.726Z",
+      "lastCreated": "2026-10-14T07:58:53.515Z",
+      "updatedInWindow": 4
+    }
+  },
+  "attribution": "Live activity observed during local development. Request clients and authors were not identified. All agent database mutations used the isolated localhost fixture.",
+  "retentionCollections": {
+    "saleshistoryledgers": 0,
+    "dailysalessummaries": 0,
+    "dailyproductsalessummaries": 0,
+    "dailycustomersalessummaries": 0,
+    "salesretentionstates": 0,
+    "salesretentionruns": 0
+  }
+}

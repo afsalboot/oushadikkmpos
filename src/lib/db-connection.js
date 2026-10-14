@@ -4,7 +4,8 @@ export function createConnectionManager(driver, cache) {
     if (!uri) throw new Error("MONGODB_URI is not configured");
     if (cache.connection) return cache.connection;
     if (!cache.promise) {
-      cache.promise = driver.connect(uri, { bufferCommands: false, serverSelectionTimeoutMS: 10000 })
+      cache.promise = driver.connect(uri, { bufferCommands: false, serverSelectionTimeoutMS: 10000,
+        ...(process.env.POS_BENCHMARK_READ_ONLY === '1' ? { autoIndex: false, autoCreate: false } : {}) })
         .then((connection) => {
           cache.connection = connection;
           return connection;

@@ -2,7 +2,9 @@ import mongoose from "mongoose";
 import {connectDb} from "@/lib/db";
 import {requireSession} from "@/lib/auth";
 import {apiError,fail,ok} from "@/lib/api";
-import {Sale, StockTransaction, Customer} from "@/models";
+import {Sale, StockTransaction, Customer, SalesHistoryLedger} from "@/models";
+import {retentionStoreId} from "@/services/sale-history.service";
+import {RETAINED_BILL_MESSAGE} from "@/lib/sale-retention";
 import {getProducts} from "@/services/product.service";
 import {creditSaleStock, saleEditProblem, saleStockReturns} from "@/lib/sale-edit";
 import { saleForActor } from "@/lib/external-purchase";
@@ -14,7 +16,7 @@ export async function GET(request,{params}){
     const{id}=await params;
     if(!mongoose.isValidObjectId(id))return fail("Invalid sale",400);
     const sale=await Sale.findById(id).populate("actorId","name role").lean();
-    if(!sale)return fail("Sale not found",404);
+    if(!sale){const old=await SalesHistoryLedger.exists({_id:id,storeId:await retentionStoreId(),purgedAt:{$ne:null}});return fail(old?RETAINED_BILL_MESSAGE:"Sale not found",old?410:404);}
     const editProblem = saleEditProblem(sale);
     if (new URL(request.url).searchParams.get("edit") === "true") {
       await requireSession("ADMIN");

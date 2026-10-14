@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 import { connectDb } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { ok, fail, apiError } from "@/lib/api";
-import { Product, InventoryBatch, StockTransaction, Sale, Purchase, AuditLog } from "@/models";
+import { Product, InventoryBatch, StockTransaction, Sale, Purchase, AuditLog, Settings, FiscalGuard } from "@/models";
+import {initializeRetentionModels,syncSaleHistory,remapSaleHistoryProducts} from '@/services/sale-retention.service';
 import { productDuplicateKey, productMergeProblem, resolvePurchaseItemBatch } from "@/lib/product-duplicates";
 import { PRODUCT_DUPLICATE_OPTIONS } from "@/lib/product-import-duplicates";
 
@@ -14,7 +15,10 @@ export async function POST(request) {
     if (!mongoose.isValidObjectId(targetId) || !Array.isArray(sourceIds) || !sourceIds.length || sourceIds.length > 100 || sourceIds.some(id => !mongoose.isValidObjectId(id)) || new Set([targetId, ...sourceIds].map(String)).size !== sourceIds.length + 1) return fail("Select a product to keep and distinct products to merge (maximum 100).");
     if (!PRODUCT_DUPLICATE_OPTIONS.some(([value]) => value === matchBy)) return fail("Invalid duplicate matching field");
     let result;
+    await initializeRetentionModels();
     await mongoose.connection.transaction(async session => {
+      await FiscalGuard.findOneAndUpdate({key:'issuance'},{$inc:{revision:1}},{upsert:true,session});
+      const settings=await Settings.findOne({key:'global'}).session(session).lean();
       const target = await Product.findById(targetId).session(session).lean();
       const sources = await Product.find({ _id: { $in: sourceIds } }).session(session).lean();
       if (!target || sources.length !== sourceIds.length) throw Object.assign(new Error("Products changed or were already merged. Check duplicates again."), { status: 409 });
@@ -25,6 +29,7 @@ export async function POST(request) {
         if (problem) throw Object.assign(new Error(`${source.name}: ${problem}`), { status: 409 });
       }
       const ids = sources.map(product => product._id);
+      const changedSales=await Sale.find({$or:[{'items.productId':{$in:ids}},{'items.freeProductId':{$in:ids}},{'items.ingredients.productId':{$in:ids}}]}).select('_id').session(session).lean();
       const batches = await InventoryBatch.find({ productId: { $in: ids } }).session(session).lean();
       const allIds = [target._id, ...ids];
       const allBatches = await InventoryBatch.find({ productId: { $in: allIds } }).session(session).lean();
@@ -48,6 +53,8 @@ export async function POST(request) {
         await Sale.updateMany({ [path]: { $in: ids } }, { $set: { [`items.$[item].${field}`]: target._id } }, { session, arrayFilters: [{ [`item.${field}`]: { $in: ids } }] });
       }
       await Sale.updateMany({ "items.ingredients.productId": { $in: ids } }, { $set: { "items.$[mix].ingredients.$[ingredient].productId": target._id } }, { session, arrayFilters: [{ "mix.ingredients.productId": { $in: ids } }, { "ingredient.productId": { $in: ids } }] });
+      for(const row of changedSales)await syncSaleHistory({sale:await Sale.findById(row._id).session(session).lean(),settings,session});
+      await remapSaleHistoryProducts({sourceIds:ids,targetId:target._id,settings,session});
       await Purchase.updateMany({ "items.productId": { $in: ids } }, { $set: { "items.$[item].productId": target._id } }, { session, arrayFilters: [{ "item.productId": { $in: ids } }] });
       await Product.updateMany({ freeSchemeFreeProduct: { $in: ids } }, { $set: { freeSchemeFreeProduct: target._id } }, { session });
       // Write the survivor too, so concurrent merges involving it conflict and retry.

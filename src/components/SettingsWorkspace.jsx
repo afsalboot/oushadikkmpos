@@ -1,6 +1,7 @@
 "use client";
 import { resourceFetch } from "@/lib/resource-fetch";
 import BackupStorageSettings from "./BackupStorageSettings";
+import SaleRetentionSettings from "./SaleRetentionSettings";
 import FutureInvoiceReset from "./FutureInvoiceReset";
 import DoctorSettings from "./DoctorSettings";
 import { useRouter } from "next/navigation";
@@ -155,6 +156,7 @@ const sectionGroups = [
   {
     label: "System",
     items: [
+      {id:"retention",label:"Sale Retention",icon:History,keywords:"90 days old bills permanent summaries cleanup"},
       {
         id: "security",
         label: "Security",
@@ -2729,7 +2731,7 @@ export default function SettingsWorkspace() {
                 disabled={!canEdit}
               />
             </div>
-          ) : section === "backup" ? (
+          ) : section === "retention" ? <SaleRetentionSettings data={data} change={change} disabled={!canEdit}/> : section === "backup" ? (
             data._capabilities?.backup ? (
               <div className="space-y-5">
                 <BackupStorageSettings

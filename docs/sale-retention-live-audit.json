@@ -1,0 +1,216 @@
+{
+  "measuredAt": "2026-10-14T09:12:01.621Z",
+  "databaseWrites": 0,
+  "storeHash": "0e9bf4d234e28ffcf1656262bdecf923b08bb87f09cd2c55896dc15e82aa7608",
+  "cutoff": "2026-07-16T09:12:01.621Z",
+  "scope": "One global settings identity; this database has no sale tenant or branch field",
+  "counts": {
+    "sales": 572,
+    "olderThan60Days": 0,
+    "olderThan90Days": 0,
+    "futureDates": 0,
+    "invalidDates": 0
+  },
+  "bytes": {
+    "detailedSales": 1925662,
+    "projectedCompactLedger": 1449250,
+    "eligibleDetailedSales": 0,
+    "eligibleProjectedLedger": 0
+  },
+  "indexes": {
+    "sales": [
+      {
+        "v": 2,
+        "key": {
+          "_id": 1
+        },
+        "name": "_id_"
+      },
+      {
+        "v": 2,
+        "key": {
+          "invoiceNumber": 1
+        },
+        "name": "invoiceNumber_1",
+        "unique": true
+      },
+      {
+        "v": 2,
+        "key": {
+          "customerType": 1
+        },
+        "name": "customerType_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "customerId": 1
+        },
+        "name": "customerId_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "saleType": 1
+        },
+        "name": "saleType_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "paymentStatus": 1
+        },
+        "name": "paymentStatus_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "createdAt": -1
+        },
+        "name": "createdAt_-1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "paymentMethod": 1,
+          "createdAt": -1
+        },
+        "name": "paymentMethod_1_createdAt_-1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "daySessionId": 1,
+          "status": 1
+        },
+        "name": "daySessionId_1_status_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "statusChangedSessionId": 1
+        },
+        "name": "statusChangedSessionId_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "documentStatus": 1
+        },
+        "name": "documentStatus_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "requestKey": 1
+        },
+        "name": "requestKey_1",
+        "unique": true,
+        "partialFilterExpression": {
+          "requestKey": {
+            "$type": "string"
+          }
+        }
+      }
+    ],
+    "inventorybatches": [
+      {
+        "v": 2,
+        "key": {
+          "_id": 1
+        },
+        "name": "_id_"
+      },
+      {
+        "v": 2,
+        "key": {
+          "productId": 1
+        },
+        "name": "productId_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "productId": 1,
+          "expiryDate": 1,
+          "createdAt": 1
+        },
+        "name": "productId_1_expiryDate_1_createdAt_1"
+      }
+    ],
+    "stocktransactions": [
+      {
+        "v": 2,
+        "key": {
+          "_id": 1
+        },
+        "name": "_id_"
+      },
+      {
+        "v": 2,
+        "key": {
+          "productId": 1
+        },
+        "name": "productId_1"
+      },
+      {
+        "v": 2,
+        "key": {
+          "type": 1
+        },
+        "name": "type_1"
+      }
+    ],
+    "settings": [
+      {
+        "v": 2,
+        "key": {
+          "_id": 1
+        },
+        "name": "_id_"
+      },
+      {
+        "v": 2,
+        "key": {
+          "key": 1
+        },
+        "name": "key_1",
+        "unique": true
+      }
+    ]
+  },
+  "permanentCollections": {
+    "saleshistoryledgers": 0,
+    "dailysalessummaries": 0,
+    "dailyproductsalessummaries": 0,
+    "dailycustomersalessummaries": 0,
+    "salesretentionstates": 0,
+    "salesretentionruns": 0
+  },
+  "storage": {
+    "sales": {
+      "count": 572,
+      "size": 1925662,
+      "storageSize": 434176,
+      "totalIndexSize": 540672
+    },
+    "inventorybatches": {
+      "count": 1594,
+      "size": 369827,
+      "storageSize": 196608,
+      "totalIndexSize": 241664
+    },
+    "stocktransactions": {
+      "count": 3044,
+      "size": 1163879,
+      "storageSize": 323584,
+      "totalIndexSize": 233472
+    }
+  },
+  "dateRange": {
+    "oldest": "2026-09-25T14:09:23.481Z",
+    "newest": "2026-10-14T09:08:58.454Z"
+  },
+  "saleTTLPresent": false,
+  "projectionNote": "Projected BSON ledger bytes are hypothetical. Daily/product/customer summaries and indexes add storage. No production backfill, cleanup, compaction or storage reduction occurred."
+}

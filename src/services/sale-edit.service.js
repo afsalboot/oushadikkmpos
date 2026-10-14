@@ -1,4 +1,5 @@
-import { saleEditProblem, saleStockReturns } from "@/lib/sale-edit";
+import { saleEditProblem, saleStockReturns } from "../lib/sale-edit.js";
+import { retentionGone } from "../lib/sale-retention.js";
 
 export async function restoreSaleStock({ sale, InventoryBatch, StockTransaction, session, actorId }) {
   const rows = await StockTransaction.find({ referenceType: "SALE", referenceId: sale._id }).session(session).lean();
@@ -36,6 +37,7 @@ export async function findSaleEditRetry({ AuditLog, requestKey, hash, actorId, s
   const audit = await AuditLog.findOne({ action: "SALE_EDITED", "metadata.requestKey": requestKey }).session(session || null).lean();
   if (!audit) return null;
   if (String(audit.actorId) !== String(actorId) || audit.metadata.requestHash !== hash) throw Object.assign(new Error("This checkout key has already been used for a different request"), { status: 409 });
+  if (audit.metadata.retentionPurged) throw retentionGone();
   return audit.metadata.after;
 }
 

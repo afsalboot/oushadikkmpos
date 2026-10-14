@@ -1,0 +1,43 @@
+{
+  "measuredAt": "2026-10-14T07:20:03.293Z",
+  "method": "MongoDB snapshot session; sorted raw BSON SHA256 including all persisted fields",
+  "collections": {
+    "sales": {
+      "count": 559,
+      "bytes": 1875586,
+      "sha256": "da97fa86a0b6de88bb31f8bf13d5a65a56846d9548d82147507edab104527a07"
+    },
+    "inventorybatches": {
+      "count": 1590,
+      "bytes": 368910,
+      "sha256": "bf6d145f5d84884c8eb9a79ad9dee181b91342e7b4827bb0b1cc6d98b70c2233"
+    },
+    "stocktransactions": {
+      "count": 3017,
+      "bytes": 1155241,
+      "sha256": "50cfe2fb35b2f404dc6eea87cef763b42d7cfc388807d71f5ffc9342e62d2ee1"
+    },
+    "products": {
+      "count": 2101,
+      "bytes": 2502624,
+      "sha256": "60d388463183e6fe18c740cb74cf1dc62b31352e3835421f5a66ac1d81347c4e"
+    }
+  },
+  "databaseWrites": 0,
+  "identity": {
+    "databaseHash": "95775df5d524c74ae3f744752ce95de9c3c4987ba0883d5e89c7daaa9632799f",
+    "databaseIdentityVersion": 2,
+    "storeHash": "0e9bf4d234e28ffcf1656262bdecf923b08bb87f09cd2c55896dc15e82aa7608",
+    "storeName": "Oushadi Kunnamkulam",
+    "checkoutEnabled": false,
+    "paymentMethods": [
+      "CASH",
+      "UPI",
+      "BANK"
+    ],
+    "splitPayment": true,
+    "upiReferenceRequired": false,
+    "bankReferenceRequired": true
+  },
+  "barcodeCount": 0
+}

@@ -1,0 +1,40 @@
+{
+  "measuredAt": "2026-10-14T06:33:03.176Z",
+  "databaseWrites": 0,
+  "indexSamples": [
+    {
+      "ms": 443.18,
+      "rows": 2099,
+      "bytes": 795481
+    },
+    {
+      "ms": 198.12,
+      "rows": 2099,
+      "bytes": 795481
+    },
+    {
+      "ms": 250.42,
+      "rows": 2099,
+      "bytes": 795481
+    },
+    {
+      "ms": 212.78,
+      "rows": 2099,
+      "bytes": 795481
+    },
+    {
+      "ms": 213.68,
+      "rows": 2099,
+      "bytes": 795481
+    }
+  ],
+  "checked": 2099,
+  "parityMs": 6264.26,
+  "requestedCard": {
+    "found": true,
+    "sku": "PRD-6AB8D0B0522E6D1D2D7429D6",
+    "price": 145,
+    "stockLabel": "1 Jar"
+  },
+  "allStockLabelsMatch": true
+}

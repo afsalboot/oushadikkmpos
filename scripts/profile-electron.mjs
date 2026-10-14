@@ -1,9 +1,9 @@
 // Real Electron renderer benchmark. Isolated profile; only optional manual login
 // can POST. Sales/stock/payments and scheduled backups are never exercised.
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdtempSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, existsSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { PRODUCTION_URL } from '../desktop/policy.mjs';
@@ -12,15 +12,28 @@ const local = process.argv.includes('--local');
 const interactive = process.argv.includes('--interactive');
 const browser = process.argv.includes('--browser');
 const reuseProfile = process.argv.find(value => value.startsWith('--reuse-profile='))?.slice('--reuse-profile='.length);
+const phase = process.argv.find(value => value.startsWith('--phase='))?.slice(8);
+if (phase && !['before', 'after'].includes(phase)) throw new Error('Invalid phase');
+const reportTag = process.argv.find(value => value.startsWith('--report-tag='))?.slice(13);
+if (reportTag && !/^[a-z0-9-]{1,40}$/.test(reportTag)) throw new Error('Invalid report tag');
+const keepProfile = process.argv.includes('--keep-profile');
 const port = browser ? 9230 : local ? 9228 : 9227;
 const origin = local ? 'http://localhost:3000' : PRODUCTION_URL;
+if (local) {
+  // A nonexistent route proves the server barrier is active without probing a
+  // financial endpoint. This also protects startup before CDP is attached.
+  const probe = await fetch(origin+'/api/__benchmark-write-probe', {method:'POST'});
+  if (probe.status !== 403 || (await probe.json()).error !== 'Writes are blocked in this read-only benchmark') throw new Error('Start the local server with POS_BENCHMARK_READ_ONLY=1 before benchmarking');
+}
+const profile = reuseProfile || mkdtempSync(join(tmpdir(), browser ? 'oushadhi-browser-check-' : 'oushadhi-desktop-check-'));
+if (dirname(realpathSync(profile)).toLowerCase() !== realpathSync(tmpdir()).toLowerCase() || !/^oushadhi-(desktop|browser)-check-/.test(basename(profile))) throw new Error('Only an owned isolated diagnostic profile is allowed');
 const started = performance.now();
 const electron = createRequire(new URL('../desktop/package.json', import.meta.url))('electron');
 const launchEnv = { ...process.env };
 delete launchEnv.ELECTRON_RUN_AS_NODE;
 const chrome = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'].find(existsSync);
 if (browser && !chrome) throw new Error('Chrome is not installed');
-const child = spawn(browser ? chrome : electron, browser ? [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'oushadhi-browser-check-'))}`, '--no-first-run', '--no-default-browser-check', '--new-window', origin] : ['.', '--benchmark', '--remote-debugging-address=127.0.0.1', `--remote-debugging-port=${port}`, ...(reuseProfile ? ['--benchmark-profile=' + reuseProfile] : []), ...(local ? ['--local'] : []), ...(interactive ? ['--benchmark-visible'] : [])], {
+const child = spawn(browser ? chrome : electron, browser ? [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--new-window', origin] : ['.', '--benchmark', '--remote-debugging-address=127.0.0.1', `--remote-debugging-port=${port}`, '--benchmark-profile=' + profile, ...(local ? ['--local'] : []), ...(interactive ? ['--benchmark-visible'] : [])], {
   cwd: fileURLToPath(new URL('../desktop/', import.meta.url)), env: launchEnv,
   stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
 });
@@ -34,7 +47,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 let socket, nextId = 0;
 const commands = new Map(), requests = new Map(), completed = [], events = new Map();
 const issued = [];
-const report = { client: browser ? 'Chrome' : 'Electron', target: local ? 'local-production-build' : 'hosted-production', origin, measuredAt: new Date().toISOString(), writesBlocked: 0, measurements: [], cacheOperations: [] };
+const report = { client: browser ? 'Chrome' : 'Electron', target: local ? 'local-production-build' : 'hosted-production', phase, profileDirectory: profile, origin, measuredAt: new Date().toISOString(), writesBlocked: 0, measurements: [], cacheOperations: [] };
 function command(method, params = {}) {
   return new Promise((resolve, reject) => {
     const id = ++nextId;
@@ -108,6 +121,26 @@ async function measureCart() {
 }
 async function measureFilterSearch(clear = false) {
   return evaluate('(async()=>{const input=document.querySelector("#pos-search");if(!input)return {unavailable:true};const start=performance.now();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,' + JSON.stringify(clear ? '' : 'a') + ');input.dispatchEvent(new Event("input",{bubbles:true}));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {ms:+(performance.now()-start).toFixed(2),cards:document.querySelectorAll(".sales-product-card").length,cache:document.querySelector("[data-sales-cache]")?.dataset.salesCache};})()');
+}
+async function measureCheckoutFixtures() {
+  // Only the UI uses isolated cart/settings fixtures; nothing is submitted.
+  // The customer's real checkout setting is preserved in MongoDB.
+  report.checkoutConfiguration = await evaluate(`(async()=>{const r=await fetch('/api/settings');if(!r.ok)throw new Error('Settings unavailable');window.__checkoutBenchmarkSettings=(await r.json()).data;return {liveCheckoutEnabled:window.__checkoutBenchmarkSettings.checkout?.enabled!==false,fixtureLines:30};})()`);
+  const runAction = async (name, action, ready) => {
+    const before = issued.length;
+    const result = await evaluate(`(async()=>{const start=performance.now();${action};while(performance.now()-start<5000&&!(${ready}))await new Promise(r=>setTimeout(r,0));const readyMs=performance.now()-start;const painted=await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(true)))),new Promise(r=>setTimeout(()=>r(false),200))]);return {ms:+(performance.now()-start).toFixed(2),domReadyMs:+readyMs.toFixed(2),painted,hidden:document.hidden,ready:!!(${ready})};})()`);
+    report.measurements.push({ name, scope: 'isolated checkout UI fixture; live Settings and cart are not changed', ...result, apiRequestStarts: issued.slice(before).length, productHttpRequests: issued.slice(before).filter(r=>r.endpoint.startsWith('/api/products')).length });
+  };
+  const input = (selector, value) => `const input=document.querySelector(${JSON.stringify(selector)});if(!input)throw new Error('Fixture input missing');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}))`;
+  for (let run=1;run<=5;run++) {
+    await runAction('fixture-checkout-opening-'+run, `window.dispatchEvent(new CustomEvent('oushadi-open-checkout',{detail:{source:'PROCEED_PAYMENT',cart:Array.from({length:30},(_,i)=>({_id:'000000000000000000000001-'+i,productId:'000000000000000000000001',kind:'PRODUCT',name:'Isolated benchmark item',saleMode:'PACKAGE',quantity:1,packageSellingPrice:123.45,gstRate:0,useDefaultGstRate:false})),cartCustomer:{name:'',phone:'',fulfilment:'COUNTER',consultationFeeEnabled:false},settings:{...window.__checkoutBenchmarkSettings,checkout:{enabled:true}}}}))`, `!!document.querySelector('#checkout-title')`);
+    await runAction('fixture-cash-entry-'+run, input('[role="dialog"] input[type="number"]', '9999'), `!document.querySelector('[role="dialog"] button[type="submit"]') && [...document.querySelectorAll('[role="dialog"] button')].some(b=>b.textContent.includes('Complete')&&!b.disabled)`);
+    await runAction('fixture-switch-upi-'+run, `const b=[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent.trim()==='UPI');if(!b)throw new Error('UPI unavailable in fixture');b.click()`, `!![...document.querySelectorAll('[role="dialog"] label')].find(l=>/reference/i.test(l.textContent))`);
+    await runAction('fixture-reference-entry-'+run, input('[role="dialog"] label input:not([type="number"])', 'fixture-reference-'+run), `document.querySelector('[role="dialog"] label input:not([type="number"])')?.value==='fixture-reference-${run}'`);
+    await runAction('fixture-switch-cash-'+run, `const b=[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent.trim()==='Cash');b.click()`, `!!document.querySelector('[role="dialog"] input[type="number"]')`);
+    await runAction('fixture-checkout-cancel-'+run, `document.querySelector('[aria-label="Close checkout"]').click()`, `!document.querySelector('#checkout-title')`);
+  }
+  await evaluate('delete window.__checkoutBenchmarkSettings');
 }
 try {
   let target;
@@ -203,6 +236,31 @@ try {
     }
     await clickRoute('/sales');
     report.activeCache = (await evaluate(dom)).cache;
+    if (process.argv.includes('--stock-cards')) {
+      const before=issued.length;
+      report.stockCardVerification=await evaluate(`(async()=>{
+        const rows=await new Promise(resolve=>{const r=indexedDB.open('oushadi-sales-cache');r.onsuccess=()=>{const db=r.result;const q=db.transaction('entries','readonly').objectStore('entries').getAll();q.onsuccess=()=>{db.close();resolve(q.result);};};r.onerror=()=>resolve([]);});
+        const details=new Set(rows.filter(r=>r.kind==='detail').map(r=>r.id));
+        const index=rows.filter(r=>r.kind==='index-row').map(r=>r.data);
+        const row=index.find(r=>/pramehoushadhi/i.test(r.name)&&!details.has(r._id))||index.find(r=>!details.has(r._id)&&r.stockLabel);
+        if(!row)return {unavailable:true};
+        const input=document.querySelector('#pos-search');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,row.name);input.dispatchEvent(new Event('input',{bubbles:true}));
+        const start=performance.now();let card;
+        while(performance.now()-start<5000){card=[...document.querySelectorAll('.sales-product-card')].find(c=>c.querySelector('h2')?.textContent===row.name);if(card&&card.innerText.includes(row.stockLabel))break;await new Promise(r=>setTimeout(r,5));}
+        await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+        return {indexOnlyProduct:true,expectedStockLabel:row.stockLabel,stockDisplayed:!!card?.innerText.includes(row.stockLabel),placeholderPresent:!!card?.innerText.includes('Select to check stock')};
+      })()`);
+      report.stockCardVerification.productHttpRequests=issued.slice(before).filter(r=>r.endpoint.startsWith('/api/products')).length;
+      if (report.stockCardVerification.stockDisplayed) {
+        const clip=await evaluate(`(()=>{const box=document.querySelector('.sales-product-card')?.getBoundingClientRect();return box?{x:box.x,y:box.y,width:box.width,height:box.height,scale:1}:null})()`);
+        if (clip) {
+          const shot=await command('Page.captureScreenshot',{format:'png',clip});
+          const screenshot=`docs/${reportTag || 'stock-cards'}-${browser ? 'browser' : 'electron'}-card.png`;
+          writeFileSync(screenshot,Buffer.from(shot.data,'base64'));report.stockCardVerification.screenshot=screenshot;
+        }
+      }
+      await changeSearch(true);
+    }
     if (report.activeCache === 'local') {
       const warmup = await measureCart();
       report.measurements.push({ name: 'cart-detail-warmup', ...warmup });
@@ -232,6 +290,7 @@ try {
       }
     }
     await evaluate('(()=>{const b=[...document.querySelectorAll("#sales-category-filters button")].find(b=>b.textContent.trim()==="All");b?.click();})()'); await delay(300);
+    if (process.argv.includes('--checkout')) await measureCheckoutFixtures();
     const restoreStart = issued.length;
     await command('Page.reload');
     await waitFor(state => state.path === '/sales' && state.cards > 0 && state.cache === 'local');
@@ -239,7 +298,7 @@ try {
     report.measurements.push({ name: 'persistent-sales-reload', productHttpRequests: issued.slice(restoreStart).filter(item => item.endpoint.startsWith('/api/products')).length });
     if (!browser && process.argv.includes('--compare-browser')) {
       const cookies = (await command('Network.getCookies', { urls: [origin] })).cookies;
-      const comparison = spawn(process.execPath, [fileURLToPath(import.meta.url), '--browser', '--session-stdin', ...(local ? ['--local'] : [])], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+      const comparison = spawn(process.execPath, [fileURLToPath(import.meta.url), '--browser', '--session-stdin', ...(local ? ['--local'] : []), ...(phase ? ['--phase='+phase] : []), ...(reportTag ? ['--report-tag='+reportTag] : []), ...(process.argv.includes('--stock-cards') ? ['--stock-cards'] : []), ...(process.argv.includes('--checkout') ? ['--checkout'] : [])], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
       comparison.stdin.end(JSON.stringify(cookies));
       comparison.stdout.on('data', chunk => process.stdout.write(chunk));
       comparison.stderr.on('data', chunk => process.stderr.write(chunk));
@@ -248,19 +307,21 @@ try {
     }
   }
   report.apiRequests = completed;
-  const file = `docs/${browser ? 'browser' : 'electron'}-${local ? 'local' : 'hosted'}-measurements.json`;
+  report.apiRequestStarts = issued;
+  const file = `docs/${reportTag ? reportTag+'-' : ''}${phase ? 'pos-performance-'+phase+'-' : ''}${browser ? 'browser' : 'electron'}-${local ? 'local' : 'hosted'}-measurements.json`;
   writeFileSync(file, JSON.stringify(report, null, 2) + '\n');
-  console.log(JSON.stringify({ report: file, authenticated: report.authenticated, measurements: report.measurements, apiRequests: completed, writesBlocked: report.writesBlocked }));
+  console.log(JSON.stringify({ report: file, authenticated: report.authenticated, samples: report.measurements.length, writesBlocked: report.writesBlocked, ...(keepProfile ? { profileDirectory: profile } : {}) }));
 } catch (error) {
   // Do not dump URLs, page contents, credentials or response bodies.
   report.error = error.message;
   report.authenticated ??= false;
   report.apiRequests = completed;
-  writeFileSync(`docs/${browser ? 'browser' : 'electron'}-${local ? 'local' : 'hosted'}-failed-measurements.json`, JSON.stringify(report, null, 2) + '\n');
+  writeFileSync(`docs/${reportTag ? reportTag+'-' : ''}${phase ? 'pos-performance-'+phase+'-' : ''}${browser ? 'browser' : 'electron'}-${local ? 'local' : 'hosted'}-failed-measurements.json`, JSON.stringify(report, null, 2) + '\n');
   console.error(JSON.stringify({ error: error.message, type: error.name })); process.exitCode = 1;
 } finally {
   if (socket?.readyState === WebSocket.OPEN) { try { await Promise.race([command('Browser.close'), delay(1500)]); } catch {} socket.close(); }
   child.kill();
   for (const task of commands.values()) clearTimeout(task.timer);
   commands.clear();
+  if (!keepProfile) { await delay(1200); try { rmSync(profile, { recursive:true, force:true, maxRetries:3, retryDelay:300 }); } catch { console.error(JSON.stringify({ cleanup: 'Owned diagnostic profile still locked', profileDirectory:profile })); } }
 }

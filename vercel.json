@@ -1,0 +1,1 @@
+{"crons":[{"path":"/api/cron/sale-retention","schedule":"30 20 * * *"}]}

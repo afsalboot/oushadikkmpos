@@ -1,0 +1,75 @@
+{
+  "database": "isolated localhost MongoDB replica set",
+  "liveDatabaseWrites": 0,
+  "checks": [
+    {
+      "name": "90-day boundary, gates, summaries, stock/customer preservation",
+      "passed": true
+    },
+    {
+      "name": "before/after reports, account running balances and estimated dashboard cost",
+      "passed": true
+    },
+    {
+      "name": "idempotent backfill, edited contributions, validation checkpoints",
+      "passed": true
+    },
+    {
+      "name": "missing contributions and corrupt summaries fail closed",
+      "passed": true
+    },
+    {
+      "name": "real database transaction rollback after delete",
+      "passed": true
+    },
+    {
+      "name": "concurrent cleanup, bounded batches and purged retry",
+      "passed": true
+    },
+    {
+      "name": "legacy restore protection and preserved analytics collections",
+      "passed": true
+    },
+    {
+      "name": "direct source/facts verification and deterministic repair",
+      "passed": true
+    },
+    {
+      "name": "full source coverage validation",
+      "passed": true
+    },
+    {
+      "name": "actual customer API lifetime statistics and deactivation",
+      "passed": true
+    },
+    {
+      "name": "cancelled/mix/external/credit/legacy payments and report rows",
+      "passed": true
+    },
+    {
+      "name": "persisted store scope isolation",
+      "passed": true
+    },
+    {
+      "name": "purged product merge analytics",
+      "passed": true
+    },
+    {
+      "name": "actual checkout transaction, duplicate clicks, retry and rollback",
+      "passed": true
+    },
+    {
+      "name": "100000-bill isolated fixture, bounded cleanup, indexed plan",
+      "passed": true
+    }
+  ],
+  "mongoVersion": "8.2.6",
+  "largeFixture": {
+    "count": 100000,
+    "batchSize": 100,
+    "deleted": 100,
+    "totalDocsExamined": 100,
+    "index": "sale_retention_candidates",
+    "elapsedMs": 6311
+  }
+}

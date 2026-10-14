@@ -38,11 +38,15 @@ import {assertRegistration,resolveSupply,validateFiscalLines,registrationStatus,
 import {requestHash,assertRetryMatches} from "@/lib/fiscal-integrity";
 import {money,multiplyMoney} from "@/lib/money";
 import { directCheckoutPayments } from "@/lib/direct-checkout";
+import { validateSalePayments } from "@/lib/checkout-payment";
 import { createSaleStockBuffer } from "@/lib/sale-stock-buffer";
 import { saleFreeQuantity } from "@/lib/sale-free-quantity";
 import { findSaleEditRetry, loadSaleForEdit, restoreSaleStock, saveSaleEdit } from "@/services/sale-edit.service";
 import { buildExternalPurchase, isExternalPurchase, externalPurchaseSummary, saleForActor } from "@/lib/external-purchase";
 import { syncExternalPurchaseExpenses } from "@/services/external-purchase.service";
+import { initializeRetentionModels, syncSaleHistory } from "@/services/sale-retention.service";
+import { findHistoricalRetry, historicalInvoiceExists, purgedInvoiceExists } from "@/services/sale-history.service";
+import { RETAINED_BILL_MESSAGE } from "@/lib/sale-retention";
 
 const amount = money;
 const escapeRegex = (value) =>
@@ -256,6 +260,9 @@ export async function GET(request) {
       const revenue = amount(totals[0]?.revenue || 0);
       return ok({
         sales: sales.map(sale => saleForActor(sale, actor)),
+        retentionNotice: 'Detailed bills are retained for 90 days. Historical totals remain in Reports.',
+        retentionUnavailable: !!(search && !sales.length && await purgedInvoiceExists(search)),
+        retentionMessage: RETAINED_BILL_MESSAGE,
         summary: {
           invoices: total,
           revenue,
@@ -295,12 +302,15 @@ export async function POST(request) {
       await requireSession("ADMIN");
       if (!mongoose.isValidObjectId(body.editSaleId)) return fail("Invalid sale", 400);
     }
-    await Promise.all([Sale.init(),FiscalGuard.init()]);
+    await Promise.all([Sale.init(),FiscalGuard.init(),initializeRetentionModels()]);
     const requestKey=String(request.headers.get('Idempotency-Key')||'');
     if(!/^[a-zA-Z0-9-]{16,80}$/.test(requestKey))return fail('A checkout retry key is required. Refresh checkout and try again.',422);
     const hash=requestHash(body);
-    const previous=await Sale.findOne({requestKey}).lean();
+    // Include the existing partial index predicate so MongoDB can use requestKey_1.
+    const retryFilter = {requestKey:{$eq:requestKey,$type:"string"}};
+    const previous=await Sale.findOne(retryFilter).lean();
     if(previous)return timed(ok(assertRetryMatches(previous,hash,session.sub)));
+    await findHistoricalRetry(requestKey,hash,session.sub);
     if (editing) {
       const retry = await findSaleEditRetry({ AuditLog, requestKey, hash, actorId: session.sub });
       if (retry) return timed(ok(retry));
@@ -326,8 +336,9 @@ export async function POST(request) {
     mark("prepare");
     await dbSession.withTransaction(async () => {
       await FiscalGuard.findOneAndUpdate({key:'issuance'},{$inc:{revision:1}},{upsert:true,session:dbSession});
-      const retried=await Sale.findOne({requestKey}).session(dbSession).lean();
+      const retried=await Sale.findOne(retryFilter).session(dbSession).lean();
       if(retried){completedSale=assertRetryMatches(retried,hash,session.sub);return;}
+      await findHistoricalRetry(requestKey,hash,session.sub,dbSession);
       if (editing) {
         const retry = await findSaleEditRetry({ AuditLog, requestKey, hash, actorId: session.sub, session: dbSession });
         if (retry) { completedSale = retry; return; }
@@ -860,67 +871,19 @@ export async function POST(request) {
                 amount: total,
                 reference: body.paymentReference,
               },
-            ]),
-        enabledMethods = settings?.payments?.enabledMethods || ["CASH", "UPI"];
+            ]);
       const credit = prepareWholesaleCredit({
         saleType,
         requested: creditRequested,
         customer,
         total,
       });
-      if (
-        !creditRequested &&
-        requestedPayments.length > 1 &&
-        settings?.payments?.splitPayment === false
-      )
-        throw new Error("Split payment is disabled in Settings");
-      if (
-        !creditRequested &&
-        (!requestedPayments.length ||
-        requestedPayments.some(
-          (payment) =>
-            !enabledMethods.includes(payment.method) ||
-            !(Number(payment.amount) > 0),
-        ))
-      )
-        throw new Error("Select an enabled payment method");
-      if (
-        !creditRequested &&
-        requestedPayments.some(
-          (payment) =>
-            (payment.method === "UPI" &&
-              settings?.payments?.upi?.requireReference &&
-              !String(payment.reference || "").trim()) ||
-            (payment.method === "BANK" &&
-              settings?.payments?.bank?.requireReference &&
-              !String(payment.reference || "").trim()),
-        )
-      )
-        throw new Error(
-          "Payment reference is required for the selected method",
-        );
-      const paymentTotal = creditRequested
-        ? 0
-        : amount(
-            requestedPayments.reduce(
-              (sum, payment) => sum + Number(payment.amount),
-              0,
-            ),
-          );
-      if (!creditRequested && Math.abs(paymentTotal - total) > 0.009)
-        throw new Error("Payment amounts must equal the invoice total");
-      const payments = creditRequested
-        ? []
-        : requestedPayments.map((payment) => ({
-            method: payment.method,
-            amount: amount(payment.amount),
-            reference: String(payment.reference || "").trim(),
-          }));
+      const payments = validateSalePayments(settings, requestedPayments, total, creditRequested);
       const prefix = settings?.invoice?.prefix || "INV";
       const invoiceDate=new Date();
       const invoiceNumber = originalSale?.invoiceNumber || await nextInvoiceNumber({
         Counter: DocumentCounter,
-        isNumberUsed: (invoiceNumber) => Sale.exists({ invoiceNumber }).session(dbSession),
+        isNumberUsed: async (invoiceNumber) => await Sale.exists({ invoiceNumber }).session(dbSession) || await historicalInvoiceExists(invoiceNumber,settings,dbSession),
         prefix,
         value: invoiceDate,
         session: dbSession,
@@ -1024,6 +987,7 @@ export async function POST(request) {
           { session: dbSession, ordered: true },
         );
       await stockBuffer.flush();
+      await syncSaleHistory({sale:completedSale,settings,session:dbSession});
       for (const row of stockRows) affectedProductIds.add(String(row.productId));
       if (!originalSale) await AuditLog.create([{actorId:session.sub,action:'INVOICE_FINALIZED',module:'sales',targetType:'Sale',targetId:completedSale._id,description:`Issued ${invoiceNumber}`,metadata:{invoiceNumber,documentType,total,tax:gstInvoice.tax,placeOfSupply,ruleVersion:GST_RULE_VERSION}}],{session:dbSession});
     });

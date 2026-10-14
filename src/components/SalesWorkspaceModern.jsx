@@ -1527,7 +1527,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                 {p.allowMixture && <Badge t="green">Mix enabled</Badge>}
               </div>
               <div className="pt-2">
-                <b className="text-sm text-[var(--green)]">{p._salesIndex ? 'Select to check stock' : p.stockLabel}</b>
+                <b className="text-sm text-[var(--green)]">{p.stockLabel || 'Loading stock…'}</b>
                 {mode === "PRODUCT" && p.allowPackageSale && (
                   <p className="mt-2 text-xl font-extrabold">
                     {money(p.packageSellingPrice)}{" "}

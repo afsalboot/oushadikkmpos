@@ -12,12 +12,14 @@ import { requestHash, assertRetryMatches } from "../src/lib/fiscal-integrity.js"
 import { buildCustomerSnapshot, normalizeDoctorName, prepareWholesaleCredit, isWholesaleCustomer } from "../src/lib/sale-customer.js";
 import { money, multiplyMoney } from "../src/lib/money.js";
 import { directCheckoutPayments } from "../src/lib/direct-checkout.js";
+import { validateSalePayments } from "../src/lib/checkout-payment.js";
 import { saleFreeQuantity } from "../src/lib/sale-free-quantity.js";
 import { buildExternalPurchase, isExternalPurchase, externalPurchaseSummary } from "../src/lib/external-purchase.js";
 import { syncExternalPurchaseExpenses } from "../src/services/external-purchase.service.js";
+import {retentionGone} from '../src/lib/sale-retention.js';
 
 const serviceSource = readFileSync(new URL("../src/services/sale-edit.service.js", import.meta.url), "utf8").replace(/^import .*;\r?\n/gm, "").replaceAll("export ", "");
-const service = new Function("saleEditProblem", "saleStockReturns", `${serviceSource}; return { restoreSaleStock, loadSaleForEdit, findSaleEditRetry, saveSaleEdit };`)(saleEditProblem, saleStockReturns);
+const service = new Function("saleEditProblem", "saleStockReturns", "retentionGone", `${serviceSource}; return { restoreSaleStock, loadSaleForEdit, findSaleEditRetry, saveSaleEdit };`)(saleEditProblem, saleStockReturns,retentionGone);
 const route = readFileSync(new URL("../src/app/api/sales/route.js", import.meta.url), "utf8").replace(/^import[\s\S]*?;\r?\n/gm, "").replaceAll("export ", "");
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const id = new mongoose.Types.ObjectId(), productId = new mongoose.Types.ObjectId(), batchId = new mongoose.Types.ObjectId(), actorId = new mongoose.Types.ObjectId();
@@ -40,18 +42,26 @@ function harness() {
   const StockTransaction = { find: () => query(state.rows), insertMany: async rows => { state.rows.push(...rows); } };
   const AuditLog = { findOne: filter => query(state.audits.find(audit => audit.metadata.requestKey === filter["metadata.requestKey"])), create: async entries => state.audits.push(...entries) };
   const Sale = function(fields) { return new SaleModel(fields); };
-  Object.assign(Sale, { init: async () => {}, findOne: filter => query(state.sale.requestKey === filter.requestKey ? state.sale : null), findById: () => query(state.sale),
+  Object.assign(Sale, { init: async () => {}, findOne: filter => {
+    assert.equal(filter.requestKey.$type,"string");
+    return query(state.sale.requestKey === filter.requestKey.$eq ? state.sale : null);
+  }, findById: () => query(state.sale),
     create: async ([fields]) => { const sale = new SaleModel({ ...fields, createdAt: new Date(), updatedAt: new Date() }); await sale.validate(); state.sale = sale.toObject(); return [sale]; },
     collection: { updateOne: async (filter, update) => { assert.equal(String(filter._id), String(state.sale._id)); assert.equal(+new Date(filter.updatedAt), +new Date(state.sale.updatedAt)); state.sale = { ...state.sale, ...update.$set }; return { matchedCount: 1 }; } } });
-  const session = { withTransaction: async callback => {
+  let transactionQueue = Promise.resolve();
+  const session = { withTransaction: callback => {
+    const work = transactionQueue.then(async () => {
     const snapshot = { sale: state.sale, batches: state.batches.map(batch => ({ ...batch })), rows: [...state.rows], audits: [...state.audits] };
     snapshot.expenses = structuredClone(state.expenses);
     try { await callback(); } catch (error) { Object.assign(state, snapshot); throw error; }
+    });
+    transactionQueue = work.catch(() => {});
+    return work;
   }, endSession: async () => {} };
   const product = { _id: productId, name: "Oil", active: true, packageType: "Bottle", baseUnit: "ml", packageSize: 100, packageSellingPrice: 120, loosePricePerUnit: 1, allowPackageSale: true };
   const catalogue = [product, { ...product, _id: addedProductId, name: "Drops", packageSellingPrice: 50 }];
   const settings = { gst: { enabled: false, registrationStatus: "UNREGISTERED" }, store: { stateCode: "32" }, discount: { enabled: false }, roundOff: { enabled: false }, payments: { enabledMethods: ["CASH", "UPI"] } };
-  const dependencies = { ...service, mongoose: { ...mongoose, startSession: async () => session },
+  const dependencies = { ...service, initializeRetentionModels:async()=>{},syncSaleHistory:async()=>{},findHistoricalRetry:async()=>{},historicalInvoiceExists:async()=>false, mongoose: { ...mongoose, startSession: async () => session },
     requireSession: async permission => { if (h.staff && permission === "ADMIN") throw new Error("FORBIDDEN"); return { sub: String(actorId), role: "ADMIN", name: "Owner" }; }, connectDb: async () => {},
     ok: (data, status = 200) => ({ data, status, headers: new Map() }), fail: (error, status = 400) => ({ error, status, headers: new Map() }), apiError: error => ({ error: error.message, status: error.message === "FORBIDDEN" ? 403 : error.status || 500, headers: new Map() }),
     Sale, InventoryBatch, StockTransaction, AuditLog, FiscalGuard: { init: async () => {}, findOneAndUpdate: async () => {} }, Settings: { findOne: () => query(settings) }, Product: { find: filter => query(catalogue.filter(entry => filter._id.$in.includes(String(entry._id)))) },
@@ -64,10 +74,10 @@ function harness() {
       if (prior) Object.assign(prior, update.$set);
       else state.expenses.push({ ...update.$set, _id: new mongoose.Types.ObjectId() });
     } },
-    calculateSalePricing, createSaleStockBuffer, deductPackageStock, deductLooseStock, deductCountBasedLooseStock, getLooseUnit, isCountBasedProduct,
+    calculateSalePricing, validateSalePayments, createSaleStockBuffer, deductPackageStock, deductLooseStock, deductCountBasedLooseStock, getLooseUnit, isCountBasedProduct,
     assertRegistration, resolveSupply, validateFiscalLines, registrationStatus, financialYear, GST_RULE_VERSION, requestHash, assertRetryMatches, buildCustomerSnapshot, normalizeDoctorName, prepareWholesaleCredit, isWholesaleCustomer, money, multiplyMoney, directCheckoutPayments, saleFreeQuantity };
-  const h = { state, settings, staff: false, async invoke({ create = false, quantity = 3, version = new Date(state.sale.updatedAt).toISOString(), revision = Number(state.sale.editRevision || 0), key = "sale-edit-retry-key-001", price = quantity * 100, items } = {}) {
-    const body = { ...(!create ? { editSaleId: String(id), editVersion: version, editRevision: revision } : {}), items: items || [{ kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity, billedLineIndex: 0 }], customerType: "WALK_IN", payments: [{ method: "CASH", amount: price }] };
+  const h = { state, settings, staff: false, async invoke({ create = false, quantity = 3, version = new Date(state.sale.updatedAt).toISOString(), revision = Number(state.sale.editRevision || 0), key = "sale-edit-retry-key-001", price = quantity * 100, items, request = {} } = {}) {
+    const body = { ...(!create ? { editSaleId: String(id), editVersion: version, editRevision: revision } : {}), items: items || [{ kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity, billedLineIndex: 0 }], customerType: "WALK_IN", payments: [{ method: "CASH", amount: price }], ...request };
     const run = new AsyncFunction(...Object.keys(dependencies), "request", `${route}\nreturn POST(request);`);
     return run(...Object.values(dependencies), { json: async () => body, headers: { get: () => key } });
   } };
@@ -91,6 +101,50 @@ test("editing a paid sale keeps its invoice, billed price and date, adjusts stoc
   assert.equal(retry.status, 200);
   assert.equal(h.state.batches[0].sealedPackages, 2);
   assert.equal(h.state.audits.length, 1);
+});
+
+test("isolated regular checkout commits once and an uncertain-response retry returns the same invoice", async () => {
+  const h=harness();
+  const result=await h.invoke({create:true,quantity:2,price:240});
+  assert.equal(result.status,201,result.error);
+  assert.equal(result.data.total,240);
+  assert.equal(h.state.batches[0].sealedPackages,1);
+  assert.equal(h.state.rows.length,1);
+  assert.equal(h.state.audits.length,1);
+  const retry=await h.invoke({create:true,quantity:2,price:240});
+  assert.equal(retry.status,200,retry.error);
+  assert.equal(String(retry.data._id),String(result.data._id));
+  assert.equal(h.state.rows.length,1);
+  assert.equal(h.state.batches[0].sealedPackages,1);
+});
+
+test("concurrent duplicate requests in a serialized transaction fixture deduct stock once", async () => {
+  const h=harness();
+  const results=await Promise.all([h.invoke({create:true,quantity:1,price:120}),h.invoke({create:true,quantity:1,price:120})]);
+  assert.ok(results.every(r=>r.status===201||r.status===200),JSON.stringify(results.map(r=>r.error)));
+  assert.equal(String(results[0].data._id),String(results[1].data._id));
+  assert.equal(h.state.batches[0].sealedPackages,2);
+  assert.equal(h.state.rows.length,1);
+  assert.equal(h.state.audits.length,1);
+});
+
+test("isolated direct checkout calculates full Cash payment and retries without duplicate stock deduction", async () => {
+  const h=harness();h.settings.checkout={enabled:false};
+  const request={skipCheckout:true,payments:[{method:'UPI',amount:1}]};
+  const result=await h.invoke({create:true,quantity:1,request});
+  assert.equal(result.status,201,result.error);
+  assert.equal(result.data.total,120);
+  assert.equal(result.data.payments[0].method,'CASH');
+  assert.equal(result.data.payments[0].amount,120);
+  const retry=await h.invoke({create:true,quantity:1,request});
+  assert.equal(retry.status,200,retry.error);
+  assert.equal(h.state.batches[0].sealedPackages,2);
+  assert.equal(h.state.rows.length,1);
+  const forbidden=harness();forbidden.settings.checkout={enabled:true};
+  const rejected=await forbidden.invoke({create:true,quantity:1,request});
+  assert.equal(rejected.status,422);
+  assert.equal(forbidden.state.batches[0].sealedPackages,3);
+  assert.equal(forbidden.state.rows.length,0);
 });
 
 test("insufficient stock and incorrect payment roll back stock returns, sale changes and audit writes", async () => {

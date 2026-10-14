@@ -22,6 +22,62 @@ async function setup(t, handler) {
   t.after(async () => { await flushSalesMutations(); await flushSalesPersistence(); });
   return urls;
 }
+
+test('legacy metadata cache upgrades once to stock-bearing rows without a conditional 304', async t => {
+  let reads=0;
+  const urls=await setup(t,(url,request)=>{
+    if(url!==SALES_INDEX_URL)return;
+    reads++;
+    if(reads===2)assert.equal(request.headers,undefined);
+    return Response.json({data:{schemaVersion:reads===1?1:2,complete:true,rows:[salesIndexRow({...product,stockLabel:reads===1?undefined:'2 Bottles'})]}});
+  });
+  await loadSalesResource(SALES_INDEX_URL,options);
+  const updated=await loadSalesResource(SALES_INDEX_URL,options);
+  assert.equal(updated.rows[0].stockLabel,'2 Bottles');
+  await loadSalesResource(SALES_INDEX_URL,options);
+  assert.equal(urls.length,2);
+});
+
+test('authoritative selling reads update and persist index stock labels while local search remains request-free', async t => {
+  const urls=await setup(t,(url)=>url===SALES_INDEX_URL
+    ? Response.json({data:{schemaVersion:2,complete:true,rows:[salesIndexRow({...product,stockLabel:'2 Bottles'})]}})
+    : url.includes('/api/products/'+id) ? Response.json({data:{...product,stockLabel:'1 Bottle',stock:{sealedPackages:1}}}) : undefined);
+  await loadSalesResource(SALES_INDEX_URL,options);
+  assert.equal(lookupSalesProduct(id,scope).stockLabel,'2 Bottles');
+  await loadSalesDetail(id,options);
+  const before=urls.length;
+  assert.equal(searchSalesIndex(peekSalesResource(SALES_INDEX_URL,scope).rows,{search:'ash'}).rows[0].stockLabel,'1 Bottle');
+  assert.equal(urls.length,before);
+  await flushSalesPersistence();clearSalesCache({purge:false});await configureSalesScope(scope);
+  assert.equal(lookupSalesProduct(id,scope).stockLabel,'1 Bottle');
+});
+
+test('successful stock writes refresh index-only cards without speculative quantities or full catalogue reload', async t => {
+  const urls=await setup(t,(url,request)=>{
+    if(request.method==='POST')return Response.json({data:{affectedProductIds:[id]}});
+    if(url===SALES_INDEX_URL)return Response.json({data:{schemaVersion:2,complete:true,rows:[salesIndexRow({...product,stockLabel:'2 Bottles'})]}});
+    if(url.startsWith(SALES_INDEX_URL+'?ids='))return Response.json({data:{rows:[salesIndexRow({...product,stockLabel:'1 Bottle'})],removedIds:[]}});
+  });
+  await loadSalesResource(SALES_INDEX_URL,options);
+  assert.equal(peekSalesDetail(id,scope),undefined);
+  await resourceFetch('/api/sales',{method:'POST',body:JSON.stringify({items:[{productId:id}]})});await flushSalesMutations();
+  assert.equal(lookupSalesProduct(id,scope).stockLabel,'1 Bottle');
+  assert.equal(peekSalesDetail(id,scope),undefined);
+  assert.equal(urls.filter(url=>url===SALES_INDEX_URL).length,1);
+  assert.equal(urls.filter(url=>url===SALES_INDEX_URL+'?ids='+id).length,1);
+});
+
+test('a changed authoritative index stock label invalidates an older selling detail before cart selection', async t => {
+  let label='2 Bottles';
+  await setup(t,(url)=>url===SALES_INDEX_URL
+    ? Response.json({data:{schemaVersion:2,complete:true,rows:[salesIndexRow({...product,stockLabel:label})]}})
+    : url.includes('/api/products/'+id)?Response.json({data:{...product,stockLabel:'2 Bottles'}}):undefined);
+  await loadSalesResource(SALES_INDEX_URL,options);await loadSalesDetail(id,options);
+  assert.equal(peekSalesDetail(id,scope).stockLabel,'2 Bottles');
+  label='1 Bottle';await loadSalesResource(SALES_INDEX_URL,{...options,force:true});
+  assert.equal(lookupSalesProduct(id,scope).stockLabel,'1 Bottle');
+  assert.equal(peekSalesDetail(id,scope),undefined);
+});
 test('cold prefetch coalesces concurrent callers; memory search, clear, barcode and return issue zero product reads', async t => {
   const urls = await setup(t);
   await Promise.all([prefetchSales(options), prefetchSales(options), loadSalesResource(SALES_FIRST_PAGE, options)]);

@@ -292,6 +292,7 @@ const settingsSchema = new Schema(
     notifications: { type: Schema.Types.Mixed, default: {} },
     security: { type: Schema.Types.Mixed, default: {} },
     backup: { type: Schema.Types.Mixed, default: {} },
+    dataRetention: { type: Schema.Types.Mixed, default: {enabled:true,saleRetentionDays:90} },
   },
   { timestamps: true, minimize: false },
 );
@@ -775,6 +776,8 @@ saleSchema.index(
     partialFilterExpression: { requestKey: { $type: "string" } },
   },
 );
+saleSchema.add({retentionProcessed:{type:Boolean,default:false},retentionHash:String,retentionStoreId:String,expiresAt:Date});
+saleSchema.index({retentionStoreId:1,retentionProcessed:1,expiresAt:1,_id:1},{name:'sale_retention_candidates'});
 export const Sale = model("Sale", saleSchema);
 Sale.schema.add({
   customerType: {
@@ -1036,3 +1039,32 @@ for (const extendedModel of [
   ExpenseCategory,
 ])
   extendedModel.recompileSchema();
+
+// Permanent analytical facts deliberately exclude reconstructable invoice data.
+const salesHistorySchema=new Schema({
+  storeId:{type:String,required:true},date:{type:String,required:true},saleDate:{type:Date,required:true},
+  sourceHash:{type:String,required:true},version:{type:Number,required:true},facts:{type:Schema.Types.Mixed,required:true},
+  metrics:{type:Schema.Types.Mixed,required:true},productMetrics:{type:[Schema.Types.Mixed],default:[]},
+  requestKey:String,requestHash:String,actorId:Schema.Types.ObjectId,invoiceHash:String,
+  expiresAt:{type:Date,required:true},purgedAt:Date,dashboardCost:Number,
+});
+salesHistorySchema.index({storeId:1,date:1});
+salesHistorySchema.index({storeId:1,'facts.customerId':1,'facts.createdAt':-1});
+salesHistorySchema.index({storeId:1,invoiceHash:1},{unique:true,partialFilterExpression:{invoiceHash:{$type:'string'}}});
+salesHistorySchema.index({requestKey:1},{unique:true,partialFilterExpression:{requestKey:{$type:'string'}}});
+export const SalesHistoryLedger=model('SalesHistoryLedger',salesHistorySchema);
+const dailySalesSchema=new Schema({storeId:{type:String,required:true},date:{type:String,required:true},version:Number,metrics:{type:Schema.Types.Mixed,default:{}}},{timestamps:true});
+dailySalesSchema.index({storeId:1,date:1},{unique:true});
+export const DailySalesSummary=model('DailySalesSummary',dailySalesSchema);
+const dailyProductSchema=new Schema({storeId:{type:String,required:true},date:{type:String,required:true},productKey:{type:String,required:true},productId:Schema.Types.ObjectId,name:String,unit:String,metrics:{type:Schema.Types.Mixed,default:{}}},{timestamps:true});
+dailyProductSchema.index({storeId:1,date:1,productKey:1},{unique:true});
+dailyProductSchema.index({storeId:1,productId:1,date:1});
+export const DailyProductSalesSummary=model('DailyProductSalesSummary',dailyProductSchema);
+const dailyCustomerSchema=new Schema({storeId:{type:String,required:true},date:{type:String,required:true},customerId:{type:Schema.Types.ObjectId,required:true},salesCount:Number,totalSpentCents:Number,highestBillCents:Number,firstPurchaseAt:Date,lastPurchaseAt:Date},{timestamps:true});
+dailyCustomerSchema.index({storeId:1,date:1,customerId:1},{unique:true});
+export const DailyCustomerSalesSummary=model('DailyCustomerSalesSummary',dailyCustomerSchema);
+const retentionStateSchema=new Schema({storeId:{type:String,required:true,unique:true},validatedAt:Date,validationVersion:Number,validationHash:String,validationInProgress:Boolean,validationCursor:Schema.Types.ObjectId,lastCleanupAt:Date,totalDeleted:{type:Number,default:0}},{timestamps:true});
+export const SalesRetentionState=model('SalesRetentionState',retentionStateSchema);
+const cleanupRunSchema=new Schema({storeId:{type:String,required:true},startedAt:Date,completedAt:Date,cutoffDate:Date,retentionDays:Number,found:Number,deleted:Number,skipped:Number,errorsCount:Number,status:String,errorCode:String});
+cleanupRunSchema.index({storeId:1,startedAt:-1});
+export const SalesRetentionRun=model('SalesRetentionRun',cleanupRunSchema);

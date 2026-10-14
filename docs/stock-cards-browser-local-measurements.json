@@ -1,0 +1,621 @@
+{
+  "client": "Chrome",
+  "target": "local-production-build",
+  "profileDirectory": "C:\\Users\\User\\AppData\\Local\\Temp\\oushadhi-browser-check-jB1FUF",
+  "origin": "http://localhost:3000",
+  "measuredAt": "2026-10-14T06:28:29.576Z",
+  "writesBlocked": 0,
+  "measurements": [
+    {
+      "name": "process-launch-to-page-ready",
+      "ms": 805.42,
+      "page": "/dashboard"
+    },
+    {
+      "name": "sales-opening-1",
+      "ms": 54.4,
+      "domReadyMs": 45.4,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-1",
+      "ms": 5.7,
+      "domReadyMs": 2.6,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-1",
+      "ms": 9.2,
+      "domReadyMs": 6.9,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-1",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-2",
+      "ms": 24.8,
+      "domReadyMs": 21.6,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-2",
+      "ms": 4.4,
+      "domReadyMs": 3.2,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-2",
+      "ms": 9.9,
+      "domReadyMs": 7.3,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-2",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-3",
+      "ms": 48.4,
+      "domReadyMs": 38.8,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-3",
+      "ms": 10.3,
+      "domReadyMs": 7.5,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-3",
+      "ms": 24.5,
+      "domReadyMs": 17.7,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-3",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-4",
+      "ms": 52.4,
+      "domReadyMs": 45.8,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-4",
+      "ms": 11.4,
+      "domReadyMs": 9,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-4",
+      "ms": 30.3,
+      "domReadyMs": 21,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-4",
+      "count": 0
+    },
+    {
+      "name": "sales-opening-5",
+      "ms": 58.3,
+      "domReadyMs": 49.3,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "search-5",
+      "ms": 5.2,
+      "domReadyMs": 3.4,
+      "painted": true,
+      "hidden": false,
+      "cards": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "clear-5",
+      "ms": 26.8,
+      "domReadyMs": 20,
+      "painted": true,
+      "hidden": false,
+      "cards": 50,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "sales-cycle-api-count-5",
+      "count": 0
+    },
+    {
+      "name": "cart-detail-warmup",
+      "ms": 55.3,
+      "selectionMs": 52.3,
+      "usedDialog": false,
+      "items": 1
+    },
+    {
+      "name": "cached-cart-add-1",
+      "ms": 35.5,
+      "selectionMs": 31.6,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-2",
+      "ms": 31.1,
+      "selectionMs": 27,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-3",
+      "ms": 38.7,
+      "selectionMs": 31.1,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-4",
+      "ms": 40.5,
+      "selectionMs": 36.1,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "cached-cart-add-5",
+      "ms": 37.5,
+      "selectionMs": 34.4,
+      "usedDialog": false,
+      "items": 1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-1",
+      "ms": 18.8,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 16.4,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-2",
+      "ms": 20.1,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 18.2,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-3",
+      "ms": 16.8,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 19,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-4",
+      "ms": 16,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 16.4,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Low Stock-5",
+      "ms": 17.7,
+      "cards": 50,
+      "cache": "local",
+      "clearMs": 17.4,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-1",
+      "ms": 12.6,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 11.8,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-2",
+      "ms": 13.3,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 10,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-3",
+      "ms": 10.2,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 13.1,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-4",
+      "ms": 12.9,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 12.6,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "stock-filter-search-Opened Stock-5",
+      "ms": 12.1,
+      "cards": 7,
+      "cache": "local",
+      "clearMs": 8.9,
+      "productHttpRequests": 0
+    },
+    {
+      "name": "persistent-sales-reload",
+      "productHttpRequests": 0
+    }
+  ],
+  "cacheOperations": [],
+  "engine": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/155.0.8059.40",
+    "revision": "@cfaadc5a132d78e1828635aa8405a499f3e14864",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+    "jsVersion": "15.5.35.20"
+  },
+  "navigation": {
+    "domContentLoadedMs": 130.7,
+    "loadMs": 175.9,
+    "responseStartMs": 98.7
+  },
+  "authenticated": true,
+  "activeCache": "local",
+  "stockCardVerification": {
+    "indexOnlyProduct": true,
+    "expectedStockLabel": "5 Jars",
+    "stockDisplayed": true,
+    "placeholderPresent": false,
+    "productHttpRequests": 0,
+    "screenshot": "docs/stock-cards-browser-card.png"
+  },
+  "cartSurvivesSearch": true,
+  "persistence": {
+    "detail": 50,
+    "index-meta": 1,
+    "index-row": 2099,
+    "resource": 2
+  },
+  "apiRequests": [
+    {
+      "endpoint": "/api/auth/status",
+      "status": 200,
+      "ms": 55.62,
+      "transferBytes": 896
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 367.61,
+      "transferBytes": 83899,
+      "serverTiming": "auth;dur=47, connection;dur=0, count;dur=58.7, product_query;dur=253.7, batch_query;dur=42.6, processing;dur=0.7, serialization;dur=0.7, total;dur=345.1"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 487.07,
+      "transferBytes": 24785,
+      "serverTiming": "auth;dur=56.7, connection;dur=0, alerts;dur=421.4, serialization;dur=0.3, total;dur=478.5"
+    },
+    {
+      "endpoint": "/api/categories",
+      "status": 200,
+      "ms": 594.63,
+      "transferBytes": 6462
+    },
+    {
+      "endpoint": "/api/products/sales-index",
+      "status": 200,
+      "ms": 1116.46,
+      "transferBytes": 796858,
+      "serverTiming": "auth;dur=43.1, connection;dur=0, index_revision;dur=404, index_categories;dur=63.4, index_products;dur=441, index_query;dur=441, index_stock;dur=192.5, index_processing;dur=11.7, serialization;dur=3.4, total;dur=1096.3"
+    },
+    {
+      "endpoint": "/api/dashboard",
+      "status": 200,
+      "ms": 1467.7,
+      "transferBytes": 28573,
+      "serverTiming": "auth;dur=48.6, connection;dur=0, settings;dur=0, sale_product_ids;dur=104.7, consultations;dur=42.5, expenses;dur=111.1, purchases;dur=111.4, batch_aggregation;dur=145.8, inventory_aggregation;dur=1171.7, sales_aggregation;dur=67.6, serialization;dur=0.4, total;dur=1453.1"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ms": 55.78,
+      "transferBytes": 7681
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 165.01,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 185.89,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 164.9,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 350.1,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/customers",
+      "status": 200,
+      "ms": 295.54,
+      "transferBytes": 13177
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 433.99,
+      "transferBytes": 5515,
+      "serverTiming": "auth;dur=122.1, connection;dur=0, stock_filter;dur=305.6, total;dur=428.5"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 598.85,
+      "transferBytes": 83731,
+      "serverTiming": "auth;dur=69.6, connection;dur=0, product_query;dur=402.1, batch_query;dur=117.3, processing;dur=1.7, serialization;dur=0.7, total;dur=592.5"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 397.6,
+      "transferBytes": 24785,
+      "serverTiming": "auth;dur=80.3, connection;dur=0, alerts;dur=312.7, serialization;dur=0.3, total;dur=393.4"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 378.18,
+      "transferBytes": 1246,
+      "serverTiming": "auth;dur=64.8, connection;dur=0, stock_filter;dur=307.5, total;dur=372.6"
+    },
+    {
+      "endpoint": "/api/products",
+      "status": 200,
+      "ms": 180.5,
+      "transferBytes": 12897,
+      "serverTiming": "auth;dur=40.3, connection;dur=0, product_query;dur=90.6, batch_query;dur=44.5, processing;dur=0.1, serialization;dur=0.2, total;dur=176.2"
+    },
+    {
+      "endpoint": "/api/settings",
+      "status": 200,
+      "ms": 62.82,
+      "transferBytes": 7681
+    },
+    {
+      "endpoint": "/api/notifications",
+      "status": 200,
+      "ms": 412.31,
+      "transferBytes": 24783,
+      "serverTiming": "auth;dur=43.7, connection;dur=0, alerts;dur=352.7, serialization;dur=1, total;dur=397.5"
+    }
+  ],
+  "apiRequestStarts": [
+    {
+      "endpoint": "/api/auth/status",
+      "start": 35514.127413,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/notifications",
+      "start": 35514.312998,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=56.7, connection;dur=0, alerts;dur=421.4, serialization;dur=0.3, total;dur=478.5"
+    },
+    {
+      "endpoint": "/api/dashboard",
+      "start": 35514.349084,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=48.6, connection;dur=0, settings;dur=0, sale_product_ids;dur=104.7, consultations;dur=42.5, expenses;dur=111.1, purchases;dur=111.4, batch_aggregation;dur=145.8, inventory_aggregation;dur=1171.7, sales_aggregation;dur=67.6, serialization;dur=0.4, total;dur=1453.1"
+    },
+    {
+      "endpoint": "/api/products/sales-index",
+      "start": 35514.352538,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=43.1, connection;dur=0, index_revision;dur=404, index_categories;dur=63.4, index_products;dur=441, index_query;dur=441, index_stock;dur=192.5, index_processing;dur=11.7, serialization;dur=3.4, total;dur=1096.3"
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 35514.352717,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=47, connection;dur=0, count;dur=58.7, product_query;dur=253.7, batch_query;dur=42.6, processing;dur=0.7, serialization;dur=0.7, total;dur=345.1"
+    },
+    {
+      "endpoint": "/api/categories",
+      "start": 35514.352796,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/settings",
+      "start": 35526.416069,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 35528.738161,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 35531.579432,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 35534.491474,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 35537.402469,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/customers",
+      "start": 35540.309003,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 35542.132344,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=122.1, connection;dur=0, stock_filter;dur=305.6, total;dur=428.5"
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 35542.592602,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": true,
+      "status": 200,
+      "serverTiming": "auth;dur=69.6, connection;dur=0, product_query;dur=402.1, batch_query;dur=117.3, processing;dur=1.7, serialization;dur=0.7, total;dur=592.5"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "start": 35544.318839,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=80.3, connection;dur=0, alerts;dur=312.7, serialization;dur=0.3, total;dur=393.4"
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 35544.542639,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=64.8, connection;dur=0, stock_filter;dur=307.5, total;dur=372.6"
+    },
+    {
+      "endpoint": "/api/products",
+      "start": 35544.932857,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": true,
+      "status": 200,
+      "serverTiming": "auth;dur=40.3, connection;dur=0, product_query;dur=90.6, batch_query;dur=44.5, processing;dur=0.1, serialization;dur=0.2, total;dur=176.2"
+    },
+    {
+      "endpoint": "/api/notifications",
+      "start": 35546.865966,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200,
+      "serverTiming": "auth;dur=43.7, connection;dur=0, alerts;dur=352.7, serialization;dur=1, total;dur=397.5"
+    },
+    {
+      "endpoint": "/api/settings",
+      "start": 35546.871357,
+      "method": "GET",
+      "hasSearch": false,
+      "targeted": false,
+      "status": 200
+    }
+  ]
+}

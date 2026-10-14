@@ -57,7 +57,7 @@ export default function SaleSourceDetails({ id }) {
       <div className="card grid min-h-72 place-items-center p-8 text-center">
         <div>
           <ReceiptText className="mx-auto text-[var(--red)]" />
-          <h1 className="mt-4 text-xl font-extrabold">Unable to load sale</h1>
+          <h1 className="mt-4 text-xl font-extrabold">{error.includes("retained for 90 days") ? "Bill no longer available" : "Unable to load sale"}</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">{error}</p>
           <Link href="/sales/recent" className="btn mt-4">
             Back to Recent Sales

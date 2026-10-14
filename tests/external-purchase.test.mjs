@@ -8,7 +8,8 @@ import { buildExternalPurchase, externalPurchaseSummary, inventoryTracked, saleF
 import { saleEditCart, saleStockReturns } from "../src/lib/sale-edit.js";
 import { buildAccountLedger } from "../src/services/accounting.service.js";
 import { syncExternalPurchaseExpenses } from "../src/services/external-purchase.service.js";
-import { Sale, Expense } from "../src/models/index.js";
+import { Sale, Expense, Settings } from "../src/models/index.js";
+import {invalidateSettingsCache} from '../src/services/settings.service.js';
 import { getReport } from "../src/services/report.service.js";
 
 const input = { itemSource: "external_purchase", name: "Dasamoolarishtam", quantity: 2, packageType: "bottle", unitPrice: 220, purchaseCost: 180, externalPurchasePaymentMethod: "CASH", externalSupplierName: "ABC Medicals" };
@@ -115,9 +116,10 @@ test("rendered thermal invoice includes external selling information and no supp
 });
 
 test("sales and profit reports include external margins without claiming unavailable inventory COGS", async () => {
-  const originalFind = Sale.find;
+  const originalAggregate=Sale.aggregate,originalPopulate=Sale.populate,originalSettings=Settings.findOne;
   const sales = [{ _id: "sale", createdAt: "2026-10-08T08:00:00Z", total: 940, items: [{ itemSource: "inventory", total: 500 }, buildExternalPurchase(input)], payments: [{ method: "CASH", amount: 940 }] }];
-  Sale.find = () => ({ select() { return this; }, populate() { return this; }, sort() { return this; }, lean: async () => sales });
+  Sale.aggregate=()=>({allowDiskUse(){return this;},readConcern:async()=>sales});Sale.populate=async()=>{};
+  Settings.findOne=()=>({lean:async()=>({_id:'fixture-store'})});invalidateSettingsCache();
   try {
     for (const type of ["sales", "gross-profit"]) {
       const report = await getReport(type, new URLSearchParams());
@@ -128,5 +130,5 @@ test("sales and profit reports include external margins without claiming unavail
       assert.equal(metric("External Purchase Profit"), 80);
       if (type === "gross-profit") assert.equal(metric("Gross Profit"), null);
     }
-  } finally { Sale.find = originalFind; }
+  } finally {Sale.aggregate=originalAggregate;Sale.populate=originalPopulate;Settings.findOne=originalSettings;invalidateSettingsCache();}
 });

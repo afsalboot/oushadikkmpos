@@ -170,7 +170,7 @@ export default function RecentSalesWorkspace() {
           </p>
           <h1 className="mt-1 text-3xl font-extrabold">Recent Sales</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Search completed invoices and open their full sale details.
+            {data?.retentionUnavailable ? data.retentionMessage : data?.retentionNotice || 'Search completed invoices and open their full sale details.'}
           </p>
         </div>
         <Link href="/sales" className="btn btn-primary">
