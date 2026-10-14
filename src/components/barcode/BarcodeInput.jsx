@@ -1,7 +1,8 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 
 import { useCallback, useState } from "react";
-import { Camera, LoaderCircle, Sparkles } from "lucide-react";
+import { Camera, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import CameraBarcodeScanner from "@/components/barcode/CameraBarcodeScanner";
 import { detectBarcodeType } from "@/lib/barcode";
@@ -81,7 +82,7 @@ export default function BarcodeInput({
             onClick={generate}
           >
             {generating ? (
-              <LoaderCircle className="loading-shimmer-icon" size={17} />
+              <LoadingShimmer className="loading-shimmer-icon" size={17} />
             ) : (
               <Sparkles size={17} />
             )}

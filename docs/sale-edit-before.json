@@ -1,0 +1,24 @@
+{
+  "mode": "baseline",
+  "measurements": [
+    {
+      "name": "sale",
+      "ms": 150
+    },
+    {
+      "name": "product_query",
+      "ms": 26244
+    },
+    {
+      "name": "batch_query",
+      "ms": 3879
+    },
+    {
+      "name": "processing",
+      "ms": 28
+    }
+  ],
+  "totalMs": 30158,
+  "products": 2110,
+  "bytes": 3888021
+}

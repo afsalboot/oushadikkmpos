@@ -1,8 +1,9 @@
 "use client";
+import LoadingShimmer, { LoadingPlaceholder } from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import OushadhiLogo from "@/components/branding/OushadhiLogo";
 import PasswordInput from "@/components/PasswordInput";
@@ -78,7 +79,7 @@ export default function LoginForm() {
           </div>
           {loading ? (
             <div className="grid min-h-80 place-items-center">
-              <LoaderCircle className="loading-shimmer-icon text-[#1f6b45]" />
+              <LoadingPlaceholder label="Loading sign in…" className="w-full" />
             </div>
           ) : (
             <>
@@ -168,7 +169,7 @@ export default function LoginForm() {
                   className="btn btn-primary w-full min-h-12"
                 >
                   {submitting && (
-                    <LoaderCircle size={18} className="loading-shimmer-icon" />
+                    <LoadingShimmer size={18} className="loading-shimmer-icon" />
                   )}
                   {bootstrap ? "Create admin account" : setupUsername ? "Save username and sign in" : "Sign in"}
                 </button>

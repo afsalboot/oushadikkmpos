@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,7 +26,6 @@ import {
   FolderCog,
   IndianRupee,
   Landmark,
-  LoaderCircle,
   Pencil,
   Plus,
   ReceiptText,
@@ -254,7 +254,7 @@ function CategoryForm({ category, onClose, onSaved }) {
           </button>
           <button className="btn btn-primary" disabled={saving}>
             {saving ? (
-              <LoaderCircle className="loading-shimmer-icon" size={16} />
+              <LoadingShimmer className="loading-shimmer-icon" size={16} />
             ) : (
               <Plus size={16} />
             )}
@@ -731,7 +731,7 @@ function ExpenseForm({
             </button>
             <button className="btn btn-primary" disabled={saving}>
               {saving ? (
-                <LoaderCircle className="loading-shimmer-icon" size={17} />
+                <LoadingShimmer className="loading-shimmer-icon" size={17} />
               ) : (
                 <CircleDollarSign size={17} />
               )}{" "}
@@ -1736,7 +1736,7 @@ export default function ExpensesWorkspace() {
       )}
       {detailLoading && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/35 text-white">
-          <LoaderCircle className="loading-shimmer-icon" />
+          <LoadingShimmer className="loading-shimmer-icon" />
           <span className="mt-2">Loading expense…</span>
         </div>
       )}

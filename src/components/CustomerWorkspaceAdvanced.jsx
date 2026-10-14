@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer, { LoadingPlaceholder } from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-location-assign-relative-destination */
@@ -12,7 +13,6 @@ import {
   Download,
   Edit3,
   FileText,
-  LoaderCircle,
   Mail,
   MoreVertical,
   Phone,
@@ -383,7 +383,7 @@ function CustomerForm({ customer, initialType = "RETAIL", onClose, onSaved }) {
           </button>
           <button className="btn btn-primary" disabled={saving}>
             {saving ? (
-              <LoaderCircle className="loading-shimmer-icon" size={17} />
+              <LoadingShimmer className="loading-shimmer-icon" size={17} />
             ) : (
               <Plus size={17} />
             )}{" "}
@@ -530,7 +530,7 @@ function DetailDrawer({ id, onClose, onEdit, onChanged }) {
         >
           {loading ? (
             <div className="grid h-full place-items-center">
-              <LoaderCircle className="loading-shimmer-icon text-[var(--green)]" />
+              <LoadingPlaceholder label="Loading customer details…" className="w-full p-6" />
             </div>
           ) : (
             data && (

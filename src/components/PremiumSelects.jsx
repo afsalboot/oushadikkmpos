@@ -1,8 +1,9 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, LoaderCircle, Search } from "lucide-react";
+import { Check, Search } from "lucide-react";
 
 const MENU_ID = "premium-select-menu";
 const SEARCH_THRESHOLD = 8;
@@ -469,7 +470,7 @@ export default function PremiumSelects() {
       <div className="premium-select-options">
         {activeSelect.dataset.selectLoading === "true" ? (
           <div className="premium-select-empty">
-            <LoaderCircle className="loading-shimmer-icon" size={17} /> Loading
+            <LoadingShimmer className="loading-shimmer-icon" size={17} /> Loading
             options...
           </div>
         ) : filtered.length ? (

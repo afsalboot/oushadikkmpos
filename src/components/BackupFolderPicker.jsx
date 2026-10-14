@@ -1,7 +1,8 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Folder, HardDrive, LoaderCircle, X } from "lucide-react";
+import { ArrowUp, Folder, HardDrive, X } from "lucide-react";
 
 export default function BackupFolderPicker({ initialPath, onSelect, onClose }) {
   const dialog = useRef(null);
@@ -118,7 +119,7 @@ export default function BackupFolderPicker({ initialPath, onSelect, onClose }) {
       >
         {loading ? (
           <p role="status" className="flex items-center gap-2 p-3">
-            <LoaderCircle size={18} className="loading-shimmer-icon" />
+            <LoadingShimmer size={18} className="loading-shimmer-icon" />
             Loading folders…
           </p>
         ) : failure ? (

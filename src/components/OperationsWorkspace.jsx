@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer, { LoadingPlaceholder } from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useState } from "react";
@@ -6,7 +7,6 @@ import {
   CircleDollarSign,
   Edit3,
   Landmark,
-  LoaderCircle,
   Plus,
   ReceiptText,
   Search,
@@ -191,7 +191,7 @@ export function SuppliersWorkspace() {
       </div>
       {loading ? (
         <div className="card grid min-h-64 place-items-center">
-          <LoaderCircle className="loading-shimmer-icon" />
+          <LoadingPlaceholder label="Loading suppliers…" className="w-full p-5" />
         </div>
       ) : rows.length ? (
         <div className="card table-wrap">
@@ -728,7 +728,7 @@ export function PurchasesWorkspace() {
                 </button>
                 <button className="btn btn-primary" disabled={saving}>
                   {saving ? (
-                    <LoaderCircle className="loading-shimmer-icon" size={17} />
+                    <LoadingShimmer className="loading-shimmer-icon" size={17} />
                   ) : (
                     <Upload size={17} />
                   )}{" "}
@@ -1558,7 +1558,7 @@ export function OperationalSettings() {
   if (!data)
     return (
       <div className="grid min-h-64 place-items-center">
-        <LoaderCircle className="loading-shimmer-icon" />
+        <LoadingPlaceholder label="Loading details…" className="w-full p-5" />
       </div>
     );
   return (

@@ -1,0 +1,52 @@
+{
+  "mode": "optimized",
+  "measurements": [
+    {
+      "name": "sale",
+      "ms": 145
+    },
+    {
+      "name": "product_query",
+      "ms": 134
+    },
+    {
+      "name": "batch_query",
+      "ms": 61
+    },
+    {
+      "name": "processing",
+      "ms": 0
+    },
+    {
+      "name": "edit-initial",
+      "ms": 197,
+      "products": 1,
+      "bytes": 4982
+    },
+    {
+      "name": "count",
+      "ms": 60
+    },
+    {
+      "name": "product_query",
+      "ms": 970
+    },
+    {
+      "name": "batch_query",
+      "ms": 132
+    },
+    {
+      "name": "processing",
+      "ms": 1
+    },
+    {
+      "name": "edit-first-page",
+      "ms": 1103,
+      "products": 50,
+      "bytes": 82768
+    }
+  ],
+  "totalMs": 1301,
+  "products": 1,
+  "bytes": 4982
+}

@@ -1,6 +1,8 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 import Link from "next/link";
+import LoadingShimmer, { LoadingPlaceholder } from "@/components/LoadingShimmer";
+import PageShimmer from "@/components/PageShimmer";
 import { useRouter } from "next/navigation";
 import { saleEditCart } from "@/lib/sale-edit";
 import ExternalPurchaseModal from "@/components/ExternalPurchaseModal";
@@ -44,7 +46,7 @@ const money = v => currencyFormatter.format(Number(v || 0)), num = v => quantity
 const api = async (u, o) => {
   const r = await checkoutFetch(u, o),
     j = await r.json();
-  if (!r.ok) throw Error(j.error);
+  if (!r.ok) throw Object.assign(Error(j.error), { status: r.status });
   return j.data;
 };
 const sealed = (p) => Number(p.stock?.sealedPackages || 0),
@@ -660,8 +662,8 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     return () => clearTimeout(timer);
   }, [search, localSearch]);
   useEffect(() => {
-    if (editSaleId) return;
-    if (stockFilter && salesIndex?.complete && !stockIds) { setProductLoading(true); return; }
+    if (editSaleId && (!editingSale || String(editingSale._id) !== editSaleId)) return;
+    if (stockFilter && localSearch && salesIndex?.complete && !stockIds) { setProductLoading(true); return; }
     // Local typing never fetches a page. Index rows remain selectable via one detail read.
     if (localQuery) { setProductLoading(false); setProductError(''); return; }
     if (stockFilter && localSearch) {
@@ -684,13 +686,13 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       if (!category) return;
       params.set('category', category._id);
     }
-    const url = '/api/products?' + params;
-    const cached = peekSalesResource(url, cacheScope);
+    const url = editSaleId ? `/api/sales/${encodeURIComponent(editSaleId)}?edit=true&view=products&${params}` : '/api/products?' + params;
+    const cached = editSaleId ? undefined : peekSalesResource(url, cacheScope);
     if (cached) { setProducts(cached.rows); setProductPagination(cached.pagination); }
     setProductLoading(!cached);
     setProductError('');
     if (cached && localSearch) return;
-    loadSalesResource(url, { scope: cacheScope }).then(result => {
+    (editSaleId ? api(url) : loadSalesResource(url, { scope: cacheScope })).then(result => {
       if (!controller.signal.aborted) { setProducts(result.rows); setProductPagination(result.pagination); }
     }).catch(error => { if (!controller.signal.aborted && error.name !== 'AbortError') {
       setProductError(error.message);
@@ -698,7 +700,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     } })
       .finally(() => { if (!controller.signal.aborted) setProductLoading(false); });
     return () => controller.abort();
-  }, [editSaleId, productPage, debouncedSearch, mode, filter, categories, productReload, localSearch, localQuery, cacheScope, stockFilter, stockIds, stockPageIds, salesIndex?.complete]);
+  }, [editSaleId, editingSale, productPage, debouncedSearch, mode, filter, categories, productReload, localSearch, localQuery, cacheScope, stockFilter, stockIds, stockPageIds, salesIndex?.complete]);
   useEffect(() => {
     if (editSaleId) return;
     try {
@@ -730,7 +732,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     api(`/api/sales/${encodeURIComponent(editSaleId)}?edit=true`).then(({ sale, products: available, customer }) => {
       const billedCart = saleEditCart(sale, available);
       if (!active) return;
-      setProducts(available);
+      setProducts([]);
       setCart(billedCart);
       setEditingSale(sale);
       setSaleCustomer(customer);
@@ -983,22 +985,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     ],
     shown = (localResults ? localResults.rows.map(row => peekSalesDisplayDetail(row._id, cacheScope) || {
       ...row, allowPackageSale: row.allowPackageSale !== false, categoryId: { _id: row.categoryId, name: row.categoryName }, _salesIndex: true,
-    }) : products).filter((p) => {
-      if (!editSaleId) return true;
-      if (mode === "MIX" && !p.allowMixture) return false;
-      if (
-        search &&
-        !`${p.name} ${p.sku} ${p.barcode || ""} ${p.categoryId?.name || ""}`
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      )
-        return false;
-      if (mode === "MIX") return true;
-      if (filter === "Low Stock") return p.lowStock;
-      if (filter === "Loose Sale") return p.allowLooseSale;
-      if (filter === "Opened Stock") return opened(p) > 0;
-      return filter === "All" || p.categoryId?.name === filter;
-    });
+    }) : products);
   const subtotal = cart.reduce((s, i) => s + total(i), 0),
     cartPricing = useMemo(() => calculateSalePricing({
       consultationFeeEnabled: cartCustomer.consultationFeeEnabled === true,
@@ -1350,7 +1337,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       setSaving(false);
     }
   }
-  if (editLoading) return <div className="card p-8" role="status">Loading billed products for editing…</div>;
+  if (editLoading) return <PageShimmer label="Loading billed products for editing…" />;
   if (editError) return <div className="card p-8"><h1 className="text-xl font-extrabold">Unable to edit sale</h1><p className="mt-2">{editError}</p><Link href={`/sales/${editSaleId}`} className="btn mt-4">Back to sale</Link></div>;
   return (
     <div data-sales-cache={localSearch ? 'local' : 'server'}>
@@ -1426,7 +1413,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
           />
         </div>
         <button className="btn" type="button" onClick={() => setExternalPurchase({})}><Plus size={16} />External Purchase</button>
-        {(browsingLoading || detailLoading) && <span className="text-xs text-[var(--muted)]" role="status">{detailLoading ? 'Loading product details…' : 'Updating products…'}</span>}
+        {(browsingLoading || detailLoading) && <span className="inline-flex items-center gap-2 text-xs text-[var(--muted)]" role="status"><LoadingShimmer size={14} />{detailLoading ? 'Loading product details…' : 'Updating products…'}</span>}
         {productError && <span className="text-xs text-red-700" role="alert">{productError}</span>}
       </section>
       {mode !== "MIX" && (
@@ -1500,6 +1487,9 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       )}
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
         <main className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+          {browsingLoading && !shown.length && Array.from({ length: 6 }, (_, index) => (
+            <LoadingPlaceholder key={index} label={index === 0 ? 'Loading products…' : ''} className="card min-h-48 p-5" />
+          ))}
           {shown.map((p) => (
             <article
               className={`sales-product-card card flex cursor-pointer flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md ${p.expired ? "sales-product-expired" : ""}`}
@@ -1527,7 +1517,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                 {p.allowMixture && <Badge t="green">Mix enabled</Badge>}
               </div>
               <div className="pt-2">
-                <b className="text-sm text-[var(--green)]">{p.stockLabel || 'Loading stock…'}</b>
+                <b className="text-sm text-[var(--green)]">{p.stockLabel || <span className="inline-flex items-center gap-2" role="status"><LoadingShimmer size={14} /><span className="sr-only">Loading stock…</span></span>}</b>
                 {mode === "PRODUCT" && p.allowPackageSale && (
                   <p className="mt-2 text-xl font-extrabold">
                     {money(p.packageSellingPrice)}{" "}
@@ -1845,14 +1835,14 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
           </aside>
         )}
       </div>
-      {!editSaleId && <nav aria-label="Product pagination" className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <nav aria-label="Product pagination" className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-[var(--muted)]" role="status">{`${visiblePagination.total} products · Page ${visiblePagination.page} of ${visiblePagination.pages}`}</span>
             <div className="flex gap-2">
               {productError && <button type="button" className="btn" onClick={() => setProductReload(value => value + 1)}>Retry</button>}
               <button type="button" className="btn" disabled={browsingLoading || visiblePagination.page <= 1} onClick={() => { const page = visiblePagination.page - 1; if (!activeSearch) browsePages.current.set(browseKey, page); setPageSelection({ key: productQueryKey, page }); }}>Previous</button>
               <button type="button" className="btn" disabled={browsingLoading || visiblePagination.page >= visiblePagination.pages} onClick={() => { const page = visiblePagination.page + 1; if (!activeSearch) browsePages.current.set(browseKey, page); setPageSelection({ key: productQueryKey, page }); }}>Next</button>
             </div>
-      </nav>}
+      </nav>
       {quick && <QuickSell p={quick} close={() => setQuick(null)} add={add} />}
       {externalPurchase && <ExternalPurchaseModal key={externalPurchase._id || "new-external"} products={products} initial={externalPurchase} onClose={() => setExternalPurchase(null)} onSave={line => setCart(current => {
         const existing = current.find(item => item._id === line._id && isExternalPurchase(item));

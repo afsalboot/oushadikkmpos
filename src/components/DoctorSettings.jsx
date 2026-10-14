@@ -1,4 +1,5 @@
 "use client";
+import { LoadingPlaceholder } from "@/components/LoadingShimmer";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 const blank = { name: "", qualification: "", consultationFee: "", active: true };
@@ -15,7 +16,7 @@ export default function DoctorSettings() {
     try { const response = await fetch(editing ? `/api/doctors/${editing}` : "/api/doctors", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); const result = await response.json(); if (!response.ok) throw new Error(result.error); setForm(blank); setEditing(null); await load(); toast.success("Doctor saved"); } catch (e) { toast.error(e.message); } finally { setSaving(false); }
   }
   if (error) return <p className="card p-5" role="alert">{error}</p>;
-  if (!data) return <p>Loading doctors…</p>;
+  if (!data) return <LoadingPlaceholder label="Loading doctors…" className="card p-5" />;
   return <div className="space-y-5">
     <p className="text-sm text-[var(--muted)]">Doctors are reception configuration only. Historical tickets keep their original doctor details.</p>
     {data.canManage && <form className="card space-y-4 p-5" onSubmit={save}><h3 className="font-bold">{editing ? "Edit doctor" : "Add doctor"}</h3><fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">

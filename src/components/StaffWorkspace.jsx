@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,7 +11,6 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  LoaderCircle,
   LockKeyhole,
   Plus,
   Search,
@@ -538,7 +538,7 @@ function StaffForm({ initial, roles, onClose, onSaved }) {
             </button>
             <button className="btn btn-primary" disabled={saving}>
               {saving ? (
-                <LoaderCircle className="loading-shimmer-icon" size={17} />
+                <LoadingShimmer className="loading-shimmer-icon" size={17} />
               ) : (
                 <UserCheck size={17} />
               )}{" "}

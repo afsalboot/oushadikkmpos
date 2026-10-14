@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useState } from "react";
@@ -21,7 +22,6 @@ import {
   CircleDollarSign,
   Eye,
   Landmark,
-  LoaderCircle,
   RefreshCw,
   Search,
   TrendingDown,
@@ -482,7 +482,7 @@ export default function AccountsWorkspace() {
         </div>
         <button className="btn" onClick={exportCsv} disabled={exporting}>
           {exporting ? (
-            <LoaderCircle className="loading-shimmer-icon" size={17} />
+            <LoadingShimmer className="loading-shimmer-icon" size={17} />
           ) : (
             <ArrowDownToLine size={17} />
           )}{" "}

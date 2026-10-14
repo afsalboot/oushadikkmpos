@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer, { LoadingPlaceholder } from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -27,7 +28,6 @@ import {
   History,
   Info,
   Layers3,
-  LoaderCircle,
   MoreVertical,
   Package,
   Plus,
@@ -1651,7 +1651,7 @@ function ProductDrawer({
           </button>
         </div>
         <div className="grid min-h-64 place-items-center text-sm text-[var(--muted)]">
-          {error || "Loading product details…"}
+          {error || <LoadingPlaceholder label="Loading product details…" className="w-full p-5" />}
         </div>
       </Drawer>
     );
@@ -3180,7 +3180,7 @@ export default function ProductCatalogue() {
               disabled={bulkBusy}
             >
               {bulkBusy ? (
-                <LoaderCircle className="loading-shimmer-icon" size={15} />
+                <LoadingShimmer className="loading-shimmer-icon" size={15} />
               ) : (
                 <Trash2 size={15} />
               )}

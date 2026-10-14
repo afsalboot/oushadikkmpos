@@ -752,7 +752,18 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .loading-shimmer,
 .loading-shimmer-icon {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background-color: #e8eee9 !important;
+}
+
+.loading-shimmer::after,
+.loading-shimmer-icon::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
     background-image: linear-gradient(
         105deg,
         transparent 20%,
@@ -760,9 +771,7 @@ input[type="number"]::-webkit-outer-spin-button {
         rgba(255, 255, 255, 0.98) 50%,
         rgba(255, 255, 255, 0.82) 60%,
         transparent 80%
-    ) !important;
-    background-position: 120% 0;
-    background-size: 220% 100%;
+    );
     animation: oushadi-loading-shimmer 1.35s ease-in-out infinite;
 }
 
@@ -771,25 +780,22 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .loading-shimmer-icon {
-    border-radius: 9999px;
-    color: transparent !important;
-    stroke: transparent !important;
-}
-
-.loading-shimmer-icon * {
-    opacity: 0;
+    display: inline-block;
+    flex-shrink: 0;
+    vertical-align: middle;
+    border-radius: 0.3rem;
 }
 
 @keyframes oushadi-loading-shimmer {
-    from { background-position: 120% 0; }
-    to { background-position: -120% 0; }
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .loading-shimmer,
-    .loading-shimmer-icon {
+    .loading-shimmer::after,
+    .loading-shimmer-icon::after {
         animation: none;
-        background-position: 50% 0;
+        transform: none;
     }
 }
 

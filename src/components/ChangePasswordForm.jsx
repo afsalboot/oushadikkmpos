@@ -1,9 +1,10 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, LoaderCircle } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import PasswordInput from "@/components/PasswordInput";
 
@@ -93,7 +94,7 @@ export default function ChangePasswordForm({ embedded = false }) {
         </div>
         <button className="btn btn-primary mt-6 w-full" disabled={saving}>
           {saving ? (
-            <LoaderCircle className="loading-shimmer-icon" size={17} />
+            <LoadingShimmer className="loading-shimmer-icon" size={17} />
           ) : (
             <KeyRound size={17} />
           )}

@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 
 import {
   createContext,
@@ -13,7 +14,6 @@ import {
   CircleAlert,
   CircleCheck,
   Info,
-  LoaderCircle,
   TriangleAlert,
 } from "lucide-react";
 
@@ -164,7 +164,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
           >
             {loading && (
-              <LoaderCircle className="loading-shimmer-icon" size={16} />
+              <LoadingShimmer className="loading-shimmer-icon" size={16} />
             )}
             {loading ? loadingText || `${confirmText}…` : confirmText}
           </button>

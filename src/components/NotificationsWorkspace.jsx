@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 
 import Link from "next/link";
 import { resourceFetch } from "@/lib/resource-fetch";
@@ -9,7 +10,6 @@ import {
   CheckCheck,
   CircleAlert,
   Clock3,
-  LoaderCircle,
   PackageSearch,
   ReceiptText,
   Trash2,
@@ -129,7 +129,7 @@ export default function NotificationsWorkspace() {
             onClick={markAllRead}
           >
             {busy === "read-all" ? (
-              <LoaderCircle className="loading-shimmer-icon" size={16} />
+              <LoadingShimmer className="loading-shimmer-icon" size={16} />
             ) : (
               <CheckCheck size={16} />
             )}
@@ -141,7 +141,7 @@ export default function NotificationsWorkspace() {
             onClick={clearAll}
           >
             {busy === "clear-all" ? (
-              <LoaderCircle className="loading-shimmer-icon" size={16} />
+              <LoadingShimmer className="loading-shimmer-icon" size={16} />
             ) : (
               <Trash2 size={16} />
             )}
@@ -215,7 +215,7 @@ export default function NotificationsWorkspace() {
                       }
                     >
                       {busy === `read-${item.id}` ? (
-                        <LoaderCircle
+                        <LoadingShimmer
                           className="loading-shimmer-icon"
                           size={15}
                         />
@@ -237,7 +237,7 @@ export default function NotificationsWorkspace() {
                     }
                   >
                     {busy === `clear-${item.id}` ? (
-                      <LoaderCircle
+                      <LoadingShimmer
                         className="loading-shimmer-icon"
                         size={15}
                       />

@@ -1,13 +1,13 @@
-export default function PageShimmer() {
+export default function PageShimmer({ label = 'Loading page' }) {
   return (
-    <div role="status" aria-label="Loading page" aria-live="polite">
-      <span className="sr-only">Loading…</span>
-      <div className="mb-7 space-y-3">
+    <div role="status" aria-label={label} aria-live="polite" aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <div className="mb-7 space-y-3" aria-hidden="true">
         <div className="loading-shimmer h-3 w-36 rounded-full" />
         <div className="loading-shimmer h-9 w-60 max-w-[70vw] rounded-xl" />
         <div className="loading-shimmer h-4 w-[32rem] max-w-full rounded-full" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
         {Array.from({ length: 4 }, (_, index) => (
           <div className="card space-y-4 p-5" key={index}>
             <div className="loading-shimmer size-10 rounded-xl" />
@@ -16,7 +16,7 @@ export default function PageShimmer() {
           </div>
         ))}
       </div>
-      <div className="card mt-5 space-y-4 p-5">
+      <div className="card mt-5 space-y-4 p-5" aria-hidden="true">
         <div className="loading-shimmer h-12 w-full rounded-xl" />
         {Array.from({ length: 5 }, (_, index) => (
           <div className="flex items-center gap-4" key={index}>

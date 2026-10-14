@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer, { LoadingPlaceholder } from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useState } from "react";
@@ -6,7 +7,6 @@ import {
   Boxes,
   Info,
   IndianRupee,
-  LoaderCircle,
   PackageCheck,
   Plus,
   Search,
@@ -477,7 +477,7 @@ function AddSupplierModal({ onClose, onCreated }) {
           </button>
           <button className="btn btn-primary" disabled={saving}>
             {saving ? (
-              <LoaderCircle className="loading-shimmer-icon" size={17} />
+              <LoadingShimmer className="loading-shimmer-icon" size={17} />
             ) : (
               <Plus size={17} />
             )}
@@ -1170,7 +1170,7 @@ export default function PurchaseForm({
                 onClick={() => save("RECEIVED")}
               >
                 {saving ? (
-                  <LoaderCircle className="loading-shimmer-icon" size={17} />
+                  <LoadingShimmer className="loading-shimmer-icon" size={17} />
                 ) : (
                   <PackageCheck size={17} />
                 )}
@@ -1213,7 +1213,7 @@ export default function PurchaseForm({
                 />
               </div>
               <div className="mt-3 max-h-[55vh] overflow-auto">
-                {pickerLoading && <p className="p-3 text-sm" role="status">Loading products…</p>}
+                {pickerLoading && <LoadingPlaceholder label="Loading products…" className="p-3" />}
                 {!pickerLoading && productResults.map((product) => (
                   <button
                     type="button"

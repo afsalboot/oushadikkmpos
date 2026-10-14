@@ -1,7 +1,8 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, LoaderCircle, RefreshCw, X } from "lucide-react";
+import { Camera, RefreshCw, X } from "lucide-react";
 
 export default function CameraBarcodeScanner({ onDetected, onClose }) {
   const videoRef = useRef(null),
@@ -110,7 +111,7 @@ export default function CameraBarcodeScanner({ onDetected, onClose }) {
           {loading && (
             <div className="absolute inset-0 grid place-items-center bg-[#10251a] text-white">
               <span className="text-center">
-                <LoaderCircle className="mx-auto loading-shimmer-icon" />
+                <LoadingShimmer className="mx-auto loading-shimmer-icon" />
                 <small className="mt-2 block">Starting camera…</small>
               </span>
             </div>

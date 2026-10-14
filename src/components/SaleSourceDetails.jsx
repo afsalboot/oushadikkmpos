@@ -1,9 +1,10 @@
 "use client";
+import PageShimmer from "@/components/PageShimmer";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import OushadhiLogo from "@/components/branding/OushadhiLogo";
-import { ArrowLeft, LoaderCircle, ReceiptText, Pencil } from "lucide-react";
+import { ArrowLeft, ReceiptText, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { receiptDiscountLabel } from "@/lib/receipt-discount";
 import { isExternalPurchase, EXTERNAL_PURCHASE_PAYMENTS } from "@/lib/external-purchase";
@@ -48,9 +49,7 @@ export default function SaleSourceDetails({ id }) {
   }, [id]);
   if (loading)
     return (
-      <div className="card grid min-h-72 place-items-center">
-        <LoaderCircle className="loading-shimmer-icon text-[var(--green)]" />
-      </div>
+      <PageShimmer label="Loading sale…" />
     );
   if (error)
     return (

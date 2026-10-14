@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer, { LoadingPlaceholder } from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 import BackupStorageSettings from "./BackupStorageSettings";
 import SaleRetentionSettings from "./SaleRetentionSettings";
@@ -20,7 +21,6 @@ import {
   FileText,
   HardDrive,
   History,
-  LoaderCircle,
   LockKeyhole,
   PackageOpen,
   Plus,
@@ -2141,7 +2141,7 @@ function Audit() {
   if (!data)
     return (
       <Card title="Audit log">
-        <LoaderCircle className="loading-shimmer-icon" />
+        <LoadingPlaceholder label="Loading audit log…" />
       </Card>
     );
   return (
@@ -2275,7 +2275,7 @@ function RestoreBackup() {
       >
         {restoring ? (
           <>
-            <LoaderCircle className="loading-shimmer-icon" size={17} />
+            <LoadingShimmer className="loading-shimmer-icon" size={17} />
             Restoring…
           </>
         ) : (
@@ -2353,7 +2353,7 @@ function Backup({ data, change, disabled }) {
   if (loading && !status)
     return (
       <Card title="Backup status">
-        <LoaderCircle className="loading-shimmer-icon" />
+        <LoadingPlaceholder label="Loading backup status…" />
       </Card>
     );
   return (
@@ -2442,7 +2442,7 @@ function Backup({ data, change, disabled }) {
           >
             {creating ? (
               <>
-                <LoaderCircle className="loading-shimmer-icon" size={17} />
+                <LoadingShimmer className="loading-shimmer-icon" size={17} />
                 Creating…
               </>
             ) : (

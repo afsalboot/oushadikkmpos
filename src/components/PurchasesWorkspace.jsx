@@ -1,4 +1,5 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 import { resourceFetch } from "@/lib/resource-fetch";
 
 import { useEffect, useMemo, useState } from "react";
@@ -20,7 +21,6 @@ import {
   FileText,
   IndianRupee,
   Info,
-  LoaderCircle,
   PackageCheck,
   Plus,
   Printer,
@@ -531,7 +531,7 @@ function AddSupplierModal({ onClose, onCreated }) {
           </button>
           <button className="btn btn-primary" disabled={saving}>
             {saving ? (
-              <LoaderCircle className="loading-shimmer-icon" size={17} />
+              <LoadingShimmer className="loading-shimmer-icon" size={17} />
             ) : (
               <Plus size={17} />
             )}
@@ -1123,7 +1123,7 @@ function LegacyPurchaseForm({
                 onClick={() => save("RECEIVED")}
               >
                 {saving ? (
-                  <LoaderCircle className="loading-shimmer-icon" size={17} />
+                  <LoadingShimmer className="loading-shimmer-icon" size={17} />
                 ) : (
                   <PackageCheck size={17} />
                 )}
@@ -2201,7 +2201,7 @@ export default function PurchasesWorkspace() {
       )}
       {detailLoading && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/35 text-white">
-          <LoaderCircle className="loading-shimmer-icon" />
+          <LoadingShimmer className="loading-shimmer-icon" />
           <span className="mt-2">Loading purchase…</span>
         </div>
       )}

@@ -1,10 +1,10 @@
 "use client";
+import LoadingShimmer from "@/components/LoadingShimmer";
 import { isExternalPurchase } from "@/lib/external-purchase";
 
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   Check,
-  LoaderCircle,
   Plus,
   Search,
   UserRound,
@@ -521,7 +521,7 @@ export default function SalesCheckoutHostV2() {
   }
   return (
     <>
-      {preparing && <div className="fixed inset-0 z-[110] grid place-items-center bg-black/20" role="status" aria-live="polite"><div className="card flex items-center gap-3 p-5"><LoaderCircle className="animate-spin" size={20} />Processing payment…</div></div>}
+      {preparing && <div className="fixed inset-0 z-[110] grid place-items-center bg-black/20" role="status" aria-live="polite"><div className="card flex items-center gap-3 p-5"><LoadingShimmer className="loading-shimmer-icon" size={20} />Processing payment…</div></div>}
       {open && (
         <div
           className="fixed inset-0 z-[100] grid place-items-center bg-black/50 p-4"
@@ -718,7 +718,7 @@ export default function SalesCheckoutHostV2() {
                         )}
                         {searching && (
                           <div className="mt-4 flex items-center gap-2 text-sm text-[var(--muted)]">
-                            <LoaderCircle className="loading-shimmer-icon" size={16} />
+                            <LoadingShimmer className="loading-shimmer-icon" size={16} />
                             Searching customers…
                           </div>
                         )}
@@ -1165,7 +1165,7 @@ export default function SalesCheckoutHostV2() {
                   className="btn btn-primary mt-5 min-h-12 w-full"
                 >
                   {saving ? (
-                    <LoaderCircle className="loading-shimmer-icon" size={18} />
+                    <LoadingShimmer className="loading-shimmer-icon" size={18} />
                   ) : (
                     <WalletCards size={18} />
                   )}{" "}
