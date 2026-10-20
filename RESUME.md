@@ -1,4 +1,47 @@
-# Latest task — Staff module access and Sales loading (2026-10-20)
+# Latest task — Sidebar order and Consultation submenu (2026-10-20)
+
+## Original task
+
+Order the owner and staff sidebar as Dashboard, Sales, Products, then other modules; place Doctors inside Consultation.
+
+## What has been completed
+
+- Reordered the shared desktop/mobile sidebar: Dashboard, Sales, Products, Consultation, Customers, Purchases, Expenses, Accounts, Reports, Staff, Settings. Only permitted entries appear.
+- Consultation is an expandable, keyboard-accessible group containing Consultations and Doctors. Each child retains its own permission check. The group appears when at least one child is permitted; doctor-only staff can access Doctors without gaining consultation access.
+- Consultation ticket entry still honors the enabled feature. The group opens on active consultation/doctor routes; links identify the current page and close the mobile drawer.
+- Targeted ESLint, diff whitespace check and production build in `.next-sidebar` passed.
+
+## What is currently being worked on
+
+Implementation and automated code verification are complete.
+
+## Files modified
+
+`src/components/AppShell.jsx`; `RESUME.md`. Previous uncommitted Sales-priority changes in `src/lib/workspace-access.js` and `tests/workspace-access.test.mjs` remain intact.
+
+## Important implementation decisions
+
+The Doctors route and its server permission guard remain unchanged; only its sidebar position is nested. Existing login priority remains Dashboard, then Sales, then other permitted modules. Desktop and mobile use the same sidebar rendering.
+
+## Known bugs/issues
+
+No known code issues. Browser visual/keyboard verification and hosted deployment have not been performed.
+
+## Remaining tasks in order
+
+1. Browser-check owner and restricted staff menus on desktop/mobile, including expanding Consultation and selecting Doctors.
+
+## Commands/tests that should be run next
+
+Passed: `npx.cmd eslint src/components/AppShell.jsx`; `git diff --check`; `$env:NEXT_DIST_DIR='.next-sidebar'; npm.cmd run build`. No new tests added for the reversible sidebar presentation change.
+
+## Exact recommended next step
+
+Browser-check the menu order and permission-filtered Consultation submenu for an owner and restricted staff user, on desktop/mobile.
+
+---
+
+# Previous task — Staff module access and Sales loading (2026-10-20)
 
 ## Original task
 
@@ -6,9 +49,11 @@ Staff assigned Consultation, Doctor and Sales were always sent to Dashboard desp
 
 Follow-up: user clarified that this must cover currently saved users and all future roles/permission combinations.
 
+Latest clarification: when Dashboard is denied, prioritize Sales ahead of all other assigned modules. Only fall back to other modules when Sales is also denied.
+
 ## What has been completed
 
-- Added permission-aware landing priority: Dashboard when allowed, then Consultation (when enabled), Doctors, Sales and remaining assigned modules. Root, login, post-login/password-change and logo navigation use the permitted destination.
+- Added permission-aware landing priority: Dashboard when allowed, then Sales, then Consultation (when enabled), Doctors and remaining assigned modules. Root, login, post-login/password-change, forbidden-page redirects and logo navigation use the permitted destination. Latest change only reorders the shared priority and updates routing tests.
 - Added server page guards for Dashboard, Consultation, Doctors, Sales, Products, Customers, Purchases/Suppliers, Expenses, Accounts, Reports and Staff. Unauthorized pages redirect before client workspaces mount; API permission checks remain enforced.
 - Added a standalone Doctors page and navigation entry. Settings no longer appears as a granted module for all staff; own password/PIN security remains accessible through the staff name link.
 - Sales-only product pages/details, stock membership/index and barcode reads accept Sales permission without granting Products module access. General catalogue/detail and write permissions remain unchanged.
@@ -22,6 +67,8 @@ Follow-up: user clarified that this must cover currently saved users and all fut
 ## What is currently being worked on
 
 Follow-up permission-save fix and verification are complete. All 430 tests passed, production build passed in `.next-staff-roles`, final lint passed with zero errors and three existing warnings, and diff whitespace check passed. Fourteen relevant tests passed again after a lint-only test variable rename.
+
+Latest Sales-priority change is complete: nine routing/access tests passed, targeted ESLint passed, and diff whitespace check passed. No full-suite/build rerun was needed for reordering the shared destination list. Browser/hosted verification remains open.
 
 ## Files modified
 
@@ -37,7 +84,7 @@ Follow-up permission-save fix and verification are complete. All 430 tests passe
 - Permissions are read from the validated current session and effective role/override resolution. No role assignments, credentials or live financial/stock records were changed.
 - Narrow Sales dependency reads use their existing POS projections and response scope headers. Adding Sales permission does not grant Products/Settings module access or write access.
 - Personal account security is available even with no assigned modules; `/settings` is the safe fallback and exposes only existing self-service controls for such staff.
-- Current Consultation/Doctor/Sales role lands at Consultation when enabled. Owners and staff with Dashboard permission retain Dashboard priority.
+- Current Consultation/Doctor/Sales role lands at Sales. Owners and staff with Dashboard permission retain Dashboard priority. Without Sales permission, use the first other permitted module.
 
 ## Known bugs/issues
 
@@ -47,7 +94,7 @@ Older staff customizations may already have lost explicit denies in storage. Int
 
 ## Remaining tasks in order
 
-1. Browser-check the staff role after signing out and back in: login should open Consultation, navigation should show Consultation/Doctors/Sales, direct `/dashboard` should redirect without dashboard API requests, and Sales should load without dependency 403s. Check saving a customized existing/new user with inherited permissions unchecked.
+1. Browser-check the staff role after signing out and back in: login should open Sales, navigation should show Consultation/Doctors/Sales, direct `/dashboard` should redirect to Sales without dashboard API requests, and Sales should load without dependency 403s. Check saving a customized existing/new user with inherited permissions unchecked.
 
 ## Commands/tests that should be run next
 

@@ -29,8 +29,6 @@ import OushadhiLogo from "@/components/branding/OushadhiLogo";
 import { workspaceHome } from "@/lib/workspace-access";
 
 const nav = [
-  { href: "/consultations", label: "Consultation", icon: Stethoscope, permission: "consultation.view" },
-  { href: "/doctors", label: "Doctors", icon: Stethoscope, permission: "doctor.view" },
   {
     href: "/dashboard",
     label: "Dashboard",
@@ -48,6 +46,13 @@ const nav = [
     label: "Products",
     icon: Package,
     permission: "products.view",
+  },
+  {
+    label: "Consultation", icon: Stethoscope,
+    children: [
+      { href: "/consultations", label: "Consultations", permission: "consultation.view", consultationFeature: true },
+      { href: "/doctors", label: "Doctors", permission: "doctor.view" },
+    ],
   },
   {
     href: "/customers",
@@ -96,6 +101,9 @@ export default function AppShell({ user, children }) {
   const [salesRouteWarm, setSalesRouteWarm] = useState(false);
   const allowed = (permission) =>
     user.role === "ADMIN" || user.permissions?.includes(permission);
+  const visibleNav = nav.map(item => item.children
+    ? { ...item, children: item.children.filter(child => allowed(child.permission) && (!child.consultationFeature || user.consultationEnabled)) }
+    : item).filter(item => item.children ? item.children.length > 0 : allowed(item.permission));
   const home = workspaceHome(user);
   const canPrefetchSales = allowed('sales.view') && !user.mustChangePassword;
   useEffect(() => {
@@ -156,14 +164,28 @@ export default function AppShell({ user, children }) {
         </button>
       </div>
       <nav className="flex-1 overflow-y-auto p-3">
-        {nav
-          .filter((item) => (item.href !== "/consultations" || user.consultationEnabled) && allowed(item.permission))
-          .map(({ href, label, icon: Icon }) => {
+        {visibleNav
+          .map(({ href, label, icon: Icon, children: links }) => {
+            if (links) {
+              const groupActive = links.some(link => path === link.href || path.startsWith(link.href + "/"));
+              return <details key={label} open={groupActive} className="group mb-1">
+                <summary className={`flex cursor-pointer list-none items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition [&::-webkit-details-marker]:hidden ${groupActive ? "bg-white/10 text-white" : "text-emerald-50/75 hover:bg-white/10 hover:text-white"}`}>
+                  <Icon size={19} /><span className="flex-1">{label}</span><ChevronRight size={15} className="transition-transform group-open:rotate-90" />
+                </summary>
+                <div className="ml-5 mt-1 space-y-1 border-l border-white/20 pl-3">
+                  {links.map(link => {
+                    const active = path === link.href || path.startsWith(link.href + "/");
+                    return <Link key={link.href} href={link.href} aria-current={active ? "page" : undefined} onClick={() => setOpen(false)} className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm font-bold transition ${active ? "bg-white text-[#173d29]" : "text-emerald-50/75 hover:bg-white/10 hover:text-white"}`}>{link.label}{active && <ChevronRight size={15} />}</Link>;
+                  })}
+                </div>
+              </details>;
+            }
             const active = path === href || path.startsWith(href + "/");
             return (
               <Link
                 key={href}
                 href={href}
+                aria-current={active ? "page" : undefined}
                 prefetch={href === '/sales' ? canPrefetchSales && salesRouteWarm : undefined}
                 onMouseEnter={href === '/sales' && canPrefetchSales ? () => void prefetchSales({ scope: user.cacheScope }).catch(() => {}) : undefined}
                 onFocus={href === '/sales' && canPrefetchSales ? () => void prefetchSales({ scope: user.cacheScope }).catch(() => {}) : undefined}

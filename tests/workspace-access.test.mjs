@@ -7,12 +7,14 @@ import { salesSettings } from '../src/lib/sales-settings.js';
 
 const staff = { role: 'STAFF', permissions: ['consultation.view', 'doctor.view', 'sales.view', 'sales.create'], consultationEnabled: true };
 
-test('landing honors only granted modules with Dashboard first when allowed', () => {
-  assert.equal(workspaceHome(staff), '/consultations');
+test('landing prioritizes Dashboard, then Sales, then other permitted modules', () => {
+  assert.equal(workspaceHome(staff), '/sales');
   assert.equal(workspaceHome({ ...staff, permissions: [...staff.permissions, 'dashboard.view'] }), '/dashboard');
   assert.equal(workspaceHome({ role: 'STAFF', permissions: ['sales.view'] }), '/sales');
   assert.equal(workspaceHome({ role: 'STAFF', permissions: ['doctor.view'] }), '/doctors');
-  assert.equal(workspaceHome({ ...staff, consultationEnabled: false }), '/doctors');
+  assert.equal(workspaceHome({ ...staff, consultationEnabled: false }), '/sales');
+  assert.equal(workspaceHome({ ...staff, permissions: ['consultation.view', 'doctor.view'] }), '/consultations');
+  assert.equal(workspaceHome({ ...staff, consultationEnabled: false, permissions: ['consultation.view', 'doctor.view'] }), '/doctors');
   assert.equal(workspaceHome({ role: 'STAFF', permissions: [] }), '/settings');
   assert.equal(workspaceHome({ role: 'ADMIN' }), '/dashboard');
   assert.equal(workspaceHome({ ...staff, mustChangePassword: true }), '/change-password');
@@ -46,7 +48,7 @@ test('server page guard redirects denied staff before protected workspace is ret
   const makeGuard = session => new Function('readSession', 'redirect', 'canAccess', 'workspaceHome', `${source}; return requireWorkspacePage;`)(async () => session, destination => { throw Object.assign(new Error('redirect'), { destination }); }, canAccess, workspaceHome);
   assert.equal(await makeGuard(staff)('sales.view'), staff);
   for (const permission of ['dashboard.view', 'products.view', 'staff.view', 'reports.view']) {
-    await assert.rejects(makeGuard(staff)(permission), error => error.destination === '/consultations');
+    await assert.rejects(makeGuard(staff)(permission), error => error.destination === '/sales');
   }
   await assert.rejects(makeGuard(null)('sales.view'), error => error.destination === '/login');
   await assert.rejects(makeGuard({ ...staff, mustChangePassword: true })('sales.view'), error => error.destination === '/change-password');

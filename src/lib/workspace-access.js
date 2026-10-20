@@ -1,8 +1,8 @@
 export const WORKSPACE_MODULES = [
   { href: '/dashboard', permission: 'dashboard.view' },
+  { href: '/sales', permission: 'sales.view' },
   { href: '/consultations', permission: 'consultation.view' },
   { href: '/doctors', permission: 'doctor.view' },
-  { href: '/sales', permission: 'sales.view' },
   { href: '/products', permission: 'products.view' },
   { href: '/customers', permission: 'customers.view' },
   { href: '/purchases', permission: 'purchases.view' },
