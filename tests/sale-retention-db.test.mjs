@@ -59,6 +59,52 @@ async function checkoutRoute(){
   new Function('require','module','exports',code)(fixtureRequire,fixtureModule,fixtureModule.exports);return fixtureModule.exports;
 }
 test('real MongoDB retention transactions and historical reporting',async t=>{
+  await t.test('product sales and separate fees reconcile in reports and dashboard before and after retention', async () => {
+    const current = bill(91, { saleType: 'WHOLESALE', total: 150, consultationFee: 20, treatmentFee: 30, payments: [{ method: 'CASH', amount: 100 }, { method: 'UPI', amount: 50 }] });
+    const previous = bill(92, { total: 115, consultationFee: 7, treatmentFee: 8 });
+    const legacy = bill(91);
+    const cancelled = bill(91, { documentStatus: 'CANCELLED', total: 1000, consultationFee: 400, treatmentFee: 500 });
+    await reset([current, previous, legacy, cancelled, bill(20, { treatmentFee: 300, total: 400 })]);
+    const dates = { start: new Date(+current.createdAt - 3600000), end: new Date(+current.createdAt + 3600000), previousStart: new Date(+previous.createdAt - 3600000), previousEnd: new Date(+previous.createdAt + 3600000) };
+    const windows = [dates];
+    const parameters = new URLSearchParams({ dateFrom: current.createdAt.toISOString().slice(0, 10), dateTo: current.createdAt.toISOString().slice(0, 10) });
+    async function check() {
+      const [dashboard] = await historicalSalesAggregate(dashboardSalesPipeline(dates, windows, [{ _id: productId, packageSize: 100 }], new Map([[String(productId), 0.2]])));
+      const summary = dashboard.summary.find(row => row._id === 'current');
+      assert.equal(summary.revenue, 200);
+      assert.equal(summary.profit, 160);
+      assert.equal(summary.consultationFee, 20);
+      assert.equal(summary.treatmentFee, 30);
+      assert.equal(dashboard.summary.find(row => row._id === 'previous').revenue, 100);
+      assert.equal(dashboard.chart.find(row => row._id.period === 'current').revenue, 200);
+      assert.equal(dashboard.wholesale[0].revenue, 100);
+      assert.equal(dashboard.payments.reduce((sum, row) => sum + row.amount, 0), 250);
+      const sales = await getReport('sales', parameters);
+      assert.equal(sales.kpis.find(row => row.label === 'Gross Sales').value, 200);
+      const wholesale = await getReport('wholesale-sales', parameters);
+      assert.equal(wholesale.rows[0].total, 100);
+      assert.equal(wholesale.kpis.find(row => row.label === 'Wholesale Revenue').value, 100);
+      const overview = await getReport('overview', parameters);
+      assert.equal(overview.kpis.find(row => row.label === 'Total Sales').value, 200);
+      assert.equal(overview.kpis.find(row => row.label === 'Consultation Fees (Sales Cart)').value, 20);
+      assert.equal(overview.kpis.find(row => row.label === 'Treatment Fees').value, 30);
+      assert.equal(overview.charts.trend[0].revenue, 200);
+      const fees = await getReport('service-fees', parameters);
+      assert.equal(fees.pagination.total, 1);
+      assert.deepEqual(fees.kpis.map(row => row.value), [20, 30, 50, 1]);
+      const payments = await getReport('payment-methods', parameters);
+      assert.equal(payments.kpis.find(row => row.label === 'Collected').value, 250);
+      return fees;
+    }
+    await check();
+    await migrate();
+    const before = await unchanged();
+    await service.cleanup({ now });
+    assert.equal(await models.Sale.exists({ _id: current._id }), null);
+    const retained = await check();
+    assert.equal(retained.rows[0].sourcePath, null);
+    assert.equal(await unchanged(), before);
+  });
   await t.test('locked activation and strict date boundaries; permanent summaries and side effects',()=>record('90-day boundary, gates, summaries, stock/customer preservation',async()=>{
     const rows=[bill(91),bill(90),bill(89),bill(-1)];await reset(rows);
     await assert.rejects(()=>service.cleanup({now}),/locked/);delete process.env.SALES_RETENTION_CLEANUP_ENABLED;assert.equal((await service.cleanup({now})).deleted,0);process.env.SALES_RETENTION_CLEANUP_ENABLED='1';

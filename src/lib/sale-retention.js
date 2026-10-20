@@ -27,7 +27,7 @@ const lineFields=['kind','name','saleMode','itemSource','quantity','baseQuantity
 // Analytics facts, not an invoice copy: no invoice number, unit selling price,
 // addresses/phone/GSTIN, references, receipt, allocations, discounts or raw input.
 export function saleAnalyticsFacts(sale){
-  const facts=pick(sale,['createdAt','invoiceDate','financialYear','documentType','documentStatus','saleType','customerType','subtotal','discount','taxableSubtotal','tax','cgst','sgst','utgst','igst','roundOff','consultationFee','total','amountPaid','balanceDue','paymentStatus','gstEnabled','taxType','placeOfSupply']);
+  const facts=pick(sale,['createdAt','invoiceDate','financialYear','documentType','documentStatus','saleType','customerType','subtotal','discount','taxableSubtotal','tax','cgst','sgst','utgst','igst','roundOff','consultationFee','treatmentFee','total','amountPaid','balanceDue','paymentStatus','gstEnabled','taxType','placeOfSupply']);
   facts.customerId=id(sale.customerId);facts.actorId=id(sale.actorId);
   facts.customerIsB2B=Boolean(sale.customerSnapshot?.gstin);
   if(sale.registrationSnapshot)facts.registrationSnapshot=pick(sale.registrationSnapshot,['status']);

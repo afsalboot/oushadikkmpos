@@ -84,6 +84,31 @@ function harness() {
   return h;
 }
 
+test("treatment fee is saved on creation and can be edited or removed", async () => {
+  const h = harness();
+  let result = await h.invoke({ create: true, price: 410, request: { treatmentFeeEnabled: true, treatmentFee: 50 } });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(result.data.treatmentFee, 50);
+  assert.equal(result.data.total, 410);
+  result = await h.invoke({ price: 435, key: "treatment-edit-001", request: { treatmentFeeEnabled: true, treatmentFee: 75 } });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(result.data.treatmentFee, 75);
+  assert.equal(result.data.total, 435);
+  result = await h.invoke({ price: 360, key: "treatment-edit-002", request: { treatmentFeeEnabled: false, treatmentFee: 75 } });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(result.data.treatmentFee, 0);
+  assert.equal(result.data.total, 360);
+});
+
+test("invalid treatment fee fails checkout before saving a sale or changing stock", async () => {
+  const h = harness();
+  const result = await h.invoke({ request: { treatmentFeeEnabled: true, treatmentFee: -5 } });
+  assert.equal(result.status, 422, result.error);
+  assert.equal(h.state.batches[0].sealedPackages, 3);
+  assert.equal(h.state.rows.length, 0);
+  assert.equal(h.state.sale.total, 200);
+});
+
 test("editing a paid sale keeps its invoice, billed price and date, adjusts stock once, and preserves an audited original", async () => {
   const h = harness();
   const result = await h.invoke();

@@ -1,11 +1,12 @@
 import { isWholesaleSale } from "./wholesale-reporting.js";
+import { productSalesTotal } from "./sale-revenue.js";
 import { calculatePhysicalStock, isLowStock, packageEquivalentStock, getLooseUnit } from "../services/inventory.service.js";
 
 const money = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 export function dashboardWholesale(sales = []) {
   const rows = sales.filter((sale) => isWholesaleSale(sale) || sale.discountSummary?.reason === "Wholesale discount");
-  const revenue = money(rows.reduce((sum, sale) => sum + Number(sale.total || 0), 0));
+  const revenue = money(rows.reduce((sum, sale) => sum + productSalesTotal(sale), 0));
   return {
     invoices: rows.length,
     revenue,

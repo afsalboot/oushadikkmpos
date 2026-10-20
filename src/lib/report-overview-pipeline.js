@@ -1,13 +1,15 @@
+import { productSalesExpression } from './sale-revenue.js';
+
 export function reportOverviewPipeline(filter) {
   const nz = field => ({ $ifNull: [field, 0] });
   const wholesale = { $or: [{ $eq: ['$saleType', 'WHOLESALE'] }, { $in: ['WHOLESALE', { $ifNull: ['$items.saleMode', []] }] }] };
   const decimal = field => ({ $toDecimal: { $toString: nz(field) } });
   const lineCost = { $divide: [{ $floor: { $add: [{ $multiply: [decimal('$items.quantity'), decimal('$items.purchaseCost'), 100] }, { $toDecimal: '0.5' }] } }, 100] };
   return [
-    { $match: filter }, { $set: { wholesale } },
+    { $match: filter }, { $set: { wholesale, productSales: productSalesExpression() } },
     { $facet: {
-      summary: [{ $group: { _id: null, revenue: { $sum: '$total' }, wholesaleRevenue: { $sum: { $cond: ['$wholesale', '$total', 0] } } } }],
-      trend: [{ $group: { _id: { $dateToString: { date: '$createdAt', format: '%Y-%m-%d', timezone: 'Asia/Kolkata' } }, revenue: { $sum: '$total' }, wholesaleRevenue: { $sum: { $cond: ['$wholesale', '$total', 0] } }, orders: { $sum: 1 } } }, { $sort: { _id: 1 } }],
+      summary: [{ $group: { _id: null, revenue: { $sum: '$productSales' }, consultationFee: { $sum: nz('$consultationFee') }, treatmentFee: { $sum: nz('$treatmentFee') }, wholesaleRevenue: { $sum: { $cond: ['$wholesale', '$productSales', 0] } } } }],
+      trend: [{ $group: { _id: { $dateToString: { date: '$createdAt', format: '%Y-%m-%d', timezone: 'Asia/Kolkata' } }, revenue: { $sum: '$productSales' }, wholesaleRevenue: { $sum: { $cond: ['$wholesale', '$productSales', 0] } }, orders: { $sum: 1 } } }, { $sort: { _id: 1 } }],
       items: [{ $unwind: '$items' }, { $group: {
         _id: null,
         inventoryRevenue: { $sum: { $cond: [{ $eq: ['$items.itemSource', 'external_purchase'] }, 0, nz('$items.total')] } },

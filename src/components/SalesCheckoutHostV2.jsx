@@ -272,6 +272,8 @@ export default function SalesCheckoutHostV2() {
   const pricing=useMemo(() => calculateSalePricing({
     consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
     consultationFee: cartCustomer?.consultationFee,
+    treatmentFeeEnabled: cartCustomer?.treatmentFeeEnabled === true,
+    treatmentFee: cartCustomer?.treatmentFee,
     wholesaleDiscount: wholesaleDiscountEnabled ? cart.map(item => item.saleWholesaleDiscountPercent || 0) : undefined,
     items:cart.map(item=>({...item,amount:lineTotal(item),gstRate:item.kind==="MIX"?settings?.gst?.defaultRate:item.gstRate,useDefaultGstRate:item.kind==="MIX"?true:item.useDefaultGstRate})),
     discount:{type:editingSale?.discountSummary?.discountType || "PERCENTAGE",value:editingSale?.discountSummary?.discountValue || 0,reason:discountReason},
@@ -452,6 +454,8 @@ export default function SalesCheckoutHostV2() {
         wholesaleDiscountEnabled,
         consultationFeeEnabled: cartCustomer?.consultationFeeEnabled === true,
         consultationFee: cartCustomer?.consultationFee,
+        treatmentFeeEnabled: cartCustomer?.treatmentFeeEnabled === true,
+        treatmentFee: cartCustomer?.treatmentFee,
         supplyContext:{fulfilment,deliveryAddress,deliveryStateCode},
         discountReason, payments, credit: payment === "CREDIT",
       };
@@ -937,6 +941,7 @@ export default function SalesCheckoutHostV2() {
                       <strong>{money(subtotal)}</strong>
                     </div>
                     {pricing.consultationFee > 0 && <div className="flex justify-between"><span>Consultation fee</span><strong>{money(pricing.consultationFee)}</strong></div>}
+                    {pricing.treatmentFee > 0 && <div className="flex justify-between"><span>Treatment fee</span><strong>{money(pricing.treatmentFee)}</strong></div>}
                     {!cartCustomer && <label className="mt-3 flex items-center gap-2 text-sm font-bold">
                       <input type="checkbox" checked={wholesaleDiscountEnabled}
                         onChange={(event) => { setWholesaleDiscountEnabled(event.target.checked); setDiscountType("PERCENTAGE"); setDiscountValue(""); }} />

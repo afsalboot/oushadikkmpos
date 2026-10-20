@@ -289,6 +289,10 @@ export default function DashboardWorkspace() {
             ))}
       </div>
       {data?.consultation && <div className="grid gap-3 sm:grid-cols-2"><Link href="/consultations" className="card p-4"><p className="text-sm">{data.rangeLabel} Consultations</p><b className="text-2xl">{data.consultation.count}</b></Link><Link href="/consultations/report" className="card p-4"><p className="text-sm">Consultation collection</p><b className="text-2xl">{money(data.consultation.collection)}</b></Link></div>}
+      {data?.fees && <section aria-label="Sales cart fees" className="grid gap-3 sm:grid-cols-2">
+        <Link href="/reports?report=service-fees" className="card p-4"><p className="text-sm">{data.rangeLabel} Consultation fees (Sales cart)</p><b className="text-2xl">{money(data.fees.consultationFee)}</b><p className="mt-1 text-xs text-[var(--muted)]">Tracked separately from product sales</p></Link>
+        <Link href="/reports?report=service-fees" className="card p-4"><p className="text-sm">{data.rangeLabel} Treatment fees</p><b className="text-2xl">{money(data.fees.treatmentFee)}</b><p className="mt-1 text-xs text-[var(--muted)]">Tracked separately from product sales</p></Link>
+      </section>}
       <div className="grid gap-5 xl:grid-cols-[1.6fr_.8fr]">
         <Card
           title="Sales overview"

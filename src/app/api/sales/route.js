@@ -802,6 +802,8 @@ export async function POST(request) {
       const pricing = calculateSalePricing({
         consultationFeeEnabled: body.consultationFeeEnabled === true,
         consultationFee: body.consultationFee,
+        treatmentFeeEnabled: body.treatmentFeeEnabled === true,
+        treatmentFee: body.treatmentFee,
         wholesaleDiscount: body.wholesaleDiscountEnabled === true ? body.items.map(item => item.saleWholesaleDiscountPercent ?? 0) : undefined,
         items: saleItems.map((item, index) => ({
           amount: item.total,
@@ -960,6 +962,7 @@ export async function POST(request) {
             roundOff,
             roundingSummary: pricing.roundingSummary,
             consultationFee: pricing.consultationFee,
+            treatmentFee: pricing.treatmentFee,
             total,
             payments,
             paymentStatus: credit?.paymentStatus || "PAID",

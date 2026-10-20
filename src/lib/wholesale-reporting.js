@@ -1,3 +1,5 @@
+import { productSalesTotal } from './sale-revenue.js';
+
 const amount = (value) =>
   Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
@@ -32,7 +34,7 @@ export function summarizeWholesaleSales(sales = []) {
   for (const sale of sales) {
     if (!isWholesaleSale(sale)) continue;
     invoices += 1;
-    revenue += Number(sale.total || 0);
+    revenue += productSalesTotal(sale);
     if (sale.customerId) customers.add(String(sale.customerId));
     for (const item of sale.items || []) {
       if (item.saleMode !== "WHOLESALE") continue;

@@ -98,7 +98,7 @@ export function calculateWholesaleDiscount(items, subtotal, percentage) {
   };
 }
 
-export function calculateSalePricing({items=[],discount={},wholesaleDiscount,consultationFeeEnabled=false,consultationFee=0,settings,currentUser,paymentMethod,placeOfSupply}){
+export function calculateSalePricing({items=[],discount={},wholesaleDiscount,consultationFeeEnabled=false,consultationFee=0,treatmentFeeEnabled=false,treatmentFee=0,settings,currentUser,paymentMethod,placeOfSupply}){
   const isWholesaleDiscount = wholesaleDiscount !== undefined && wholesaleDiscount !== null;
   const subtotal=money(items.reduce((sum,item)=>sum+Number(item.amount??item.total??0),0)),discountSummary=isWholesaleDiscount ? calculateWholesaleDiscount(items,subtotal,wholesaleDiscount) : calculateDiscount({items,cartSubtotal:subtotal,discount,settings,currentUser});
   const gst=calculateGstInvoice({lines:items,discount:sumMoney([discountSummary.cartDiscount,discountSummary.automaticDiscount]),lineDiscounts:discountSummary.lineDiscounts,discountEligible:items.map(item=>isWholesaleDiscount || eligible(item,settings)),settings,placeOfSupply});
@@ -110,9 +110,15 @@ export function calculateSalePricing({items=[],discount={},wholesaleDiscount,con
     if(!Number.isFinite(value)||value<=0||value>99999999)discountSummary.validationErrors.push("Enter a consultation fee between 0.01 and 99,999,999.");
     else { fee=money(value); if(fee<=0)discountSummary.validationErrors.push("Consultation fee must be at least 0.01."); }
   }
-  const beforeRoundOff=sumMoney([gst.total,fee]);
+  let treatment=0;
+  if(treatmentFeeEnabled){
+    const value=Number(treatmentFee);
+    if(!Number.isFinite(value)||value<=0||value>99999999)discountSummary.validationErrors.push("Enter a treatment fee between 0.01 and 99,999,999.");
+    else { treatment=money(value); if(treatment<=0)discountSummary.validationErrors.push("Treatment fee must be at least 0.01."); }
+  }
+  const beforeRoundOff=sumMoney([gst.total,fee,treatment]);
   const roundOff=settings?.roundOff?.enabled?calculateRoundOff(beforeRoundOff,settings.roundOff,paymentMethod):0,total=sumMoney([beforeRoundOff,roundOff]);
-  return{subtotal,...discountSummary,consultationFee:fee,gst,beforeRoundOff,roundOff,total,roundingSummary:{enabled:Boolean(settings?.roundOff?.enabled),beforeRoundOff,roundOffAmount:roundOff,finalAmount:total,method:String(settings?.roundOff?.method||"NEAREST").toUpperCase(),precision:settings?.roundOff?.precision==="CUSTOM"?Number(settings?.roundOff?.customPrecision):Number(settings?.roundOff?.precision)||(settings?.roundOff?.method==="NEAREST_050"?.5:1),paymentScope:String(settings?.roundOff?.paymentScope||"ALL").toUpperCase()}};
+  return{subtotal,...discountSummary,consultationFee:fee,treatmentFee:treatment,gst,beforeRoundOff,roundOff,total,roundingSummary:{enabled:Boolean(settings?.roundOff?.enabled),beforeRoundOff,roundOffAmount:roundOff,finalAmount:total,method:String(settings?.roundOff?.method||"NEAREST").toUpperCase(),precision:settings?.roundOff?.precision==="CUSTOM"?Number(settings?.roundOff?.customPrecision):Number(settings?.roundOff?.precision)||(settings?.roundOff?.method==="NEAREST_050"?.5:1),paymentScope:String(settings?.roundOff?.paymentScope||"ALL").toUpperCase()}};
 }
 
 export function calculateConfiguredDiscount({subtotal,type="FIXED",value=0,settings,currentUser={role:"ADMIN"}}){const result=calculateDiscount({cartSubtotal:subtotal,discount:{type,value},settings,currentUser});if(result.validationErrors.length)throw new Error(result.validationErrors[0]);return result.totalDiscount;}

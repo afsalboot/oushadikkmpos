@@ -115,6 +115,12 @@ const reportGroups = [
     ],
   },
   {
+    label: "Fees",
+    items: [
+      { id: "service-fees", label: "Consultation & Treatment Fees", description: "Separate fee totals and invoice breakdown", icon: WalletCards },
+    ],
+  },
+  {
     label: "Inventory",
     items: [
       {
@@ -390,8 +396,8 @@ function Overview({ data, openReport, allowed }) {
   );
 }
 
-export default function ReportsWorkspace() {
-  const [report, setReport] = useState("overview"),
+export default function ReportsWorkspace({ initialReport = "overview" }) {
+  const [report, setReport] = useState(initialReport),
     [data, setData] = useState(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),

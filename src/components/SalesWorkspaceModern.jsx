@@ -739,7 +739,8 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
       setWholesaleDiscountEnabled(customer?.customerType === "WHOLESALE" || sale.saleType === "WHOLESALE" || sale.items.some(item => Number(item.wholesaleDiscountPercent) > 0));
       setCartCustomer({ name: sale.customerSnapshot?.name || "", phone: sale.customerSnapshot?.phone || "", selected: customer,
         doctorName: sale.customerSnapshot?.doctorName || "", ...sale.supplyContext,
-        consultationFeeEnabled: Number(sale.consultationFee) > 0, consultationFee: sale.consultationFee || "" });
+        consultationFeeEnabled: Number(sale.consultationFee) > 0, consultationFee: sale.consultationFee || "",
+        treatmentFeeEnabled: Number(sale.treatmentFee) > 0, treatmentFee: sale.treatmentFee || "" });
     }).catch(error => { if (active) { setEditError(error.message); toast.error(error.message); } })
       .finally(() => { if (active) setEditLoading(false); });
     return () => { active = false; };
@@ -850,7 +851,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     const openCheckout = (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();
-      const fields = document.querySelectorAll("#cart-customer-fields input, #cart-customer-fields select, #cart-customer-fields textarea, [data-consultation-fee]");
+      const fields = document.querySelectorAll("#cart-customer-fields input, #cart-customer-fields select, #cart-customer-fields textarea, [data-consultation-fee], [data-treatment-fee]");
       for (const field of fields) if (!field.reportValidity()) return;
       window.dispatchEvent(
         new CustomEvent("oushadi-open-checkout", {
@@ -990,6 +991,8 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     cartPricing = useMemo(() => calculateSalePricing({
       consultationFeeEnabled: cartCustomer.consultationFeeEnabled === true,
       consultationFee: cartCustomer.consultationFee,
+      treatmentFeeEnabled: cartCustomer.treatmentFeeEnabled === true,
+      treatmentFee: cartCustomer.treatmentFee,
       wholesaleDiscount: wholesaleDiscountEnabled ? cart.map(item => item.saleWholesaleDiscountPercent || 0) : undefined,
       items: cart.map((i) => ({ ...i, discount: undefined, amount: total(i),
         gstRate: i.kind === "MIX" ? settings?.gst?.defaultRate : i.gstRate,
@@ -1694,7 +1697,12 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
                 <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" className="size-4 accent-[var(--green)]" checked={Boolean(cartCustomer.consultationFeeEnabled)} onChange={(event) => setCartCustomer((current) => ({ ...current, consultationFeeEnabled: event.target.checked, consultationFee: "" }))} />Consultation Fee</label>
                 {cartCustomer.consultationFeeEnabled && <input data-consultation-fee type="number" className="field !min-h-9 !w-28" aria-label="Consultation fee amount" placeholder="Enter amount" min="0.01" max="99999999" step="0.01" required value={cartCustomer.consultationFee || ""} onChange={(event) => setCartCustomer((current) => ({ ...current, consultationFee: event.target.value }))} />}
               </div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" className="size-4 accent-[var(--green)]" checked={Boolean(cartCustomer.treatmentFeeEnabled)} onChange={(event) => setCartCustomer((current) => ({ ...current, treatmentFeeEnabled: event.target.checked, treatmentFee: "" }))} />Treatment Fee</label>
+                {cartCustomer.treatmentFeeEnabled && <input data-treatment-fee type="number" className="field !min-h-9 !w-28" aria-label="Treatment fee amount" placeholder="Enter amount" min="0.01" max="99999999" step="0.01" required value={cartCustomer.treatmentFee || ""} onChange={(event) => setCartCustomer((current) => ({ ...current, treatmentFee: event.target.value }))} />}
+              </div>
               {cartPricing.consultationFee > 0 && <div className="mb-2 flex justify-between text-sm"><span>Consultation fee</span><b>{money(cartPricing.consultationFee)}</b></div>}
+              {cartPricing.treatmentFee > 0 && <div className="mb-2 flex justify-between text-sm"><span>Treatment fee</span><b>{money(cartPricing.treatmentFee)}</b></div>}
               <label className="mb-3 flex items-center gap-2 text-sm font-bold">
                 <input type="checkbox" className="size-4 accent-[var(--green)]"
                   checked={wholesaleDiscountEnabled}

@@ -1,4 +1,102 @@
-# Latest task — shimmering loading animations (2026-10-14)
+# Latest task — Separate fees from sales tracking (2026-10-20)
+
+## Original task
+
+User requested consultation and treatment fees be excluded from sales tracking, with separate tracking in Reports and Dashboard.
+
+## What has been completed
+
+- Added shared product revenue calculation: invoice total minus consultation and treatment fees. Product discounts, GST and invoice rounding retain their existing allocation.
+- Dashboard sales/profit KPIs, current/previous charts and wholesale totals use product revenue. Cancelled invoices are excluded. Added separate consultation (Sales cart) and treatment fee cards linking to the new report.
+- Reports Overview displays separate fee KPIs; sales/wholesale/staff sales values and customer revenue KPIs exclude fees. Actual customer spending, invoice/payment totals, cash flow and fiscal registers preserve full invoice amounts.
+- Added a Fees category and Consultation & Treatment Fees report with separate columns/KPIs, date filters, search, sorting, pagination and CSV export. It uses existing reports.sales/export permissions. Dashboard links open the fee report through a validated report query parameter.
+- Existing OP consultation ticket collection remains a separately labelled tracker. The new report tracks Sales cart fees only.
+- Added pure report/revenue tests and an isolated MongoDB scenario validating dashboard/report/payment reconciliation before and after archival cleanup. No live financial writes or production retention migration were performed.
+
+## What is currently being worked on
+
+Implementation and automated verification are complete: 419 tests passed with zero failures/skips, lint passed with zero errors and three existing warnings, and the production build passed in `.next-fee-tracking`. The isolated MongoDB case confirms product sales, fees and payments reconcile before and after retention. An initial fixture assertion was corrected to supply the same inventory cost before and after retention; retained dashboard cost snapshots already include cost.
+
+## Files modified for this request
+
+New: `src/lib/sale-revenue.js`, `src/lib/service-fee-report.js`, `tests/service-fee-report.test.mjs`.
+
+Modified: `src/lib/dashboard-sales-pipeline.js`, `report-overview-pipeline.js`, `dashboard-summary.js`, `wholesale-reporting.js`, `server/dashboard-data.js`; `src/services/report.service.js`, `report-overview.service.js`; `src/components/DashboardWorkspace.jsx`, `ReportsWorkspace.jsx`; `src/app/(workspace)/reports/page.js`; `tests/sale-retention-db.test.mjs`; `RESUME.md`.
+
+Prior Treatment fee implementation changes remain in the working tree and are documented below.
+
+## Important implementation decisions
+
+- Stored sale totals/payments stay authoritative for actual billing/collections. Separate read calculations prevent counting fee income as product revenue without rewriting past bills.
+- Historical report readers already union retained facts; those facts preserve fee fields. Permanent retention reconciliation metrics are unchanged, avoiding an unsolicited historical migration.
+- Separate fees are billed values, including any unpaid invoices, consistent with the existing revenue reports. Actual collections remain in Payment Methods and Cash Flow.
+- Missing fee values on older bills count as zero. Cancelled invoices do not contribute fees or product revenue.
+
+## Known bugs/issues
+
+Browser visual verification remains open. No live deployment or physical printing checks were performed.
+
+## Remaining tasks in order
+
+1. Browser-check dashboard fee cards and Reports > Fees including date filters and CSV export.
+
+## Commands/tests that should be run next
+
+Passed: `npm.cmd test` (419 tests); `npm.cmd run lint` (three existing warnings); `$env:NEXT_DIST_DIR='.next-fee-tracking'; npm.cmd run build`; `git diff --check`. Repeat only after code changes.
+
+## Exact recommended next step
+
+Open Dashboard and verify the separate consultation/treatment fee cards for the selected date range, then open Reports > Fees and confirm the invoice breakdown, filters and export. Invoice collections should equal product sales plus fees.
+
+---
+
+# Previous task — Treatment fee in Sales cart (2026-10-20)
+
+## Original task
+
+Add a Treatment fee checkbox below Consultation Fee in the Sales cart, showing an amount field when checked.
+
+## What has been completed
+
+- Added the checkbox and conditional required amount field directly beneath Consultation Fee; unchecking clears the fee.
+- Included treatment fees in shared client/server pricing, checkout payloads, saved sales, sale editing, payment summary, sale details, thermal receipts and retained financial facts.
+- Added tests for optional/combined fees, invalid input, retained facts, checkout creation, fee editing/removal and rejection before stock writes.
+- Full test suite passed: 414 tests, zero failures/skips. Lint passed with zero errors and three existing warnings. Production build passed in `.next-treatment-fee`. Diff whitespace check passed.
+
+## What is currently being worked on
+
+Implementation and automated verification are complete.
+
+## Files modified
+
+`src/components/SalesWorkspaceModern.jsx`, `SalesCheckoutHostV2.jsx`, `SaleSourceDetails.jsx`, `ThermalReceiptPrinter.jsx`; `src/app/api/sales/route.js`; `src/services/pricing.service.js`; `src/models/index.js`; `src/lib/sale-retention.js`; `tests/sale-edit.test.mjs`; new `tests/treatment-fee.test.mjs`; `RESUME.md`.
+
+## Important implementation decisions
+
+- Follow existing consultation fee behavior: validate enabled amounts between 0.01 and 99,999,999, add the separate fee after product pricing and before rounding.
+- Persist the numeric fee with default zero; infer the checkbox from a positive saved fee when editing. Existing sales need no migration.
+- Include treatment input in the existing pre-payment browser validity checks. Stock logic is unchanged.
+- All checkout verification uses isolated fixtures; no live transactions were created.
+
+## Known bugs/issues
+
+No known implementation defects. Browser layout and physical printing remain unverified.
+
+## Remaining tasks in order
+
+1. Browser-check selecting/clearing the checkbox and changing the amount; confirm cart/payment summaries and saved receipt display.
+
+## Commands/tests that should be run next
+
+All passed: `npm.cmd test` (414 tests); `npm.cmd run lint` (three existing warnings); `$env:NEXT_DIST_DIR='.next-treatment-fee'; npm.cmd run build`; `git diff --check`. Repeat only after further code changes.
+
+## Exact recommended next step
+
+Open Sales in an authenticated browser, select Treatment Fee below Consultation Fee, enter an amount and verify the total updates; clear it and verify the fee disappears. No live transaction is required for this UI check.
+
+---
+
+# Previous task — shimmering loading animations (2026-10-14)
 
 ## Original task
 

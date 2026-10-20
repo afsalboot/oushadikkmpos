@@ -69,6 +69,7 @@ export async function getDashboardData(range = 'today', from, to, { timing } = {
   if (latest?.supplierId) latest.supplierId = await Supplier.findById(latest.supplierId).select('name').lean();
   const expiringSoonCount = batchSummary.expiringSoon?.[0]?.count || 0;
   return {
+    fees: { consultationFee: amount(current.consultationFee), treatmentFee: amount(current.treatmentFee), total: amount(Number(current.consultationFee || 0) + Number(current.treatmentFee || 0)) },
     consultation: consultationGroups ? { count: consultationGroups[0]?.count || 0, collection: amount(consultationGroups[0]?.collection) } : null,
     storeName: settings.store?.name || settings.storeName || 'Store',
     features: { loose: settings.looseSales?.enabled !== false && Boolean(inventoryTotals.loose), mix: settings.customMix?.enabled !== false && Boolean(inventoryTotals.mix) },

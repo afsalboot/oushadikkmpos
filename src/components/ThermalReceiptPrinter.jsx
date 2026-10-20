@@ -292,6 +292,7 @@ export function ThermalReceipt({ sale }) {
             </div>
           ))}
         {Number(sale.consultationFee || 0) > 0 && <div><dt>Consultation fee</dt><dd>{money(sale.consultationFee)}</dd></div>}
+        {Number(sale.treatmentFee || 0) > 0 && <div><dt>Treatment fee</dt><dd>{money(sale.treatmentFee)}</dd></div>}
         {Math.abs(Number(sale.roundOff || 0)) > 0.001 && (
           <div>
             <dt>Round Off</dt>
