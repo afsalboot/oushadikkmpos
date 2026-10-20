@@ -31,11 +31,21 @@ export function applyPermissionDependencies(value={}){
   return result;
 }
 
+// The staff Customize matrix is a complete selection. Preserve explicit denies
+// so unchecked inherited permissions cannot return when the record is saved.
+export function normalizePermissionOverrides(value={}){
+  const grants=applyPermissionDependencies(value);
+  return Object.fromEntries(Object.entries(PERMISSION_CATALOG).map(([module,actions])=>[
+    module,Object.fromEntries(actions.map(action=>[action,value?.[module]?.view!==false&&grants[module]?.[action]===true])),
+  ]));
+}
+
 export function getEffectivePermissionObject(user){
   if(user.role==="ADMIN")return Object.fromEntries(Object.entries(PERMISSION_CATALOG).map(([module,actions])=>[module,Object.fromEntries(actions.map((action)=>[action,true]))]));
   const base=normalizePermissions(user.roleId?.permissions||{}),overrides=user.permissionOverrides||{};
   for(const[module,actions]of Object.entries(overrides))for(const[action,enabled]of Object.entries(actions||{})){if(!PERMISSION_CATALOG[module]?.includes(action))continue;base[module]||={};base[module][action]=Boolean(enabled);}
   for(const moduleName of user.permissions||[]){if(!PERMISSION_CATALOG[moduleName])continue;base[moduleName]||={};base[moduleName].view=true;}
+  for(const[module,actions]of Object.entries(overrides))if(actions?.view===false)delete base[module];
   return applyPermissionDependencies(base);
 }
 

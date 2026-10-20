@@ -12,9 +12,10 @@ import { salesCacheResponse } from '@/lib/sales-cache-scope';
 export async function GET(request) {
   const timing = requestTiming('products');
   try {
-    const session = await timing.measure('auth', () => requireSession("products.view"));
-    await timing.measure('connection', () => connectDb());
     const parameters = new URL(request.url).searchParams;
+    const salesContext = parameters.get('view') === 'sales-stock-ids' || (parameters.get('sales') === 'true' && !parameters.get('view'));
+    const session = await timing.measure('auth', () => requireSession(salesContext ? ['sales.view', 'products.view'] : 'products.view'));
+    await timing.measure('connection', () => connectDb());
     if (parameters.get('view') === 'sales-stock-ids') {
       const stock = parameters.get('stock');
       if (!['low', 'opened'].includes(stock)) return timing.finish(fail('Invalid stock filter', 422));

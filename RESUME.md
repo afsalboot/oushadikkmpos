@@ -1,4 +1,67 @@
-# Latest task — Separate fees from sales tracking (2026-10-20)
+# Latest task — Staff module access and Sales loading (2026-10-20)
+
+## Original task
+
+Staff assigned Consultation, Doctor and Sales were always sent to Dashboard despite lacking access; Sales failed with 403s on settings/products/categories/index and then displayed “Sign in again to load Sales”. User requested only assigned modules and APIs, Dashboard disabled when unassigned, and the first permitted module after Dashboard as login priority.
+
+Follow-up: user clarified that this must cover currently saved users and all future roles/permission combinations.
+
+## What has been completed
+
+- Added permission-aware landing priority: Dashboard when allowed, then Consultation (when enabled), Doctors, Sales and remaining assigned modules. Root, login, post-login/password-change and logo navigation use the permitted destination.
+- Added server page guards for Dashboard, Consultation, Doctors, Sales, Products, Customers, Purchases/Suppliers, Expenses, Accounts, Reports and Staff. Unauthorized pages redirect before client workspaces mount; API permission checks remain enforced.
+- Added a standalone Doctors page and navigation entry. Settings no longer appears as a granted module for all staff; own password/PIN security remains accessible through the staff name link.
+- Sales-only product pages/details, stock membership/index and barcode reads accept Sales permission without granting Products module access. General catalogue/detail and write permissions remain unchanged.
+- Added explicit Sales category context and projected Sales settings. POS clients/prefetch/cache use these limited reads; store administration, security, backup and retention configuration are excluded.
+- Sales customer searches run only when the staff also has customer-directory access. Checkout behavior otherwise remains unchanged.
+- Sales cache still clears on denied access; forbidden scopes now explain missing permission instead of incorrectly asking users to sign in again. Expired sessions still require sign-in.
+- Added landing/guard/permission/configuration tests and route fixtures exercising permitted Sales reads and blocked unrestricted reads. Full suite passed: 427 tests, zero failures/skips. Lint passed: zero errors and three existing warnings.
+- Follow-up found a second bug: staff Customize saves discarded false overrides, so unchecked inherited grants returned. Added `normalizePermissionOverrides` for complete customized selections; create/update now preserve denials, module view denial revokes inherited actions/legacy grants, and the UI clears module actions when view is unchecked. Editing a customized user starts from effective permissions.
+- Added tests for every module as the only grant under existing/new role names, plus staff create/update customization persistence and explicit module revocation. Full suite passed 430 tests; production build passed in `.next-staff-roles`. A test variable named `module` triggered Next's lint rule; renamed it `entry`, reran 14 relevant tests successfully, and lint is being rerun.
+
+## What is currently being worked on
+
+Follow-up permission-save fix and verification are complete. All 430 tests passed, production build passed in `.next-staff-roles`, final lint passed with zero errors and three existing warnings, and diff whitespace check passed. Fourteen relevant tests passed again after a lint-only test variable rename.
+
+## Files modified
+
+- `src/lib/workspace-access.js`, `src/lib/server/workspace-access.js`, `src/lib/sales-settings.js` (new); `src/lib/auth.js`, `src/lib/sales-resources.js`.
+- `src/app/page.js`, `src/app/login/page.js`; new module `layout.js` guards under `src/app/(workspace)/{dashboard,consultations,doctors,sales,products,customers,purchases,suppliers,expenses,accounts,reports,staff}`; new `doctors/page.js`.
+- `src/app/api/products/route.js`, `products/[id]/route.js`, `products/barcode/[barcode]/route.js`, `products/sales-index/route.js`, `categories/route.js`, `settings/route.js`.
+- `src/components/AppShell.jsx`, `LoginForm.jsx`, `ChangePasswordForm.jsx`, `SalesWorkspaceModern.jsx`, `SalesCheckoutHostV2.jsx`, `CartCustomerFields.jsx`.
+- New `tests/workspace-access.test.mjs`, `tests/sales-read-access.test.mjs`; updated `tests/sales-resources.test.mjs`; `RESUME.md`.
+- Follow-up: `src/services/rbac.service.js`, `src/services/staff.service.js`, `src/components/StaffWorkspace.jsx`; `tests/rbac.test.mjs`, `tests/staff-credentials.test.mjs`, `tests/workspace-access.test.mjs`.
+
+## Important implementation decisions
+
+- Permissions are read from the validated current session and effective role/override resolution. No role assignments, credentials or live financial/stock records were changed.
+- Narrow Sales dependency reads use their existing POS projections and response scope headers. Adding Sales permission does not grant Products/Settings module access or write access.
+- Personal account security is available even with no assigned modules; `/settings` is the safe fallback and exposes only existing self-service controls for such staff.
+- Current Consultation/Doctor/Sales role lands at Consultation when enabled. Owners and staff with Dashboard permission retain Dashboard priority.
+
+## Known bugs/issues
+
+No known automated failures. An authenticated browser verification with the user's staff account and hosted deployment are unverified. Existing lint warnings remain in ExpensesWorkspace and the existing Sales effect dependency.
+
+Older staff customizations may already have lost explicit denies in storage. Intent cannot safely be inferred: owner should re-save the intended customized selection once after updating. Existing role/user permissions were not migrated or rewritten.
+
+## Remaining tasks in order
+
+1. Browser-check the staff role after signing out and back in: login should open Consultation, navigation should show Consultation/Doctors/Sales, direct `/dashboard` should redirect without dashboard API requests, and Sales should load without dependency 403s. Check saving a customized existing/new user with inherited permissions unchecked.
+
+## Commands/tests that should be run next
+
+Passed: `npm.cmd test` (427 tests); `npm.cmd run lint` (three existing warnings); `$env:NEXT_DIST_DIR='.next-staff-access'; npm.cmd run build`; `git diff --check`. Temporary test log removed. Repeat checks only after further changes.
+
+Follow-up passed: `npm.cmd test` (430 tests); `$env:NEXT_DIST_DIR='.next-staff-roles'; npm.cmd run build`; `node --test tests/workspace-access.test.mjs tests/rbac.test.mjs tests/staff-credentials.test.mjs` (14 tests); `npm.cmd run lint` (three existing warnings). Temporary test log removed.
+
+## Exact recommended next step
+
+Sign out and back in with the restricted staff account on the updated local app and verify permitted landing/menu/Sales reads. Hosted deployment remains a separate action.
+
+---
+
+# Previous task — Separate fees from sales tracking (2026-10-20)
 
 ## Original task
 

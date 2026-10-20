@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {applyPermissionDependencies,flattenPermissions,getEffectivePermissionObject,hasPermission} from "../src/services/rbac.service.js";
+import {applyPermissionDependencies,flattenPermissions,getEffectivePermissionObject,hasPermission,normalizePermissionOverrides} from "../src/services/rbac.service.js";
 
 test("action permissions automatically include module view access",()=>{
   const permissions=applyPermissionDependencies({sales:{create:true},products:{stockAdjust:true}});
@@ -23,4 +23,15 @@ test("owner access is complete and legacy module permissions remain view-only",(
   const legacy={role:"STAFF",permissions:["customers"],permissionOverrides:{},roleId:null};
   assert.equal(hasPermission(legacy,"customers.view"),true);
   assert.equal(hasPermission(legacy,"customers.edit"),false);
+});
+
+test("explicit module denial also revokes inherited actions and legacy view grants",()=>{
+  const user={role:"STAFF",permissions:["sales"],roleId:{permissions:{sales:{view:true,create:true,print:true}}},permissionOverrides:{sales:{view:false}}};
+  assert.equal(hasPermission(user,"sales.view"),false);
+  assert.equal(hasPermission(user,"sales.create"),false);
+  const saved=normalizePermissionOverrides({sales:{view:false,create:true},doctor:{manage:true},unknown:{view:true}});
+  assert.equal(saved.sales.create,false);
+  assert.equal(saved.doctor.view,true);
+  assert.equal(saved.doctor.manage,true);
+  assert.equal(saved.unknown,undefined);
 });

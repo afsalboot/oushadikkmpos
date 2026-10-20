@@ -7,11 +7,12 @@ import { salesCacheResponse } from '@/lib/sales-cache-scope';
 
 export async function GET(_request, { params }) {
   try {
-    const session = await requireSession("products.view");
+    const salesOnly = new URL(_request.url).searchParams.get('sales') === 'true';
+    const session = await requireSession(salesOnly ? ['sales.view', 'products.view'] : 'products.view');
     await connectDb();
     const { id } = await params;
     if (!mongoose.isValidObjectId(id)) return fail("Invalid product");
-    if (new URL(_request.url).searchParams.get('sales') === 'true') {
+    if (salesOnly) {
       const [product] = await getProducts({ _id: id, active: true, visibleInSales: { $ne: false } }, { salesOnly: true });
       return salesCacheResponse(product ? ok(product) : fail('Product is no longer available in Sales', 404), session);
     }

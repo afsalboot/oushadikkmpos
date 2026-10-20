@@ -7,11 +7,11 @@ export const SALES_INDEX_URL = '/api/products/sales-index';
 export const SALES_STOCK_IDS = { 'Low Stock': '/api/products?view=sales-stock-ids&stock=low', 'Opened Stock': '/api/products?view=sales-stock-ids&stock=opened' };
 const entries = new Map(), details = new Map(), pending = new Map();
 const byId = new Map(), byBarcode = new Map(), bySku = new Map(), listeners = new Set(), mutationWork = new Set();
-const deniedScopes = new Set();
+const deniedScopes = new Map();
 let scope = typeof window === 'undefined' ? 'volatile:test' : null;
 let epoch = 0, snapshot = 0, hydration, persisted = Promise.resolve();
 let catalogueTimer, catalogueDirty = false, catalogueRefresh = Promise.resolve(), finishCatalogueWait;
-const freshFor = key => key.includes('view=sales-stock-ids') ? 30000 : key.includes('?') || key === SALES_INDEX_URL || key === '/api/categories' ? 300000 : 30000;
+const freshFor = key => key.includes('view=sales-stock-ids') ? 30000 : key.includes('?') || key === SALES_INDEX_URL || key === '/api/categories?context=sale' ? 300000 : 30000;
 const retainedFor = 86400000;
 const compareRows = (a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : a._id.localeCompare(b._id);
 export function salesPerf(operation, start, metadata = {}) {
@@ -54,7 +54,10 @@ function unmapRow(id) {
 }
 export async function configureSalesScope(next) {
   if (!next) throw new Error('Sales cache requires a validated session');
-  if (deniedScopes.has(next)) throw Object.assign(new Error('Sign in again to load Sales'), { status: 401 });
+  if (deniedScopes.has(next)) {
+    const status = deniedScopes.get(next);
+    throw Object.assign(new Error(status === 403 ? 'You do not have permission to load Sales. Ask the owner to review your access.' : 'Sign in again to load Sales'), { status });
+  }
   if (scope === next && hydration) return hydration;
   if (scope !== next) { reset(); scope = next; }
   const version = epoch, started = performance.now();
@@ -96,7 +99,7 @@ function put(map, key, data, maximum, kind) {
   map.delete(key); map.set(key, { data, at: Date.now() });
   const removals = [];
   while (map.size > maximum) {
-    const old = [...map.keys()].find(id => map !== entries || ![SALES_FIRST_PAGE, SALES_INDEX_URL, '/api/categories'].includes(id));
+    const old = [...map.keys()].find(id => map !== entries || ![SALES_FIRST_PAGE, SALES_INDEX_URL, '/api/categories?context=sale'].includes(id));
     if (!old) break;
     map.delete(old); removals.push([kind, old]);
   }
@@ -120,7 +123,7 @@ function storeIndex(data) {
 }
 function verifyScope(response, requested, url) {
   const returned = response.headers.get('X-Sales-Cache-Scope');
-  if (requested && !returned && (response.ok || response.status === 304) && (url?.startsWith('/api/products') || url === '/api/categories')) throw Object.assign(new Error('Update the POS backend before using the Sales cache'), { status: 409 });
+  if (requested && !returned && (response.ok || response.status === 304) && (url?.startsWith('/api/products') || url === '/api/categories?context=sale')) throw Object.assign(new Error('Update the POS backend before using the Sales cache'), { status: 409 });
   if (requested && returned && returned !== requested) {
     clearResourceCache('sales-session-changed');
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('oushadi-session-changed'));
@@ -154,7 +157,7 @@ export async function loadSalesResource(url, { scope: requested, force = false, 
     const result = await response.json();
     if (epoch !== version || scope !== currentScope) throw new DOMException('Sales data changed', 'AbortError');
     if (!response.ok) {
-      if ([401, 403].includes(response.status)) clearResourceCache('sales-access-denied');
+      if ([401, 403].includes(response.status)) clearResourceCache(response.status === 403 ? 'sales-access-forbidden' : 'sales-access-denied');
       throw Object.assign(new Error(result.error || 'Unable to load Sales products'), { status: response.status });
     }
     const data = result.data;
@@ -202,7 +205,7 @@ export async function loadSalesBarcode(barcode, options = {}) {
   const result = await response.json();
   if (version !== epoch || scope !== currentScope) throw new DOMException('Sales data changed', 'AbortError');
   if (!response.ok) {
-    if ([401, 403].includes(response.status)) clearResourceCache('sales-access-denied');
+    if ([401, 403].includes(response.status)) clearResourceCache(response.status === 403 ? 'sales-access-forbidden' : 'sales-access-denied');
     throw Object.assign(new Error(result.error || 'Unable to scan barcode. Please try again.'), { status: response.status });
   }
   const product = result.data;
@@ -213,7 +216,7 @@ export async function loadSalesBarcode(barcode, options = {}) {
 }
 export async function prefetchSales(options = {}) {
   await readiness(options.scope);
-  return Promise.allSettled([SALES_INDEX_URL, SALES_FIRST_PAGE, '/api/categories'].map(url => loadSalesResource(url, options)));
+  return Promise.allSettled([SALES_INDEX_URL, SALES_FIRST_PAGE, '/api/categories?context=sale'].map(url => loadSalesResource(url, options)));
 }
 function updateStockLabels(products) {
   const changed = [];
@@ -298,7 +301,7 @@ async function applyMutation(mutation, data, version) {
       if (data.active === false || data.visibleInSales === false) removed.push(String(data._id));
       else {
         const categoryId = String(data.categoryId?._id || data.categoryId || '');
-        const category = peekSalesResource('/api/categories')?.find(row => String(row._id) === categoryId);
+        const category = peekSalesResource('/api/categories?context=sale')?.find(row => String(row._id) === categoryId);
         rows.push(salesIndexRow({ ...data, categoryId }, data.categoryId?.name || category?.name || ''));
       }
     }
@@ -318,8 +321,8 @@ async function applyMutation(mutation, data, version) {
     }
   } else if (mutation.kind === 'catalogue') {
     if (entries.has(SALES_INDEX_URL)) entries.get(SALES_INDEX_URL).at = Date.now() - 300001;
-    entries.delete('/api/categories');
-    await Promise.allSettled([loadSalesResource(SALES_INDEX_URL, { scope: currentScope, force: true, unconditional: true }), loadSalesResource('/api/categories', { scope: currentScope })]);
+    entries.delete('/api/categories?context=sale');
+    await Promise.allSettled([loadSalesResource(SALES_INDEX_URL, { scope: currentScope, force: true, unconditional: true }), loadSalesResource('/api/categories?context=sale', { scope: currentScope })]);
   }
   if (scope === currentScope && epoch === version) await Promise.allSettled(Object.values(SALES_STOCK_IDS).filter(url => entries.has(url)).map(url => loadSalesResource(url, { scope: currentScope, force: true })));
 }
@@ -338,7 +341,7 @@ function scheduleCatalogueRefresh() {
 }
 onResourceInvalidated((reason, change) => {
   if (!change) {
-    if (reason === 'sales-access-denied' || reason === 'sales-session-changed') deniedScopes.add(scope);
+    if (reason === 'sales-access-denied' || reason === 'sales-session-changed' || reason === 'sales-access-forbidden') deniedScopes.set(scope, reason === 'sales-access-forbidden' ? 403 : 401);
     else deniedScopes.clear();
     clearSalesCache(); return;
   }
@@ -361,7 +364,7 @@ onResourceInvalidated((reason, change) => {
   const version = ++epoch;
   pending.clear();
   const work = applyMutation(change.mutation, change.data, version).catch(error => {
-    if ([401, 403].includes(error.status)) clearResourceCache('sales-access-denied');
+    if ([401, 403].includes(error.status)) clearResourceCache(error.status === 403 ? 'sales-access-forbidden' : 'sales-access-denied');
     if (epoch === version) salesPerf('mutation-refresh-failed', performance.now(), { status: error.status });
   });
   mutationWork.add(work);

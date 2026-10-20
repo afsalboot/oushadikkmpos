@@ -17,7 +17,7 @@ async function setup(t, handler) {
     urls.push(String(url));
     const response = handler ? await handler(url, request) : undefined;
     if (response && !response.headers.has('X-Sales-Cache-Scope')) response.headers.set('X-Sales-Cache-Scope', scope);
-    return response || Response.json({ data: url === SALES_INDEX_URL ? { rows: [salesIndexRow(product)], complete: true } : url === SALES_FIRST_PAGE ? { rows: [product], pagination: { page: 1 } } : url === '/api/categories' ? [] : product }, { headers: { 'X-Sales-Cache-Scope': scope, ETag: 'W/"one"' } });
+    return response || Response.json({ data: url === SALES_INDEX_URL ? { rows: [salesIndexRow(product)], complete: true } : url === SALES_FIRST_PAGE ? { rows: [product], pagination: { page: 1 } } : url === '/api/categories?context=sale' ? [] : product }, { headers: { 'X-Sales-Cache-Scope': scope, ETag: 'W/"one"' } });
   });
   t.after(async () => { await flushSalesMutations(); await flushSalesPersistence(); });
   return urls;
@@ -213,7 +213,7 @@ test('logout purges persistent data after pending writes; expired or denied sess
   t.mock.method(globalThis, 'fetch', async () => Response.json({ error: 'Denied' }, { status: 403 }));
   await assert.rejects(loadSalesResource(SALES_INDEX_URL, options));
   await flushSalesPersistence();
-  await assert.rejects(loadSalesResource(SALES_INDEX_URL, options), /Sign in again/);
+  await assert.rejects(loadSalesResource(SALES_INDEX_URL, options), /permission to load Sales/);
   assert.deepEqual(await readSalesCache(scope), []);
 });
 test('a late response cannot restore a previous scope or overwrite stock after a write', async t => {

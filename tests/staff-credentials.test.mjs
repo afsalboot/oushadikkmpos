@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { normalizeUsername, validPassword } from "../src/lib/password-policy.js";
+import { normalizePermissionOverrides, getEffectivePermissionObject } from "../src/services/rbac.service.js";
 
 const source = (await readFile(new URL("../src/services/staff.service.js", import.meta.url), "utf8"))
   .replace(/^import .*;\r?\n/gm, "").replace(/export \{normalizePermissions\};/, "").replaceAll("export async function", "async function");
@@ -10,7 +11,7 @@ function harness() {
   const user = { _id: "id", username: "old.user", authVersion: 2, save: async () => {}, markModified: () => {} };
   const role = { _id: "role", name: "Cashier", slug: "cashier" };
   const deps = { bcrypt: { hash: async () => "hashed-password" }, passwordValid: validPassword, normalizeUsername,
-    PASSWORD_POLICY_MESSAGE: "Strong password required", ensureDefaultRoles: async () => [role],
+    PASSWORD_POLICY_MESSAGE: "Strong password required", ensureDefaultRoles: async () => [role], normalizePermissionOverrides,
     User: { init: async () => {}, create: async (data) => { created.push(data); return { _id: "id" }; }, findOne: async () => user },
     StaffRole: { findOne: async () => role }, AuditLog: { create: async () => {} } };
   const methods = new Function(...Object.keys(deps), `${source}; getStaffDetails = async (id) => id; return {createStaff, updateStaff, resetStaffPassword};`)(...Object.values(deps));
@@ -28,6 +29,21 @@ test("staff creation persists normalized username and hashed strong password", a
 test("staff creation rejects missing usernames and weak passwords", async () => {
   await assert.rejects(harness().createStaff({ ...body, username: "" }, actor), /Username/);
   await assert.rejects(harness().createStaff({ ...body, password: "ShortP1" }, actor), /Strong password/);
+});
+
+test("new and existing staff preserve unchecked inherited permissions when saving customization", async () => {
+  const h = harness();
+  const customized = { ...body, customizePermissions: true, permissionOverrides: { dashboard: { view: false }, sales: { view: true, create: false } } };
+  await h.createStaff(customized, actor);
+  assert.equal(h.created[0].permissionOverrides.dashboard.view, false);
+  assert.equal(h.created[0].permissionOverrides.sales.create, false);
+  assert.equal(h.created[0].permissionOverrides.products.view, false);
+  await h.updateStaff('id', customized, actor);
+  const effective = getEffectivePermissionObject({ role: 'STAFF', roleId: { permissions: { dashboard: { view: true }, sales: { view: true, create: true }, products: { view: true } } }, permissionOverrides: h.user.permissionOverrides });
+  assert.equal(effective.dashboard, undefined);
+  assert.equal(effective.products, undefined);
+  assert.equal(effective.sales.view, true);
+  assert.equal(effective.sales.create, undefined);
 });
 test("staff username changes invalidate existing sessions", async () => {
   const h = harness();

@@ -41,7 +41,7 @@ export default function LoginForm() {
       const result = await response.json();
       if (!response.ok) return toast.error(result.error);
       toast.success(bootstrap ? "Admin account created" : "Welcome back");
-      router.replace(result.data?.user?.mustChangePassword ? "/change-password" : "/dashboard");
+      router.replace(result.data?.user?.mustChangePassword ? "/change-password" : "/");
     } catch {
       toast.error("Could not sign in. Check your connection and try again.");
     } finally {

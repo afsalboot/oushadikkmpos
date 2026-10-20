@@ -7,11 +7,11 @@ import { salesCacheResponse } from '@/lib/sales-cache-scope';
 
 export async function GET(request, { params }) {
   try {
-    const session = await requireSession("products.view");
+    const context = new URL(request.url).searchParams.get("context") || "sale";
+    const session = await requireSession(context === 'sale' ? ['sales.view', 'products.view'] : 'products.view');
     await connectDb();
     const { barcode: rawBarcode } = await params;
     const barcode = normalizeBarcode(rawBarcode);
-    const context = new URL(request.url).searchParams.get("context") || "sale";
     const errors = validateBarcode(barcode);
     if (!barcode || errors.length) return fail(errors[0] || "Enter a valid barcode", 400);
     const [product] = await getProducts({ barcode }, { salesOnly: context === 'sale' });

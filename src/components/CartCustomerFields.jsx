@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { GST_STATES } from "@/lib/gst-states";
 
-export default function CartCustomerFields({ value, onChange, wholesale }) {
+export default function CartCustomerFields({ value, onChange, wholesale, canSearch = true }) {
   const [results, setResults] = useState([]);
   const [error, setError] = useState("");
   const directory = wholesale ? "WHOLESALE" : "RETAIL";
@@ -14,7 +14,7 @@ export default function CartCustomerFields({ value, onChange, wholesale }) {
     const timer = setTimeout(async () => {
       setResults([]);
       setError("");
-      if (selected) return;
+      if (selected || !canSearch) return;
       const terms = [...new Set([value.name, value.phone].map((v) => (v || "").trim()).filter((v) => v.length >= 2))];
       try {
         const groups = await Promise.all(terms.map(async (term) => {
@@ -29,7 +29,7 @@ export default function CartCustomerFields({ value, onChange, wholesale }) {
       }
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [value.name, value.phone, selected, directory]);
+  }, [value.name, value.phone, selected, directory, canSearch]);
   const update = (field, next) => {
     const formatted = ["name", "doctorName"].includes(field)
       ? next.replace(/(^|\s)(\p{L})/gu, (_, space, letter) => space + letter.toUpperCase())

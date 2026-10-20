@@ -10,7 +10,7 @@ import { SALES_INDEX_SCHEMA_VERSION } from '@/lib/sales-search';
 export async function GET(request) {
   const timing = requestTiming('sales-index');
   try {
-    const session = await timing.measure('auth', () => requireSession('products.view'));
+    const session = await timing.measure('auth', () => requireSession(['sales.view', 'products.view']));
     await timing.measure('connection', () => connectDb());
     const parameters = new URL(request.url).searchParams;
     const ids = parameters.has('ids') ? [...new Set(parameters.get('ids').split(',').filter(Boolean))] : undefined;

@@ -159,7 +159,7 @@ export default function SalesCheckoutHostV2() {
         setDeliveryAddress(draft.deliveryAddress || "");
         setDeliveryStateCode(draft.deliveryStateCode || "");
       }
-      (event.detail?.settings ? Promise.resolve(event.detail.settings) : api("/api/settings"))
+      (event.detail?.settings ? Promise.resolve(event.detail.settings) : api("/api/settings?view=sales"))
         .then((value) => {
           if (!lifetimeRef.current.active) return;
           setSettings(value);
@@ -189,7 +189,7 @@ export default function SalesCheckoutHostV2() {
     return () => window.removeEventListener("oushadi-open-checkout", handle);
   }, []);
   useEffect(() => {
-    if (!open || saleType !== "WHOLESALE") return;
+    if (!open || saleType !== "WHOLESALE" || settings?._capabilities?.customerLookup !== true) return;
     if (customerType !== "EXISTING" || query.trim().length < 2) {
       queueMicrotask(() => {
         setResults([]);
@@ -223,15 +223,16 @@ export default function SalesCheckoutHostV2() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [open, customerType, query, saleType]);
+  }, [open, customerType, query, saleType, settings]);
   const searchRetailCustomers = useCallback(async (name, phone, signal) => {
+    if (settings?._capabilities?.customerLookup !== true) return [];
     const terms = [...new Set([name.trim(), phone.trim()].filter((term) => term.length >= 2))];
     const groups = await Promise.all(terms.map((term) => api(
       `/api/customers/search?q=${encodeURIComponent(term)}&customerType=${directoryType}&limit=50`,
       { signal },
     )));
     return [...new Map(groups.flat().map((customer) => [customer._id, customer])).values()];
-  }, [directoryType]);
+  }, [directoryType, settings]);
   useEffect(() => {
     if (!open || cartCustomer || saleType === "WHOLESALE" || selected) return;
     const controller = new AbortController();
@@ -321,6 +322,7 @@ export default function SalesCheckoutHostV2() {
     : payment === "CREDIT" ? creditValid : true);
   const referenceRequired = settings?.payments?.[payment === "SPLIT" ? "upi" : payment.toLowerCase()]?.requireReference === true;
   async function findDuplicate(form) {
+    if (settings?._capabilities?.customerLookup !== true) return null;
     const phone = String(form.phone || "").trim(),
       email = String(form.email || "")
         .trim()

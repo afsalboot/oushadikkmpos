@@ -30,7 +30,7 @@ export default function ChangePasswordForm({ embedded = false }) {
       if (!response.ok)
         throw new Error(result.error || "Unable to change password");
       toast.success("Password changed successfully.");
-      router.replace(embedded ? "/settings" : "/dashboard");
+      router.replace(embedded ? "/settings" : "/");
       router.refresh();
     } catch (error) {
       toast.error(error.message);

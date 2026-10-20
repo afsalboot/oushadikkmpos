@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import {validPassword as passwordValid,normalizeUsername,PASSWORD_POLICY_MESSAGE} from "@/lib/password-policy";
 import mongoose from "mongoose";
 import {AuditLog,Expense,Purchase,Sale,StaffRole,User} from "@/models";
-import {applyPermissionDependencies,ensureDefaultRoles,getEffectivePermissionObject,normalizePermissions,permissionLabel} from "@/services/rbac.service";
+import {applyPermissionDependencies,ensureDefaultRoles,getEffectivePermissionObject,normalizePermissions,normalizePermissionOverrides,permissionLabel} from "@/services/rbac.service";
 import {queryValues} from "@/lib/filter-utils";
 
 const text=(value)=>String(value??"").trim();
@@ -47,14 +47,14 @@ export async function createStaff(body,actor){
   const role=roles.find((entry)=>String(entry._id)===String(body.roleId));if(!role)throw new Error("Select an active staff role");
   const canManagePermissions=actor.role==="ADMIN"||actor.permissions?.includes("staff.managePermissions");
   const username=normalizeUsername(body.username);if(!username)throw new Error("Username must be 3-32 letters, numbers, dots, underscores or hyphens");await User.init();
-  const user=await User.create({name,email,phone,username,passwordHash:await bcrypt.hash(password,12),role:"STAFF",roleId:role._id,permissionOverrides:canManagePermissions&&body.customizePermissions?applyPermissionDependencies(body.permissionOverrides):{},permissions:[],active:body.active!==false,mustChangePassword:Boolean(body.mustChangePassword),createdBy:actor.sub});
+  const user=await User.create({name,email,phone,username,passwordHash:await bcrypt.hash(password,12),role:"STAFF",roleId:role._id,permissionOverrides:canManagePermissions&&body.customizePermissions?normalizePermissionOverrides(body.permissionOverrides):{},permissions:[],active:body.active!==false,mustChangePassword:Boolean(body.mustChangePassword),createdBy:actor.sub});
   await writeAudit({actorId:actor.sub,action:"STAFF_CREATED",targetId:user._id,description:`Created staff account for ${user.name}`,metadata:{role:role.name}});return getStaffDetails(user._id);
 }
 
 export async function updateStaff(id,body,actor){
   const user=await User.findOne({_id:id,role:"STAFF"});if(!user)throw new Error("Staff account not found");const role=await StaffRole.findOne({_id:body.roleId,active:true});if(!role)throw new Error("Select an active staff role");
   const username=normalizeUsername(body.username);if(!username)throw new Error("A valid username is required");await User.init();if(user.username!==username){user.username=username;user.authVersion=Number(user.authVersion||0)+1;}
-  user.name=text(body.name);user.email=text(body.email).toLowerCase();user.phone=text(body.phone);user.roleId=role._id;const canManagePermissions=actor.role==="ADMIN"||actor.permissions?.includes("staff.managePermissions");if(canManagePermissions&&Object.hasOwn(body,"customizePermissions"))user.permissionOverrides=body.customizePermissions?applyPermissionDependencies(body.permissionOverrides):{};if(typeof body.active==="boolean")user.active=body.active;if(!user.name||!user.email)throw new Error("Name and email are required");await user.save();
+  user.name=text(body.name);user.email=text(body.email).toLowerCase();user.phone=text(body.phone);user.roleId=role._id;const canManagePermissions=actor.role==="ADMIN"||actor.permissions?.includes("staff.managePermissions");if(canManagePermissions&&Object.hasOwn(body,"customizePermissions"))user.permissionOverrides=body.customizePermissions?normalizePermissionOverrides(body.permissionOverrides):{};if(typeof body.active==="boolean")user.active=body.active;if(!user.name||!user.email)throw new Error("Name and email are required");await user.save();
   await writeAudit({actorId:actor.sub,action:"STAFF_UPDATED",targetId:user._id,description:`Updated staff account for ${user.name}`,metadata:{role:role.name}});return getStaffDetails(user._id);
 }
 

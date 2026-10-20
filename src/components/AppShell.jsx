@@ -26,9 +26,11 @@ import {
 import NotificationBell from "@/components/NotificationBell";
 import { useConfirm } from "@/components/ConfirmDialog";
 import OushadhiLogo from "@/components/branding/OushadhiLogo";
+import { workspaceHome } from "@/lib/workspace-access";
 
 const nav = [
   { href: "/consultations", label: "Consultation", icon: Stethoscope, permission: "consultation.view" },
+  { href: "/doctors", label: "Doctors", icon: Stethoscope, permission: "doctor.view" },
   {
     href: "/dashboard",
     label: "Dashboard",
@@ -94,7 +96,8 @@ export default function AppShell({ user, children }) {
   const [salesRouteWarm, setSalesRouteWarm] = useState(false);
   const allowed = (permission) =>
     user.role === "ADMIN" || user.permissions?.includes(permission);
-  const canPrefetchSales = allowed('sales.view') && allowed('products.view') && !user.mustChangePassword;
+  const home = workspaceHome(user);
+  const canPrefetchSales = allowed('sales.view') && !user.mustChangePassword;
   useEffect(() => {
     if (!canPrefetchSales) return;
     const start = () => { setSalesRouteWarm(true); void prefetchSales({ scope: user.cacheScope }).catch(() => {}); };
@@ -138,9 +141,9 @@ export default function AppShell({ user, children }) {
     <>
       <div className="flex h-20 items-center justify-between border-b border-white/10 px-5">
         <Link
-          href="/dashboard"
+          href={home}
           onClick={() => mobile && setOpen(false)}
-          aria-label="Oushadhi POS dashboard"
+          aria-label="Oushadhi POS home"
         >
           <OushadhiLogo tone="inverse" />
         </Link>
@@ -154,7 +157,7 @@ export default function AppShell({ user, children }) {
       </div>
       <nav className="flex-1 overflow-y-auto p-3">
         {nav
-          .filter((item) => (item.href !== "/consultations" || user.consultationEnabled) && (item.href === "/settings" || allowed(item.permission)))
+          .filter((item) => (item.href !== "/consultations" || user.consultationEnabled) && allowed(item.permission))
           .map(({ href, label, icon: Icon }) => {
             const active = path === href || path.startsWith(href + "/");
             return (
@@ -184,7 +187,7 @@ export default function AppShell({ user, children }) {
             {String(user.name || "U").charAt(0)}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-white">{user.name}</p>
+            <Link href="/settings" aria-label="My account security" className="block truncate text-sm font-bold text-white">{user.name}</Link>
             <p className="text-xs text-emerald-100/55">
               {user.roleName || user.role}
             </p>
@@ -227,7 +230,7 @@ export default function AppShell({ user, children }) {
           >
             <Menu />
           </button>
-          <Link href="/dashboard" aria-label="Oushadhi POS dashboard">
+          <Link href={home} aria-label="Oushadhi POS home">
             <OushadhiLogo />
           </Link>
         </header>

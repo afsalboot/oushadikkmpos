@@ -579,7 +579,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
   const confirmAction = useConfirm();
   const [mode, setMode] = useState("PRODUCT"),
     [products, setProducts] = useState(() => editSaleId ? [] : peekSalesResource(SALES_FIRST_PAGE, cacheScope)?.rows || []),
-    [categories, setCategories] = useState(() => peekSalesResource('/api/categories', cacheScope) || []),
+    [categories, setCategories] = useState(() => peekSalesResource('/api/categories?context=sale', cacheScope) || []),
     [settings, setSettings] = useState(null),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("All"),
@@ -631,7 +631,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     const changed = () => {
       setSalesIndex(peekSalesResource(SALES_INDEX_URL, cacheScope));
       setProductReload(value => value + 1);
-      const rows = peekSalesResource('/api/categories', cacheScope);
+      const rows = peekSalesResource('/api/categories?context=sale', cacheScope);
       if (rows) setCategories(rows);
       if (!peekSalesResource(SALES_INDEX_URL, cacheScope)) setProducts([]);
       setStockMembership(Object.fromEntries(Object.values(SALES_STOCK_IDS).map(url => [url, peekSalesResource(url, cacheScope)])));
@@ -786,10 +786,10 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
     };
   }, [mode]);
   useEffect(() => {
-    loadSalesResource("/api/categories", { scope: cacheScope })
+    loadSalesResource("/api/categories?context=sale", { scope: cacheScope })
       .then(setCategories)
       .catch((e) => toast.error(e.message));
-    api("/api/settings")
+    api("/api/settings?view=sales")
       .then(setSettings)
       .catch(() => {});
   }, [editSaleId, cacheScope]);
@@ -1568,7 +1568,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
               </div>
             </div>
             <div className="sales-cart-list">
-              <CartCustomerFields value={cartCustomer} onChange={setCartCustomer} wholesale={wholesaleDiscountEnabled} />
+              <CartCustomerFields value={cartCustomer} onChange={setCartCustomer} wholesale={wholesaleDiscountEnabled} canSearch={settings?._capabilities?.customerLookup === true} />
               {cart.length ? (
                 [...cart].reverse().map((i) => {
                   const saleLabel =

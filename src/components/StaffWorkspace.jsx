@@ -117,6 +117,7 @@ function PermissionMatrix({ value, onChange, disabled = false }) {
       [module]: { ...(value[module] || {}), [action]: enabled },
     };
     if (action !== "view" && enabled) next[module].view = true;
+    if (action === "view" && !enabled) for (const name of modules[module]) next[module][name] = false;
     onChange(next);
   };
   const shortcut = (mode) => {
@@ -310,7 +311,7 @@ function StaffForm({ initial, roles, onClose, onSaved }) {
             active: initial.active,
             customizePermissions:
               Object.keys(initial.permissionOverrides || {}).length > 0,
-            permissionOverrides: initial.permissionOverrides || {},
+            permissionOverrides: initial.effectivePermissions || initial.permissionOverrides || {},
           }
         : emptyForm(),
     ),
