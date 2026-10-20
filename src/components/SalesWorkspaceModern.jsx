@@ -564,22 +564,24 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
   const [editError, setEditError] = useState("");
   const loadedEditRef = useRef(false);
   const [productReload, setProductReload] = useState(0);
-  const [productPagination, setProductPagination] = useState(() => peekSalesResource(SALES_FIRST_PAGE, cacheScope)?.pagination || { page: 1, pages: 1, total: 0 });
-  const [productLoading, setProductLoading] = useState(() => !peekSalesResource(SALES_FIRST_PAGE, cacheScope));
-  const [salesIndex, setSalesIndex] = useState(() => peekSalesResource(SALES_INDEX_URL, cacheScope));
+  // The server and first browser render must use the same empty snapshot.
+  // Restore private browser cache data in the effects below, after hydration.
+  const [productPagination, setProductPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [productLoading, setProductLoading] = useState(true);
+  const [salesIndex, setSalesIndex] = useState(undefined);
   const [stockMembership, setStockMembership] = useState({});
   const [detailLoading, setDetailLoading] = useState(false);
   const detailSelection = useRef(false);
   const mountStart = useRef(performance.now());
-  const warmMount = useRef(Boolean(peekSalesResource(SALES_FIRST_PAGE, cacheScope)));
+  const warmMount = useRef(false);
   const browsePages = useRef(new Map());
   const [productError, setProductError] = useState('');
   const [pageSelection, setPageSelection] = useState({ key: '', page: 1 });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const confirmAction = useConfirm();
   const [mode, setMode] = useState("PRODUCT"),
-    [products, setProducts] = useState(() => editSaleId ? [] : peekSalesResource(SALES_FIRST_PAGE, cacheScope)?.rows || []),
-    [categories, setCategories] = useState(() => peekSalesResource('/api/categories?context=sale', cacheScope) || []),
+    [products, setProducts] = useState([]),
+    [categories, setCategories] = useState([]),
     [settings, setSettings] = useState(null),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("All"),
@@ -622,6 +624,7 @@ export default function SalesWorkspaceModern({ editSaleId = null }) {
   const browsingLoading = !localSearch && productLoading;
   useEffect(() => {
     if (editSaleId) return;
+    warmMount.current = Boolean(peekSalesResource(SALES_FIRST_PAGE, cacheScope));
     let active = true;
     const refresh = () => {
       loadSalesResource(SALES_INDEX_URL, { scope: cacheScope }).then(index => { if (active) setSalesIndex(index); }).catch(error => {

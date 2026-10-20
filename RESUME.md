@@ -1,4 +1,49 @@
-# Latest task — Sidebar order and Consultation submenu (2026-10-20)
+# Latest task — Sales cache hydration mismatch (2026-10-20)
+
+## Original task
+
+Fix the recoverable Sales hydration error: server rendered `data-sales-cache="server"` and a loading status, while the browser's initial render used `data-sales-cache="local"` and omitted the status.
+
+## What has been completed
+
+- Removed browser cache reads from Sales initial state for products, categories, pagination, loading and the search index. Server and initial browser renders now share the same empty/loading snapshot.
+- Existing post-mount effects restore scoped cached products/categories/index and retain current freshness, local search and server fallback behavior. The warm-mount performance marker is also read after mount.
+- Added `tests/sales-hydration.test.mjs`: renders the real Sales component through React's server renderer with isolated dependencies and asserts exact initial HTML parity before/after warming browser cache, including edit mode. Confirms no private cache reads during rendering.
+- All 432 tests and the production build in `.next-hydration` passed. Targeted ESLint passed with one existing Sales effect dependency warning. Diff whitespace check passed.
+
+## What is currently being worked on
+
+Implementation and automated verification are complete.
+
+## Files modified
+
+`src/components/SalesWorkspaceModern.jsx`; new `tests/sales-hydration.test.mjs`; `RESUME.md`.
+
+## Important implementation decisions
+
+- Preserve SSR and fix the initial snapshot; do not suppress hydration warnings or disable rendering.
+- Keep private cache scope, cache lifetime, checkout, pricing and stock behavior unchanged. Warm browsing data becomes visible after the initial hydration commit.
+- Regression uses real React HTML generation with mocked dependencies; it is not an actual browser hydration run.
+
+## Known bugs/issues
+
+No known regression-test failures. Existing Sales hook dependency lint warning remains. Browser hydration verification is open.
+
+## Remaining tasks in order
+
+1. Browser-check loading `/sales` with a warm prefetched cache, then navigate away/back and inspect the console; check sale editing too.
+
+## Commands/tests that should be run next
+
+Passed: `node --test tests/sales-hydration.test.mjs`; `npx.cmd eslint src/components/SalesWorkspaceModern.jsx tests/sales-hydration.test.mjs`; `npm.cmd test` (432 tests); `$env:NEXT_DIST_DIR='.next-hydration'; npm.cmd run build`; `git diff --check`. Temporary test log removed.
+
+## Exact recommended next step
+
+Verify browser hydration with a warm Sales cache without creating a live sale.
+
+---
+
+# Previous task — Sidebar order and Consultation submenu (2026-10-20)
 
 ## Original task
 
