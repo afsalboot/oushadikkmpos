@@ -68,12 +68,12 @@ test('opened filter includes stock returned from this bill', async () => {
   assert.deepEqual(h.calls.find(call => call.filter).filter._id.$in, [productId]);
 });
 const routeSource = readFileSync(new URL('../src/app/api/sales/[id]/route.js', import.meta.url), 'utf8').replace(/^import .*;\r?\n/gm, '').replaceAll('export ', '');
-test('both edit views require admin and reject locked bills before product reads', async () => {
+test('both edit views require Sales edit and reject locked bills before product reads', async () => {
   for (const view of ['', '&view=products']) {
     for (const locked of [false, true]) {
       let reads = 0;
       const deps = { mongoose, requireSession: async permission => {
-        if (permission === 'ADMIN' && !locked) throw Object.assign(new Error('Forbidden'), { status: 403 });
+        if (permission === 'sales.edit' && !locked) throw Object.assign(new Error('Forbidden'), { status: 403 });
         return { role: 'ADMIN' };
       }, connectDb: async () => {}, Sale: { findById: () => ({ populate() { return this; }, lean: async () => ({ ...sale, paymentStatus: 'CREDIT' }) }) },
       saleEditProblem, requestTiming: () => ({ measure: (_name, work) => work(), finish: response => response }),

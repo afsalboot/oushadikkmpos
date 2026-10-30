@@ -9,6 +9,7 @@ import {saleEditProblem} from "@/lib/sale-edit";
 import {getSaleEditData, getSaleEditProductPage} from "@/services/sale-edit-read.service";
 import {requestTiming} from "@/lib/performance";
 import { saleForActor } from "@/lib/external-purchase";
+import { canAccess } from "@/lib/workspace-access";
 
 export async function GET(request,{params}){
   const timing = requestTiming('sale-detail');
@@ -16,7 +17,7 @@ export async function GET(request,{params}){
     const actor = await timing.measure('auth', () => requireSession("sales.view"));
     const parameters = new URL(request.url).searchParams;
     const editing = parameters.get('edit') === 'true';
-    if (editing) await requireSession("ADMIN");
+    if (editing) await requireSession("sales.edit");
     await timing.measure('connection', () => connectDb());
     const{id}=await params;
     if(!mongoose.isValidObjectId(id))return timing.finish(fail("Invalid sale",400));
@@ -29,6 +30,6 @@ export async function GET(request,{params}){
         ? await getSaleEditProductPage(sale, parameters, timing) : await getSaleEditData(sale, timing);
       return timing.finish(await timing.measure('serialization', () => ok(data)));
     }
-    return timing.finish(ok({...saleForActor(sale, actor), canEdit: actor.role === "ADMIN" && !editProblem, editProblem}));
+    return timing.finish(ok({...saleForActor(sale, actor), canEdit: canAccess(actor, "sales.edit") && !editProblem, editProblem}));
   }catch(error){return timing.finish(apiError(error));}
 }

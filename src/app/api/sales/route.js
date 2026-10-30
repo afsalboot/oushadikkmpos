@@ -293,13 +293,13 @@ export async function POST(request) {
   const mark = name => { const now = performance.now(); durations.push(`${name};dur=${(now - checkpoint).toFixed(1)}`); checkpoint = now; };
   const timed = response => { response.headers.set("Server-Timing", [...durations, `total;dur=${(performance.now() - startedAt).toFixed(1)}`].join(", ")); return response; };
   try {
-    const session = await requireSession("sales.create");
-    await connectDb();
-    mark("auth_db");
+    await requireSession("sales.view");
     const body = await request.json();
     const editing = Boolean(body.editSaleId);
+    const session = await requireSession(editing ? "sales.edit" : "sales.create");
+    await connectDb();
+    mark("auth_db");
     if (editing) {
-      await requireSession("ADMIN");
       if (!mongoose.isValidObjectId(body.editSaleId)) return fail("Invalid sale", 400);
     }
     await Promise.all([Sale.init(),FiscalGuard.init(),initializeRetentionModels()]);

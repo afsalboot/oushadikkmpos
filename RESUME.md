@@ -1,3 +1,128 @@
+# Latest task - Sales edit permission for staff (2026-10-30)
+
+## Original task
+
+User wants "Edit sale / Add products" from Recent Sales to be controlled by a permission under Sales, so restricted staff cannot edit existing sales. Screenshots show the sale-detail button and the Staff role permission matrix.
+
+## What has been completed
+
+- Found Sales already defines sales.edit in the role catalog and Staff matrix, but sale detail capability and edit-read/save APIs were hardcoded to ADMIN.
+- Reused sales.edit; role/staff matrices and access previews label it "Edit sale / Add products". Existing roles/individual overrides continue to use the same saved key; no migration or role rewrites.
+- Sale detail canEdit now checks effective session sales.edit and the existing bill eligibility rules. Existing SaleSourceDetails already hides its edit link when canEdit is false.
+- Both initial edit reads and edit product-page reads now require sales.edit. Direct /sales?edit=<id> requires sales.edit before returning the workspace.
+- POST /api/sales authenticates Sales view, then requires sales.edit for edits or sales.create for new sales before starting mutation work. Edit-only staff can revise/add products without gaining permission to create new invoices. Create-only staff cannot edit or replay an edit retry.
+- Preserved existing transaction, inventory return/deduction, invoice identity, payments, audit, concurrency/idempotency, fiscal locks and separate Owner-only manual wholesale free quantity rules.
+- Added regression coverage for actual API read handlers, direct edit page guard, real rendered permission matrix/detail link, existing/future role grants, explicit denies, Owner access, edit/create separation, staff product additions and denied retries.
+- Focused tests passed: 46/46. Full lint passed with zero errors and three pre-existing warnings. Production build passed in .next-sales-edit-permission. Diff whitespace check passed.
+- Initial full suite: 422 passed, one failed solely because sandbox blocked the MongoDB fixture binary download. Authorized full rerun passed all 439 tests with zero failures/skips, including the isolated localhost MongoDB integration fixtures.
+
+## What is currently being worked on
+
+Local implementation and automated verification are complete. No live database writes or deployment performed.
+
+## Files modified
+
+- src/app/(workspace)/sales/page.js
+- src/app/api/sales/[id]/route.js
+- src/app/api/sales/route.js
+- src/components/StaffWorkspace.jsx
+- tests/sale-edit-read.test.mjs
+- tests/sale-edit.test.mjs
+- New tests/sales-edit-permission.test.mjs
+- RESUME.md
+
+Earlier desktop diagnostic 0.1.2 changes remain in the working tree and are preserved in the previous handoff below.
+
+## Important implementation decisions
+
+- Reuse the existing Sales Edit action instead of introducing a second overlapping permission. Owners retain full access; explicit false overrides still revoke inherited grants.
+- Staff without this permission retain Recent Sales viewing and, when assigned Create, normal new-sale checkout. Permission does not unlock cancelled, credit/partially paid, or tax documents.
+- Existing saved Edit grants now become effective. To restrict the screenshot's Staff role, the owner must uncheck Sales > Edit sale / Add products and save; individual Customize overrides may also need review.
+- Session permissions are computed from the current saved role/overrides in readSession; applies to current and future users/roles without data migration.
+- This is a hosted web change. The desktop loads the hosted site; deployment is needed for installed clients to receive it. No desktop installer rebuild needed for this task.
+
+## Known bugs/issues
+
+All 439 tests and production build passed. Hosted/browser account verification not performed. Existing Expenses/Sales lint warnings remain unrelated.
+
+## Remaining tasks in order
+
+1. Deploy the web update through the normal release process; no deployment was requested/performed in this turn.
+2. In the owner's Staff role editor, uncheck Sales > Edit sale / Add products and save for restricted roles, reviewing any individual Customize grants.
+3. After deployment, verify with a restricted staff account: detail link absent, direct edit URL redirected and edit API requests rejected. Verify granted staff can save one controlled edit in a test environment.
+
+## Commands/tests that should be run next
+
+Passed: npm.cmd test outside restricted sandbox (439/439); log at $env:TEMP/oushadhi-sales-edit-permission-tests-authorized.log.
+Passed: node --test tests/sales-edit-permission.test.mjs tests/sale-edit.test.mjs tests/sale-edit-read.test.mjs tests/rbac.test.mjs tests/staff-credentials.test.mjs tests/workspace-access.test.mjs (46); npm.cmd run lint; targeted ESLint; $env:NEXT_DIST_DIR='.next-sales-edit-permission'; npm.cmd run build; git diff --check.
+
+## Exact recommended next step
+
+Deploy the web update, then uncheck Sales > Edit sale / Add products on the screenshot's Staff role and save. Verify restricted staff can create/view sales but cannot edit recent sales.
+
+---
+# Latest task - Friend's installed desktop cannot connect (2026-10-30)
+
+## Original task
+
+Diagnose the friend's installed desktop showing "Unable to connect to Oushadhi POS". User confirmed the POS works in their own desktop app and the website opens in the friend's browser; only the friend's desktop app fails.
+
+## What has been completed
+
+- Confirmed current source and previously packaged version 0.1.1 use https://oushadikkmpos.vercel.app, not localhost. Friend's installed version is unknown.
+- Live read-only HTTPS checks returned 307 from root to /login, then 200. Browser success on friend's machine comes from user's report; no remote device access was performed.
+- Found existing loadURL catch discards the specific error and displays a generic fallback. Browser success does not identify whether Electron is failing on certificates, proxy, DNS, app-specific filtering, or another cause.
+- Prepared desktop 0.1.2 to display the actual sanitized Electron network code, app version, server address, and brief appropriate guidance on the fallback page. Does not display raw errors or request URLs with credentials/query strings.
+- Added an isolated connection smoke that deliberately blocks the POS request and verifies the real fallback page, script, error, version, and guidance. Packaged apps cannot activate this development-only mode.
+- Built dist-desktop/Oushadhi-POS-Setup-0.1.2.exe (112568939 bytes). Inspected packaged ASAR: version 0.1.2, new diagnostic files present, production URL retained, no environment files or node_modules.
+- Passed all 10 desktop tests, targeted ESLint, normal live desktop smoke, isolated blocked-connection smoke, and git diff --check.
+- Follow-up screenshot confirms friend is running 0.1.2 and the actual error is ERR_CERT_DATE_INVALID. The remote Windows taskbar shows 24-10-2026; client date for this session is 30-10-2026. Incorrect clock is the leading hypothesis, not yet confirmed by a successful reconnect. Google Chrome Help associates this error with incorrect date/time; Microsoft documents automatic clock/time-zone settings.
+
+## What is currently being worked on
+
+Friend has run the diagnostic installer. Next action is to correct/synchronize the remote Windows clock and retry, before considering any certificate-chain investigation.
+
+## Files modified
+
+- desktop/main.mjs: pass sanitized network code and version to fallback, guard closed window, isolated connection smoke.
+- desktop/offline.html and new desktop/offline.js: display connection error, version, server and guidance.
+- New desktop/connection-error.mjs and desktop/connection-error.test.mjs: extract code without disclosing raw error details.
+- desktop/package.json and desktop/package-lock.json: version 0.1.2, packaged diagnostic assets and smoke:connection script.
+- desktop/README.md: diagnostic behavior and command.
+- RESUME.md.
+- Built ignored artifacts under dist-desktop, including Oushadhi-POS-Setup-0.1.2.exe and its blockmap.
+
+## Important implementation decisions
+
+- This is a diagnostic release, not a confirmed fix for the friend's computer.
+- Preserve production URL, TLS validation, cookies, authentication, backups, printing, checkout, inventory and database behavior. No profile reset or broad firewall/antivirus changes.
+- Tests use isolated temporary Electron profiles and do not log in or write business records. Connection smoke blocks all requests to the POS origin.
+- Initial sandbox smoke failed because GPU process could not start; unrestricted isolated smoke passed. Initial sandbox packaging failed on network EACCES; authorized network build succeeded. These failures do not describe the friend's problem.
+- Initial ASAR assertion used forward slashes, but Windows asar.listPackage returns backslashes. Normalizing separators confirmed all files are included.
+
+## Known bugs/issues
+
+- Error is confirmed as ERR_CERT_DATE_INVALID; clock correction and successful reconnection remain unverified.
+- Running version 0.1.2 is confirmed by the remote screenshot. Authenticated APIs and physical printing remain unverified.
+- Diagnostics do not themselves repair certificate/proxy/firewall/DNS problems.
+
+## Remaining tasks in order
+
+1. On friend's PC: right-click taskbar clock > Adjust date/time, enable Set time automatically, select the actual local time zone (UTC+05:30 for India), and Sync now. Confirm actual current date/time rather than copying an old screenshot.
+2. Fully exit/reopen Oushadhi POS and use Ctrl+R. Obtain confirmation whether login loads.
+3. If the same certificate-date error remains with a correct clock, inspect the certificate validity/issuer and any HTTPS inspection on that computer. Do not disable certificate validation or bypass TLS errors.
+4. If the date resets after restart, investigate Windows time synchronization and hardware clock separately after confirming the behavior.
+
+## Commands/tests that should be run next
+
+Already passed: npm.cmd run desktop:test (10/10); npx.cmd eslint desktop/main.mjs desktop/connection-error.mjs desktop/connection-error.test.mjs desktop/offline.js; npm.cmd --prefix desktop run smoke:connection; npm.cmd run desktop:smoke; npm.cmd run desktop:dist; ASAR content assertions; git diff --check.
+Runtime smoke and packaging required execution outside restricted sandbox. Repeat only after further changes. Full web suite/build not needed: no web app or server files changed.
+
+## Exact recommended next step
+
+Have the friend synchronize the Windows clock (screenshot shows 24 October while session date is 30 October 2026), then fully restart POS and retry. No further application code change or installer is currently necessary.
+
+---
 # Latest task — Sales cache hydration mismatch (2026-10-20)
 
 ## Original task

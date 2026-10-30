@@ -91,6 +91,8 @@ const modules = {
 };
 const moduleLabel = (value) =>
   value.charAt(0).toUpperCase() + value.slice(1).replaceAll(/([A-Z])/g, " $1");
+const actionLabel = (module, action) =>
+  module === "sales" && action === "edit" ? "Edit sale / Add products" : moduleLabel(action);
 const emptyForm = () => ({
   name: "",
   email: "",
@@ -185,7 +187,7 @@ function PermissionMatrix({ value, onChange, disabled = false }) {
                             update(module, action, event.target.checked)
                           }
                         />
-                        {moduleLabel(action)}
+                        {actionLabel(module, action)}
                       </label>
                     ))}
                   </div>
@@ -211,7 +213,7 @@ function AccessPreview({ permissions }) {
           <p className="mt-1 text-xs text-[var(--muted)]">
             {Object.entries(actions)
               .filter(([, enabled]) => enabled)
-              .map(([action]) => moduleLabel(action))
+              .map(([action]) => actionLabel(module, action))
               .join(" · ")}
           </p>
         </div>

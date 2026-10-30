@@ -4,10 +4,11 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline'"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Oushadhi POS — Connection unavailable</title>
+    <script src="./offline.js" defer></script>
     <style>
       body {
         margin: 0;
@@ -30,6 +31,12 @@
         padding: 3px 8px;
         border-radius: 4px;
       }
+      .details {
+        border-top: 1px solid #cbd8cf;
+        padding-top: 16px;
+        font-size: 15px;
+        overflow-wrap: anywhere;
+      }
     </style>
   </head>
   <body>
@@ -42,6 +49,12 @@
       <p>
         This desktop app needs a connection to your POS server. If the server is
         temporarily unavailable, try again shortly.
+      </p>
+      <p id="connection-advice"></p>
+      <p class="details">
+        Connection error: <strong id="connection-error">Unknown</strong><br />
+        Desktop version: <span id="app-version">Unknown</span><br />
+        Server: https://oushadikkmpos.vercel.app
       </p>
     </main>
   </body>

@@ -1,6 +1,6 @@
 {
   "name": "oushadhi-pos-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Oushadhi POS desktop client",
   "author": "Oushadhi POS",
@@ -10,6 +10,7 @@
     "dev": "node launch.mjs --local",
     "smoke": "node launch.mjs --smoke",
     "smoke:print": "node launch.mjs --print-smoke",
+    "smoke:connection": "node launch.mjs --connection-smoke",
     "dist": "electron-builder --win nsis --x64 --publish never",
     "test": "node --test *.test.mjs"
   },
@@ -29,7 +30,9 @@
       "receipt-print.mjs",
       "printer-policy.mjs",
       "policy.mjs",
+      "connection-error.mjs",
       "offline.html",
+      "offline.js",
       "assets/icon.png",
       "package.json"
     ],

@@ -17,6 +17,7 @@ import { saleFreeQuantity } from "../src/lib/sale-free-quantity.js";
 import { buildExternalPurchase, isExternalPurchase, externalPurchaseSummary } from "../src/lib/external-purchase.js";
 import { syncExternalPurchaseExpenses } from "../src/services/external-purchase.service.js";
 import {retentionGone} from '../src/lib/sale-retention.js';
+import { canAccess } from '../src/lib/workspace-access.js';
 
 const serviceSource = readFileSync(new URL("../src/services/sale-edit.service.js", import.meta.url), "utf8").replace(/^import .*;\r?\n/gm, "").replaceAll("export ", "");
 const service = new Function("saleEditProblem", "saleStockReturns", "retentionGone", `${serviceSource}; return { restoreSaleStock, loadSaleForEdit, findSaleEditRetry, saveSaleEdit };`)(saleEditProblem, saleStockReturns,retentionGone);
@@ -62,7 +63,11 @@ function harness() {
   const catalogue = [product, { ...product, _id: addedProductId, name: "Drops", packageSellingPrice: 50 }];
   const settings = { gst: { enabled: false, registrationStatus: "UNREGISTERED" }, store: { stateCode: "32" }, discount: { enabled: false }, roundOff: { enabled: false }, payments: { enabledMethods: ["CASH", "UPI"] } };
   const dependencies = { ...service, initializeRetentionModels:async()=>{},syncSaleHistory:async()=>{},findHistoricalRetry:async()=>{},historicalInvoiceExists:async()=>false, mongoose: { ...mongoose, startSession: async () => session },
-    requireSession: async permission => { if (h.staff && permission === "ADMIN") throw new Error("FORBIDDEN"); return { sub: String(actorId), role: "ADMIN", name: "Owner" }; }, connectDb: async () => {},
+    requireSession: async permission => {
+      const actor = { sub: String(actorId), role: h.staff ? "STAFF" : "ADMIN", name: h.staff ? "Employee" : "Owner", permissions: h.permissions };
+      if (!canAccess(actor, permission)) throw new Error("FORBIDDEN");
+      return actor;
+    }, connectDb: async () => {},
     ok: (data, status = 200) => ({ data, status, headers: new Map() }), fail: (error, status = 400) => ({ error, status, headers: new Map() }), apiError: error => ({ error: error.message, status: error.message === "FORBIDDEN" ? 403 : error.status || 500, headers: new Map() }),
     Sale, InventoryBatch, StockTransaction, AuditLog, FiscalGuard: { init: async () => {}, findOneAndUpdate: async () => {} }, Settings: { findOne: () => query(settings) }, Product: { find: filter => query(catalogue.filter(entry => filter._id.$in.includes(String(entry._id)))) },
     Customer: {}, DocumentCounter: {}, createCustomer: async () => { throw new Error("Unexpected customer creation"); }, nextInvoiceNumber: async () => "INV-NEW",
@@ -76,7 +81,7 @@ function harness() {
     } },
     calculateSalePricing, validateSalePayments, createSaleStockBuffer, deductPackageStock, deductLooseStock, deductCountBasedLooseStock, getLooseUnit, isCountBasedProduct,
     assertRegistration, resolveSupply, validateFiscalLines, registrationStatus, financialYear, GST_RULE_VERSION, requestHash, assertRetryMatches, buildCustomerSnapshot, normalizeDoctorName, prepareWholesaleCredit, isWholesaleCustomer, money, multiplyMoney, directCheckoutPayments, saleFreeQuantity };
-  const h = { state, settings, staff: false, async invoke({ create = false, quantity = 3, version = new Date(state.sale.updatedAt).toISOString(), revision = Number(state.sale.editRevision || 0), key = "sale-edit-retry-key-001", price = quantity * 100, items, request = {} } = {}) {
+  const h = { state, settings, staff: false, permissions: ["sales.view", "sales.create"], async invoke({ create = false, quantity = 3, version = new Date(state.sale.updatedAt).toISOString(), revision = Number(state.sale.editRevision || 0), key = "sale-edit-retry-key-001", price = quantity * 100, items, request = {} } = {}) {
     const body = { ...(!create ? { editSaleId: String(id), editVersion: version, editRevision: revision } : {}), items: items || [{ kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity, billedLineIndex: 0 }], customerType: "WALK_IN", payments: [{ method: "CASH", amount: price }], ...request };
     const run = new AsyncFunction(...Object.keys(dependencies), "request", `${route}\nreturn POST(request);`);
     return run(...Object.values(dependencies), { json: async () => body, headers: { get: () => key } });
@@ -184,9 +189,13 @@ test("insufficient stock and incorrect payment roll back stock returns, sale cha
   }
 });
 
-test("staff, stale edits, tax documents and credit sales cannot change a billed sale", async () => {
+test("staff without edit permission, stale edits, tax documents and credit sales cannot change a billed sale", async () => {
   const staff = harness(); staff.staff = true;
   assert.equal((await staff.invoke()).status, 403);
+  assert.equal(staff.state.sale.total, 200);
+  assert.equal(staff.state.batches[0].sealedPackages, 3);
+  assert.equal(staff.state.rows.length, 0);
+  assert.equal(staff.state.audits.length, 0);
   const stale = harness();
   assert.equal((await stale.invoke({ version: "2026-10-01T00:00:00.000Z" })).status, 409);
   for (const change of [{ gstEnabled: true }, { documentStatus: "CANCELLED" }, { paymentStatus: "PARTIAL", balanceDue: 10 }]) {
@@ -194,6 +203,33 @@ test("staff, stale edits, tax documents and credit sales cannot change a billed 
     assert.equal((await h.invoke()).status, 422);
     assert.equal(h.state.rows.length, 0);
   }
+});
+
+test("Sales edit permits staff to revise and add billed products, independently of creating sales", async () => {
+  const h = harness(); h.staff = true; h.permissions = ["sales.view", "sales.edit"];
+  const result = await h.invoke({ items: [
+    { kind: "PRODUCT", productId: String(productId), saleMode: "PACKAGE", quantity: 2, billedLineIndex: 0 },
+    { kind: "PRODUCT", productId: String(addedProductId), saleMode: "PACKAGE", quantity: 1 },
+  ], price: 250 });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(result.data.invoiceNumber, original.invoiceNumber);
+  assert.equal(result.data.items.length, 2);
+  assert.equal(h.state.batches[0].sealedPackages, 3);
+  assert.equal(h.state.batches[1].sealedPackages, 3);
+  assert.equal(h.state.audits.length, 1);
+  assert.equal(String(h.state.audits[0].actorId), String(actorId));
+  assert.equal((await h.invoke({ create: true, key: "edit-only-create-key-001" })).status, 403);
+  h.permissions = ["sales.view", "sales.create"];
+  assert.equal((await h.invoke()).status, 403, "Revoking edit must also deny an idempotent retry");
+  assert.equal(h.state.audits.length, 1);
+});
+
+test("Sales create permits staff checkout without granting edits", async () => {
+  const h = harness(); h.staff = true;
+  const result = await h.invoke({ create: true, quantity: 1, price: 120 });
+  assert.equal(result.status, 201, result.error);
+  assert.equal(h.state.batches[0].sealedPackages, 2);
+  assert.equal((await h.invoke({ key: "create-only-edit-key-001" })).status, 403);
 });
 
 test("a second edit uses only the latest allocations and altered retries are rejected", async () => {

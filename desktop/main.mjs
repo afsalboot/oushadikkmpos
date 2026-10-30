@@ -6,12 +6,14 @@ import { tmpdir } from "node:os";
 import { join, dirname, basename } from "node:path";
 import { getStartUrl, isTrustedUrl } from "./policy.mjs";
 import { LocalBackup, backupDue } from "./local-backup.mjs";
+import { connectionErrorCode } from "./connection-error.mjs";
 
 const startUrl = getStartUrl(app.isPackaged, process.argv);
 // Diagnostics use an isolated real desktop shell without scheduled backups.
 const benchmark = !app.isPackaged && process.argv.includes("--benchmark");
 const printSmoke = !app.isPackaged && process.argv.includes("--print-smoke");
-const smoke = !app.isPackaged && (process.argv.includes("--smoke") || printSmoke);
+const connectionSmoke = !app.isPackaged && process.argv.includes("--connection-smoke");
+const smoke = !app.isPackaged && (process.argv.includes("--smoke") || printSmoke || connectionSmoke);
 if (smoke || benchmark) {
   const reuse = benchmark && process.argv.find(value => value.startsWith('--benchmark-profile='))?.slice('--benchmark-profile='.length);
   let profile;
@@ -121,6 +123,7 @@ async function loadPos() {
       if (smokePrintCount !== 1) throw new Error("Receipt adapter did not submit exactly one job.");
       console.log("Receipt adapter passed: one IPC request, afterprint cleanup, no physical printing.");
     }
+    if (connectionSmoke) throw new Error("Connection smoke did not block the server request.");
     if (smoke) {
       const chromeColor = await mainWindow.webContents.executeJavaScript("getComputedStyle(document.body).backgroundColor");
       if (chromeColor !== "rgb(24, 61, 43)" || appView.getBounds().y !== 40) throw new Error("Desktop title bar layout failed.");
@@ -129,12 +132,33 @@ async function loadPos() {
       app.exit(0);
     }
   } catch (error) {
-    if (smoke) {
+    if (smoke && !connectionSmoke) {
       console.error("Desktop smoke failed:", error.message);
       app.exit(1);
       return;
     }
-    if (!mainWindow.isDestroyed()) await appView.webContents.loadFile(offlinePath);
+    if (!mainWindow || mainWindow.isDestroyed() || !appView || appView.webContents.isDestroyed()) return;
+    const code = connectionErrorCode(error);
+    await appView.webContents.loadFile(offlinePath, {
+      query: { error: code, version: app.getVersion() },
+    });
+    if (connectionSmoke) {
+      try {
+        const details = await appView.webContents.executeJavaScript(`({
+          code: document.getElementById('connection-error').textContent,
+          version: document.getElementById('app-version').textContent,
+          advice: document.getElementById('connection-advice').textContent
+        })`);
+        if (details.code !== "ERR_BLOCKED_BY_CLIENT" || details.version !== app.getVersion() || !details.advice) {
+          throw new Error("Connection error page did not display the expected diagnostics.");
+        }
+        console.log("Connection smoke passed: blocked request displayed error code, app version and advice.");
+        app.exit(0);
+      } catch (failure) {
+        console.error("Connection smoke failed:", failure.message);
+        app.exit(1);
+      }
+    }
   } finally {
     loading = false;
   }
@@ -211,6 +235,12 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   app.whenReady().then(async () => {
+    if (connectionSmoke) {
+      session.defaultSession.webRequest.onBeforeRequest(
+        { urls: [`${new URL(startUrl).origin}/*`] },
+        (_details, callback) => callback({ cancel: true }),
+      );
+    }
     ipcMain.on("chrome:menu", (event, label) => {
       if (event.sender !== mainWindow?.webContents || !["POS", "Edit", "View"].includes(label)) return;
       appView.webContents.focus();

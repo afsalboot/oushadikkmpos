@@ -32,6 +32,8 @@ Renderer pages are sandboxed with context isolation, no Node integration, a narr
 
 `desktop:smoke` opens a hidden, temporary-running client and checks whether the production page loads, then exits. Smoke checks use an isolated temporary profile. Run `npm --prefix desktop run smoke:print` to verify receipt interception, duplicate-call suppression, IPC, and cleanup with physical printing mocked. It does not log in, create records, or verify checkout and printing.
 
+When the desktop cannot connect but Chrome can open the site on the same computer, the connection page in version 0.1.2 and later shows the Electron network error and desktop version. Send those details when reporting a failure. Only the error code is displayed; raw error messages and request URLs are excluded. Certificate errors require checking the Windows clock or the secure connection; TLS validation stays enabled. `npm --prefix desktop run smoke:connection` blocks the POS request in an isolated temporary profile and checks that the real fallback page displays the error, version, and guidance without contacting the server.
+
 Release acceptance: install on a Windows test machine; verify login/logout and session persistence, Retail/Wholesale checkout, barcode camera, downloads, receipt printing, reconnect after loss of internet, and uninstall. These require manual validation and a physical printer where applicable.
 
 The installer is unsigned unless Windows code-signing credentials are configured for electron-builder in the release environment. Unsigned builds can trigger Windows SmartScreen. There is no automatic updater; rebuild and distribute the installer when Electron or the desktop shell changes. Keep Electron patched.
