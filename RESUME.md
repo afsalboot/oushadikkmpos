@@ -1,4 +1,72 @@
-# Latest task - Sales edit permission for staff (2026-10-30)
+# Latest task - Receipt font and print intensity settings (2026-11-12)
+
+## Original task
+
+Add receipt settings to change fonts and increase the intensity of letters and logos from 0% to 100%, because some receipt paper prints faintly. User supplied a photograph of the faint physical receipt.
+
+## What has been completed
+
+- Added an allowlisted font selector (Arial, Verdana, Tahoma, Courier New, Times New Roman), intensity slider and numeric percentage input under Settings > Thermal Receipt.
+- Added a shared receipt-document builder. 0% preserves original black printing; higher settings grow text strokes and dilate the black logo up to 0.45px, without changing opacity or printer heat.
+- Added live sample preview and a test receipt button that uses unsaved selections without recording a sale.
+- Added settings defaults, server validation and regression tests. Existing saved settings gain Arial/0% defaults on read; no data migration is needed.
+- Full regression suite passed (444/444), including isolated MongoDB integration fixtures. The initial sandbox run could not download the fixture binary; the authorized retry passed.
+- Full lint passed with zero errors and three existing Expenses/Sales warnings. Production build passed in .next-receipt-appearance; focused post-refinement tests passed (28/28). Diff whitespace check passed; Impeccable detector returned no findings.
+- Isolated Electron/Chromium fixture browser verified actual SettingsWorkspace controls, 15 font/intensity combinations, preview, test-print document, mocked settings save/reload, 58mm mobile layout and four generated PDFs. The fixture uses temporary mock settings and intercepts printing; no production data or physical printer was used.
+- Measured screenshot dark pixels confirm increased ink at 100%: 80mm logo 7,188 -> 10,548 and text 1,396 -> 1,788; 58mm logo 3,666 -> 5,893 and text 1,390 -> 1,787.
+- Corrected the existing 58mm logo crop by using object-fit:contain at that width; 80mm retains its existing sizing. Logo filter converts luminance to ink so white backgrounds on consultation logos remain clear.
+
+## What is currently being worked on
+
+Implementation and local automated/browser verification are complete. No deployment was requested or performed.
+
+## Files modified
+
+- src/lib/receipt-appearance.js (new)
+- src/components/ReceiptAppearanceSettings.jsx (new)
+- src/components/SettingsWorkspace.jsx
+- src/components/ThermalReceiptPrinter.jsx
+- src/services/settings.service.js
+- tests/receipt-appearance.test.mjs (new)
+- RESUME.md
+- Browser verification artifacts: output/playwright/receipt-settings-{desktop,mobile}.png and receipt-{58mm,80mm}-{0,100}.{png,pdf}
+
+## Important implementation decisions
+
+- One shared font/intensity setting applies to all paths using printThermalReceipt, including immediate-sale snapshots, current-setting reprints and consultation tickets.
+- Use allowlisted local system font stacks, retaining system fallback for Malayalam. The logo lettering remains the supplied image.
+- Intensity is extra artwork stroke strength: 0% original, 100% strongest. It does not claim to change thermal printer hardware density.
+- Preserve existing receipt paper widths, financial content, checkout, permissions and settings audit/save path.
+- Sample content is static and marked TEST PRINT / SAMPLE ONLY / No sale recorded.
+- Prior handoffs below are historical; the working tree was clean at the start of this task.
+
+## Known bugs/issues
+
+No known implementation failures. Physical paper, installed desktop/driver behavior, real authenticated settings save and hosted deployment are unverified. Browser save/reload was verified against fixture settings only. Node direct writes were blocked with EPERM; use apply_patch for repository edits. The temporary fixture harness is C:\Users\User\AppData\Local\Temp\oushadhi-receipt-verify-LjsS9n; it uses a mock API and a temporary profile. Its compiled fixture must be refreshed from source before future reruns. Playwright CLI download was blocked; the available Electron Chromium runtime supplied browser verification.
+
+## Remaining tasks in order
+
+1. Release the web update through the normal deployment workflow when requested. The installed Electron app loads the hosted web code; this change does not need an installer rebuild.
+2. On the target receipt paper, open Settings > Thermal Receipt, start at 25% intensity and choose Print test receipt. Compare the original and selected font before saving.
+3. Choose Save Changes, then verify one controlled reprint on the target printer. Increase artwork intensity or adjust the printer driver's density/heat as necessary.
+
+## Commands/tests that should be run next
+
+Passed commands; repeat only after relevant changes:
+- node --test tests/receipt-appearance.test.mjs tests/settings-gst.test.mjs tests/consultation.test.mjs tests/external-purchase.test.mjs (28/28)
+- npm.cmd run lint (zero errors, three existing warnings)
+- npm.cmd test (444/444); log: $env:TEMP\oushadhi-receipt-tests-authorized.log
+- $env:NEXT_DIST_DIR='.next-receipt-appearance'; npm.cmd run build; log: $env:TEMP\oushadhi-receipt-build.log
+- git diff --check
+- C:\Users\User\.codex\skills\impeccable\scripts\impeccable.cmd detect --json src/components/ReceiptAppearanceSettings.jsx src/components/SettingsWorkspace.jsx (no findings)
+
+## Exact recommended next step
+
+After normal web release, print the clearly marked sample on the user's paper at 0%, 25% and 50%, choose a readable font and save the preferred settings. Do not infer physical thermal density improvement solely from the local screenshot/PDF checks.
+
+---
+
+# Previous task - Sales edit permission for staff (2026-10-30)
 
 ## Original task
 

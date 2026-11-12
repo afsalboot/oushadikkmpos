@@ -5,6 +5,7 @@ import BackupStorageSettings from "./BackupStorageSettings";
 import SaleRetentionSettings from "./SaleRetentionSettings";
 import FutureInvoiceReset from "./FutureInvoiceReset";
 import DoctorSettings from "./DoctorSettings";
+import ReceiptAppearanceSettings from "./ReceiptAppearanceSettings";
 import { useRouter } from "next/navigation";
 /* eslint-disable react-hooks/set-state-in-effect */
 
@@ -126,7 +127,7 @@ const sectionGroups = [
         id: "receipt",
         label: "Thermal Receipt",
         icon: Printer,
-        keywords: "58mm 80mm auto print footer",
+        keywords: "58mm 80mm auto print footer font intensity darkness logo paper",
       },
     ],
   },
@@ -2790,6 +2791,7 @@ export default function SettingsWorkspace() {
             </Card>
           ) : (
             <div className="space-y-5">
+              {section === "receipt" && <ReceiptAppearanceSettings receipt={data.receipt} change={change} errors={errors} disabled={!canEdit || saving} />}
               {current.groups.map((group) => (
                 <Card title={group.title} key={group.title}>
                   <div className="grid gap-4 sm:grid-cols-2">

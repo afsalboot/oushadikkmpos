@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Printer } from "lucide-react";
 import { gstStateName } from "@/lib/gst-states";
 import { receiptDiscountLabel } from "@/lib/receipt-discount";
-import { receiptLayout } from "@/lib/receipt-layout";
+import { receiptDocument } from "@/lib/receipt-appearance";
 
 const money = (value) =>
   new Intl.NumberFormat("en-IN", {
@@ -53,18 +53,6 @@ export function ThermalReceipt({ sale }) {
   return (
     <div className="thermal-receipt">
       <header className="receipt-center">
-        <svg width="0" height="0" aria-hidden="true" style={{ position: "absolute" }}>
-          <defs>
-            <filter id="receipt-logo-solid-ink" colorInterpolationFilters="sRGB">
-              <feComponentTransfer>
-                <feFuncR type="discrete" tableValues="0 0" />
-                <feFuncG type="discrete" tableValues="0 0" />
-                <feFuncB type="discrete" tableValues="0 0" />
-                <feFuncA type="discrete" tableValues="0 1" />
-              </feComponentTransfer>
-            </filter>
-          </defs>
-        </svg>
         <h1>
           {/* A plain image is copied into the isolated print document. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -345,7 +333,6 @@ export async function printThermalReceipt(source, onFinished, receiptSnapshot) {
     const response = await fetch("/api/settings/receipt", { cache: "no-store" });
     if (response.ok) receipt = (await response.json()).data.receipt;
   } catch { /* Keep the document's last known width when offline. */ }
-  const layout = receiptLayout(receipt);
   const frame = document.createElement("iframe");
   frame.setAttribute("title", "Thermal receipt print");
   Object.assign(frame.style, {
@@ -362,7 +349,7 @@ export async function printThermalReceipt(source, onFinished, receiptSnapshot) {
   // Keep content inside a conservative 72 mm print area on an 80 mm roll.
   // The printed end mark keeps trailing-blank trimming from removing this gap.
   documentRef.write(
-    `<!doctype html><html><head><title>Invoice Reprint</title><style>@font-face{font-family:OushadhiPrint;src:url("/fonts/UncialAntiqua-Regular.ttf") format("truetype");font-weight:400;font-style:normal}.receipt-wordmark{margin-bottom:6px}.oushadhi-logo{display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap;color:#000}.oushadhi-logo__word{font-family:OushadhiPrint,serif;font-size:26px;font-weight:400;line-height:1.15;letter-spacing:-.035em}.oushadhi-logo__pos{font-family:Arial,sans-serif;font-size:9px;font-weight:600;letter-spacing:.12em;color:#526b59}*{box-sizing:border-box}html,body{margin:0!important;padding:0!important;width:100%;max-width:${layout.paper}mm;min-height:0!important;background:#fff;color:#000;font-family:Arial,sans-serif;overflow:visible}.thermal-receipt{display:block!important;position:static!important;width:${layout.content}mm;max-width:100%;height:auto!important;min-height:0!important;margin:0;padding:0 2mm;font-size:11px;line-height:1.35;overflow:visible;break-after:avoid;page-break-after:avoid}.receipt-logo{filter:url(#receipt-logo-solid-ink);print-color-adjust:exact;-webkit-print-color-adjust:exact;display:block;width:${layout.logo}mm;max-width:100%;height:17mm;object-fit:cover;object-position:center;margin:0 auto 0.5mm}.receipt-center{text-align:center;overflow-wrap:anywhere}footer.receipt-center{break-inside:avoid;page-break-inside:avoid}.receipt-cut-space{display:flex!important;align-items:flex-end;justify-content:center;height:10mm!important;min-height:10mm!important;flex:none;break-inside:avoid;page-break-inside:avoid}.receipt-end-mark{display:block;width:4mm;border-bottom:0.25mm solid #000}.receipt-center h1{font-size:18px;line-height:1.1;margin:0}.receipt-center p{margin:1px 0}.receipt-center small{display:block;margin-top:5px}.receipt-rule{border-top:1px dashed #000;margin:8px 0}.receipt-meta,.receipt-totals{margin:0}.receipt-meta div,.receipt-totals div,.receipt-item div{display:flex;justify-content:space-between;gap:8px}.receipt-meta dt,.receipt-totals dt{font-weight:400;flex:0 0 auto}.receipt-meta dd,.receipt-totals dd{margin:0;min-width:0;flex:1;text-align:right;font-weight:700;overflow-wrap:anywhere}.receipt-item{margin:0 0 7px;break-inside:avoid}.receipt-item strong{display:block;margin-bottom:1px}.receipt-item span{min-width:0;flex:1;max-width:50mm;overflow-wrap:anywhere}.receipt-item b{flex:0 0 auto;white-space:nowrap}.receipt-grand{font-size:14px;font-weight:700;border-top:1px solid #000;margin-top:5px;padding-top:5px}</style></head><body>${source.innerHTML}</body></html>`,
+    receiptDocument(source.innerHTML, receipt),
   );
   documentRef.close();
   frame.onload = async () => {
