@@ -672,7 +672,7 @@ const documentCounterSchema = new Schema(
   {
     key: { type: String, required: true, unique: true, index: true },
     sequence: { type: Number, default: 0, min: 0 },
-      tokenResetOffset: { type: Number, default: 0, min: 0 },
+      tokenResetOffset: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

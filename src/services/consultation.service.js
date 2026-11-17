@@ -43,6 +43,8 @@ export async function createConsultation(body, actor) {
   await requireConsultation();
   if (!validId(body.doctorId)) reject("Select a doctor");
   if (typeof body.requestId !== "string" || !/^[a-f0-9-]{36}$/i.test(body.requestId)) reject("Invalid request ID");
+  const startingToken = body.startingToken === "" || body.startingToken == null ? null : Number(body.startingToken);
+  if (startingToken !== null && (!Number.isInteger(startingToken) || startingToken < 1 || startingToken > 1000000)) reject("Starting token must be a whole number from 1 to 1,000,000");
   const existing = await Consultation.findOne({ requestId: body.requestId, createdBy: actor.sub }).lean();
   if (existing) return existing;
   const issuedAt = new Date(), dayKey = dashboardToday(issuedAt), tokenKey = `consultation-token:${CONSULTATION_BRANCH}:${dayKey}`;
@@ -66,10 +68,23 @@ export async function createConsultation(body, actor) {
         if (!customer) reject("Customer is unavailable");
         customerId = customer._id;
       }
+      if (startingToken !== null) {
+        const [latestIssued] = await Consultation.aggregate([
+          { $match: { branchId: CONSULTATION_BRANCH, dayKey } },
+          { $project: { token: { $ifNull: ["$displayTokenNumber", "$tokenNumber"] } } },
+          { $sort: { token: -1 } },
+          { $limit: 1 },
+        ]).session(session);
+        if (latestIssued && startingToken <= latestIssued.token) reject(`Starting token must be greater than today's highest issued token (${latestIssued.token})`);
+      }
       const op = await DocumentCounter.findOneAndUpdate({ key: "consultation-op" }, { $inc: { sequence: 1 } }, { session, returnDocument: "after" });
       const token = await DocumentCounter.findOneAndUpdate({ key: tokenKey }, { $inc: { sequence: 1 } }, { session, returnDocument: "after" });
+      if (startingToken !== null) {
+        token.tokenResetOffset = token.sequence - startingToken;
+        await token.save({ session });
+      }
       const [row] = await Consultation.create([{ ...values, createdAt: issuedAt, branchId: CONSULTATION_BRANCH, dayKey, requestId: body.requestId, opNumber: `OP${String(op.sequence).padStart(6, "0")}`, tokenNumber: token.sequence, displayTokenNumber: token.sequence - Number(token.tokenResetOffset || 0), customerId, doctorId: doctor._id, doctorSnapshot: { name: doctor.name, qualification: doctor.qualification }, storeSnapshot: settings.store, receiptSnapshot: settings.receipt, createdBy: actor.sub, creatorSnapshot: { name: actor.name } }], { session });
-      await AuditLog.create([{ actorId: actor.sub, action: "CONSULTATION_CREATED", module: "consultation", targetType: "Consultation", targetId: row._id, description: `Created ${row.opNumber}` }], { session });
+      await AuditLog.create([{ actorId: actor.sub, action: "CONSULTATION_CREATED", module: "consultation", targetType: "Consultation", targetId: row._id, description: `Created ${row.opNumber}`, metadata: startingToken === null ? undefined : { startingToken } }], { session });
       return row.toObject();
     });
   } catch (error) {

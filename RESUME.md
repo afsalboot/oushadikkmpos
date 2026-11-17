@@ -1,3 +1,55 @@
+# Latest task - Editable starting token for Consultation (2026-11-17)
+
+## Original task
+
+Add an optional starting token at the top of New Consultation. If staff enter 18, the first ticket receives token 18 and later tickets continue 19, 20, and upward. Blank keeps the current daily sequence. Keep the admin reset button that restarts today's displayed tokens at 1.
+
+## What has been completed
+
+- Added an optional Starting token field to the New Consultation form, with an example of 18 continuing to 19, 20, and onward.
+- Added server validation for whole-number starts from 1 through 1,000,000.
+- When supplied, the server adjusts the display offset transactionally while preserving the unique internal counter. Later blank submissions continue from the selected number.
+- Rejects a custom starting number that is not greater than today's highest issued displayed token, avoiding an immediate same-day collision.
+- The existing owner-only reset action remains unchanged and continues to restart displayed tokens at 1.
+
+## What is currently being worked on
+
+Implementation is complete. Focused automated tests passed. Browser verification and deployment have not been run.
+
+## Files modified
+
+- src/components/ConsultationWorkspace.jsx
+- src/models/index.js
+- src/services/consultation.service.js
+- tests/consultation-service.test.mjs
+- RESUME.md
+
+## Important implementation decisions
+
+- `tokenNumber` remains the monotonically increasing internal unique value; `tokenResetOffset` now allows a negative value so a chosen display token can be higher than the current internal sequence.
+- Existing tickets keep their saved display token and OP number. The selected token applies to the consultation being created and subsequent tokens.
+- Blank input does not change the offset. The existing admin reset remains the explicit way to restart at 1.
+
+## Known bugs/issues
+
+- Focused tests passed: 25/25 across consultation service and model tests, including custom 18 -> 19 continuation and duplicate-start rejection. Same-day custom starts are checked against the highest stored display token. Browser, hosted database, and deployment behavior remain unverified.
+
+## Remaining tasks in order
+
+1. Verify in the running app: blank starts from the current daily number; entering 18 issues 18 and later blank submissions issue 19 and 20; owner reset restarts at 1.
+2. Deploy only when requested.
+
+## Commands/tests that should be run next
+
+- `node --test tests/consultation-service.test.mjs tests/consultation.test.mjs` (passed: 25/25)
+- `git diff --check` (not run)
+
+## Exact recommended next step
+
+Verify the new starting-token flow in the running app if requested; do not deploy without a request.
+
+---
+
 # Latest task - Receipt font and print intensity settings (2026-11-12)
 
 ## Original task

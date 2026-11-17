@@ -11,7 +11,7 @@ const actor = { sub: "aaaaaaaaaaaaaaaaaaaaaaaa", role: "ADMIN", permissions: [],
 const body = { doctorId: "bbbbbbbbbbbbbbbbbbbbbbbb", requestId: "12345678-1234-1234-1234-123456789abc", patient: { name: "Patient" }, paymentMethod: "CASH" };
 function harness({ enabled = true, lockEnabled = true, existing = null, inactive = false, cancelled = false } = {}) {
   const writes = [], session = {}, settings = normalizeSettings({ features: { consultation: enabled } });
-  const counters = new Map();
+  const counters = new Map(), consultations = [];
   const lean = value => ({ lean: async () => value });
   const row = { _id: "cccccccccccccccccccccccc", opNumber: "OP000001", status: cancelled ? "CANCELLED" : "COMPLETED", consultationFee: 200, paymentMethod: "CASH", toObject() { return { ...this }; }, async save(options) { writes.push({ type: "save", options }); } };
   const deps = {
@@ -27,9 +27,17 @@ function harness({ enabled = true, lockEnabled = true, existing = null, inactive
     }, findOneAndUpdate: async (filter, update, options) => {
       const counter = counters.get(filter.key) || { _id: "eeeeeeeeeeeeeeeeeeeeeeee", sequence: 0 };
       counter.sequence += update.$inc?.sequence || 0;
-      counters.set(filter.key, counter); writes.push({ type: "counter", filter, options }); return { ...counter };
+      counters.set(filter.key, counter); writes.push({ type: "counter", filter, options });
+      return { ...counter, async save(saveOptions) { Object.assign(counter, this); writes.push({ type: "counterSave", options: saveOptions }); } };
     } },
-    Consultation: { init: async () => {}, findOne: () => lean(existing), findById: () => ({ session: async () => row }), create: async (rows, options) => { writes.push({ type: "create", rows, options }); return [{ ...rows[0], _id: row._id, toObject() { return { ...this }; } }]; } },
+    Consultation: { init: async () => {}, findOne: () => lean(existing), findById: () => ({ session: async () => row }), aggregate: () => ({ session: async () => {
+      const latest = consultations.reduce((max, item) => Math.max(max, item.displayTokenNumber ?? item.tokenNumber), 0);
+      return latest ? [{ token: latest }] : [];
+    } }), create: async (rows, options) => {
+      writes.push({ type: "create", rows, options });
+      consultations.push({ ...rows[0] });
+      return [{ ...rows[0], _id: row._id, toObject() { return { ...this }; } }];
+    } },
     AuditLog: { findOne: filter => ({ session: () => lean(writes.flatMap(write => write.rows || []).find(row => row.action === filter.action && row.metadata?.requestId === filter["metadata.requestId"])) }), create: async (rows, options) => { writes.push({ type: "audit", rows, options }); } },
   };
   const service = new Function(...Object.keys(deps), `${source}; return {createConsultation,cancelConsultation,updateConsultation,deleteConsultation,resetConsultationTokens};`)(...Object.values(deps));
@@ -54,6 +62,23 @@ test("ticket numbers, snapshots and audit share one database transaction", async
   assert.equal(result.doctorSnapshot.name, "Doctor"); assert.equal(result.patient.name, "Patient");
   assert.deepEqual(h.writes.map(write => write.type), ["counter", "counter", "create", "audit"]);
   assert.ok(h.writes.every(write => write.options.session === h.session));
+});
+test("custom starting token applies to this ticket and continues for later blank entries", async () => {
+  const h = harness();
+  const first = await h.service.createConsultation({ ...body, startingToken: "18" }, actor);
+  const second = await h.service.createConsultation({ ...body, requestId: "32345678-1234-1234-1234-123456789abc" }, actor);
+  assert.equal(consultationTokenNumber(first), 18);
+  assert.equal(consultationTokenNumber(second), 19);
+  assert.equal(second.tokenNumber, 2);
+  assert.equal(h.counters.get(`consultation-token:${CONSULTATION_BRANCH}:${dashboardToday()}`).tokenResetOffset, -17);
+});
+test("custom starting token must be a valid number above today's issued tokens", async () => {
+  const h = harness();
+  await assert.rejects(h.service.createConsultation({ ...body, startingToken: "18.5" }, actor), /whole number/);
+  await h.service.createConsultation({ ...body, startingToken: "18" }, actor);
+  const beforeDuplicate = h.writes.length;
+  await assert.rejects(h.service.createConsultation({ ...body, requestId: "32345678-1234-1234-1234-123456789abc", startingToken: "18" }, actor), /highest issued token \(18\)/);
+  assert.equal(h.writes.length, beforeDuplicate);
 });
 test("retry of an issued request returns its ticket without new counters or payments", async () => {
   const existing = { opNumber: "OP000003" }, h = harness({ existing });
